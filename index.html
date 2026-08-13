@@ -1,0 +1,1324 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Meadow Gatherer</title>
+    <style>
+        :root {
+            --bg-1: #0b1422;
+            --bg-2: #13263d;
+            --ink: #e7f0ff;
+            --card: #14253ab8;
+            --accent: #ff7f7f;
+            --good: #38bfa7;
+            --warn: #ffb366;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            min-height: 100vh;
+            font-family: "Space Grotesk", "Avenir Next", "Century Gothic", sans-serif;
+            color: var(--ink);
+            background: radial-gradient(circle at 20% 20%, #1a2e46 0%, transparent 50%),
+                        radial-gradient(circle at 80% 10%, #1f3d5b 0%, transparent 50%),
+                        linear-gradient(120deg, var(--bg-1), var(--bg-2));
+            display: grid;
+            place-items: start center;
+            padding: 8px;
+            overflow: auto;
+        }
+
+        .ambient {
+            position: fixed;
+            inset: 0;
+            pointer-events: none;
+            z-index: 0;
+        }
+
+        .ambient::before,
+        .ambient::after {
+            content: "";
+            position: absolute;
+            border-radius: 50%;
+            opacity: 0.35;
+            filter: blur(6px);
+            animation: drift 10s ease-in-out infinite alternate;
+        }
+
+        .ambient::before {
+            width: 220px;
+            height: 220px;
+            background: #355f8a;
+            left: -60px;
+            bottom: -40px;
+        }
+
+        .ambient::after {
+            width: 260px;
+            height: 260px;
+            background: #214c75;
+            right: -90px;
+            top: -60px;
+            animation-delay: -2s;
+        }
+
+        @keyframes drift {
+            from { transform: translateY(0) translateX(0); }
+            to { transform: translateY(-12px) translateX(16px); }
+        }
+
+        .shell {
+            position: relative;
+            z-index: 1;
+            width: min(99vw, 1940px);
+            height: calc(100vh - 16px);
+            max-height: calc(100vh - 16px);
+            backdrop-filter: blur(7px);
+            background: var(--card);
+            border: 1px solid #3a5676;
+            border-radius: 22px;
+            box-shadow: 0 14px 40px #02060d99;
+            padding: 16px;
+            display: grid;
+            grid-template-rows: auto 1fr auto auto;
+            gap: 12px;
+            animation: pop-in 0.6s ease;
+            overflow: hidden;
+        }
+
+        @keyframes pop-in {
+            from { transform: translateY(12px) scale(0.98); opacity: 0; }
+            to { transform: translateY(0) scale(1); opacity: 1; }
+        }
+
+        .hud {
+            display: flex;
+            flex-wrap: wrap;
+            align-items: center;
+            justify-content: space-between;
+            gap: 10px;
+        }
+
+        .stage {
+            position: relative;
+            width: 100%;
+            min-height: 0;
+            display: grid;
+            place-items: center;
+        }
+
+        .map-frame {
+            position: relative;
+            border-radius: 14px;
+            overflow: hidden;
+        }
+
+        .hud-bar.overlay {
+            position: absolute;
+            left: 14px;
+            top: 14px;
+            z-index: 2;
+            width: min(560px, 74%);
+            pointer-events: none;
+            padding: 8px;
+            border-radius: 12px;
+            background: #132437d9;
+            border: 1px solid #355272;
+            box-shadow: 0 8px 20px #02060d66;
+        }
+
+        .hud-row {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 6px;
+        }
+
+        .hud-row + .hud-row {
+            margin-top: 6px;
+            padding-top: 6px;
+            border-top: 1px solid #2e4967;
+        }
+
+        .chip {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            padding: 5px 8px;
+            border-radius: 8px;
+            background: #1a3048cc;
+            border: 1px solid #355272;
+            font-size: 0.8rem;
+            font-weight: 700;
+            letter-spacing: 0.01em;
+            white-space: nowrap;
+        }
+
+        .chip strong {
+            font-weight: 800;
+        }
+
+        .ico {
+            width: 10px;
+            height: 10px;
+            border-radius: 2px;
+            display: inline-block;
+            flex-shrink: 0;
+        }
+
+        .ico.bag { background: #264653; }
+        .ico.bank { background: #2a9d8f; }
+        .ico.progress { background: #4d7ea8; border-radius: 50%; }
+        .ico.best { background: #ffd166; border-radius: 50%; }
+        .ico.capacity { background: #6c757d; }
+        .ico.minion { background: #f4a261; }
+
+        .shop {
+            position: absolute;
+            right: 14px;
+            top: 14px;
+            z-index: 3;
+            width: min(390px, 42%);
+            padding: 12px;
+            border-radius: 14px;
+            background: #132437e8;
+            border: 1px solid #355272;
+            box-shadow: 0 8px 20px #02060d88;
+            transition: transform 160ms ease, opacity 160ms ease;
+        }
+
+        .shop-toggle {
+            position: absolute;
+            right: 14px;
+            top: 14px;
+            z-index: 4;
+            width: 44px;
+            height: 44px;
+            border-radius: 50%;
+            display: none;
+            align-items: center;
+            justify-content: center;
+            background: #1a3048e6;
+            color: var(--ink);
+            border: 1px solid #355272;
+            box-shadow: 0 8px 20px #02060d88;
+            font-size: 1.1rem;
+            line-height: 1;
+            padding: 0;
+        }
+
+        .shop-toggle:hover {
+            background: #1f3853;
+        }
+
+        .shop.collapsed {
+            opacity: 0;
+            transform: scale(0.96);
+            pointer-events: none;
+        }
+
+        .shop.collapsed + .shop-toggle {
+            display: inline-flex;
+        }
+
+        .shop h2 {
+            font-size: 0.96rem;
+            letter-spacing: 0.08em;
+            margin-bottom: 16px;
+            padding-right: 34px;
+        }
+
+        .shop-collapse {
+            position: absolute;
+            right: 10px;
+            top: 10px;
+            width: 28px;
+            height: 28px;
+            border-radius: 50%;
+            padding: 0;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 0.95rem;
+            line-height: 1;
+        }
+
+        .shop-controls {
+            display: grid;
+            gap: 8px;
+            margin-top: 8px;
+        }
+
+        .shop-controls button {
+            width: 100%;
+            text-align: left;
+        }
+
+        .shop-btn {
+            border-radius: 12px;
+            padding: 8px 10px;
+            display: grid;
+            gap: 6px;
+            background: #1a3048;
+        }
+
+        .shop-btn-title {
+            display: flex;
+            align-items: baseline;
+            justify-content: space-between;
+            gap: 8px;
+            font-size: 0.82rem;
+            font-weight: 800;
+            letter-spacing: 0.01em;
+        }
+
+        .shop-btn-level {
+            font-size: 0.74rem;
+            font-weight: 700;
+            color: #b8d4eb;
+            white-space: nowrap;
+        }
+
+        .shop-btn-costs {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 6px;
+        }
+
+        .hud-bank-costs {
+            gap: 4px;
+        }
+
+        .hud-bank-costs .cost-chip {
+            padding: 2px 5px;
+            font-size: 0.7rem;
+        }
+
+        .cost-chip {
+            display: inline-flex;
+            align-items: center;
+            gap: 5px;
+            padding: 3px 6px;
+            border-radius: 999px;
+            border: 1px solid #34506e;
+            background: #13263d;
+            font-size: 0.73rem;
+            line-height: 1;
+            font-weight: 700;
+        }
+
+        .res-icon {
+            width: 9px;
+            height: 9px;
+            display: inline-block;
+            flex-shrink: 0;
+        }
+
+        .res-icon.wood {
+            background: #2a9d8f;
+            border-radius: 1px;
+        }
+
+        .res-icon.stone {
+            background: #6c757d;
+            border-radius: 50%;
+        }
+
+        .res-icon.crystal {
+            background: #00b4d8;
+            transform: rotate(45deg);
+            border-radius: 1px;
+        }
+
+        .controls {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        button {
+            border: none;
+            border-radius: 999px;
+            background: #2f5577;
+            color: #f4f8ff;
+            font: inherit;
+            padding: 8px 14px;
+            cursor: pointer;
+            transition: transform 120ms ease, background 200ms ease;
+        }
+
+        button:hover {
+            transform: translateY(-1px);
+            background: #3a678f;
+        }
+
+        button.secondary {
+            background: #1a3048;
+            color: var(--ink);
+            border: 1px solid #355272;
+        }
+
+        canvas {
+            display: block;
+            width: 100%;
+            height: 100%;
+            aspect-ratio: 16 / 9;
+            background: linear-gradient(180deg, #132437, #102033);
+            border-radius: 14px;
+            border: 2px solid #355272;
+            box-shadow: inset 0 0 0 1px #2b4763;
+        }
+
+        .help {
+            font-size: 0.9rem;
+            opacity: 0.75;
+        }
+
+        @media (max-width: 650px) {
+            .shell {
+                padding: 12px;
+                border-radius: 16px;
+            }
+
+            .shop {
+                width: min(92%, 390px);
+                right: 8px;
+                top: 8px;
+            }
+
+            .chip, button {
+                font-size: 0.85rem;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="ambient" aria-hidden="true"></div>
+    <main class="shell">
+        <section class="hud">
+            <div class="controls">
+                <button id="startBtn">Start Day</button>
+                <button id="pauseBtn" class="secondary">Pause</button>
+            </div>
+            <div class="controls">
+                <button id="resetBtn" class="secondary">Reset Save</button>
+            </div>
+        </section>
+
+        <section class="stage">
+            <div class="map-frame">
+                <canvas id="game" width="1920" height="1080" aria-label="Meadow Gatherer game area"></canvas>
+                <div class="hud-bar overlay" aria-hidden="true">
+                    <div class="hud-row">
+                        <div class="chip" title="Bag materials: Wood / Stone / Crystal"><span class="ico bag"></span><span>Bag</span><span class="shop-btn-costs hud-bank-costs"><span class="cost-chip"><span class="res-icon wood"></span><strong id="bagWoodHud">0</strong></span><span class="cost-chip"><span class="res-icon stone"></span><strong id="bagStoneHud">0</strong></span><span class="cost-chip"><span class="res-icon crystal"></span><strong id="bagCrystalHud">0</strong></span></span></div>
+                        <div class="chip" title="Banked materials: Wood / Stone / Crystal"><span class="ico bank"></span><span>Bank</span><span class="shop-btn-costs hud-bank-costs"><span class="cost-chip"><span class="res-icon wood"></span><strong id="bankWoodHud">0</strong></span><span class="cost-chip"><span class="res-icon stone"></span><strong id="bankStoneHud">0</strong></span><span class="cost-chip"><span class="res-icon crystal"></span><strong id="bankCrystalHud">0</strong></span></span></div>
+                    </div>
+                    <div class="hud-row">
+                        <div class="chip" title="Stored progress points"><span class="ico progress"></span><span>Prog</span><strong id="stored">0</strong></div>
+                        <div class="chip" title="Best stored progress reached"><span class="ico best"></span><span>Best</span><strong id="bestStored">0</strong></div>
+                        <div class="chip" title="Bag capacity used / maximum"><span class="ico capacity"></span><span>Cap</span><strong id="capacity">10</strong></div>
+                        <div class="chip" title="Number of crafted minions"><span class="ico minion"></span><span>Min</span><strong id="minions">0</strong></div>
+                    </div>
+                </div>
+                <aside class="shop" aria-label="Shop panel">
+                    <button id="shopCollapseBtn" class="secondary shop-collapse" type="button" aria-label="Collapse shop">-</button>
+                    <h2>FIELD SHOP</h2>
+                    <div class="shop-controls">
+                        <button id="speedBtn" class="secondary shop-btn">Upgrade Speed</button>
+                        <button id="bagBtn" class="secondary shop-btn">Upgrade Bag</button>
+                        <button id="craftBtn" class="secondary shop-btn">Craft Minion</button>
+                        <button id="minionSpeedBtn" class="secondary shop-btn">Minion Speed</button>
+                        <button id="minionCapBtn" class="secondary shop-btn">Minion Capacity</button>
+                    </div>
+                </aside>
+                <button id="shopExpandBtn" class="shop-toggle" type="button" aria-label="Open shop">S</button>
+            </div>
+        </section>
+
+    </main>
+
+    <script>
+        (function () {
+            const STORAGE_KEY = "meadow-gatherer-save-v1";
+            const BASE_PLAYER_SPEED = 3.5;
+
+            const stageEl = document.querySelector(".stage");
+            const mapFrameEl = document.querySelector(".map-frame");
+            const canvas = document.getElementById("game");
+            const ctx = canvas.getContext("2d");
+            const staticCanvas = document.createElement("canvas");
+            const staticCtx = staticCanvas.getContext("2d");
+
+            const bagWoodHudEl = document.getElementById("bagWoodHud");
+            const bagStoneHudEl = document.getElementById("bagStoneHud");
+            const bagCrystalHudEl = document.getElementById("bagCrystalHud");
+            const bankWoodHudEl = document.getElementById("bankWoodHud");
+            const bankStoneHudEl = document.getElementById("bankStoneHud");
+            const bankCrystalHudEl = document.getElementById("bankCrystalHud");
+            const storedEl = document.getElementById("stored");
+            const bestStoredEl = document.getElementById("bestStored");
+            const capacityEl = document.getElementById("capacity");
+            const minionsEl = document.getElementById("minions");
+            const startBtn = document.getElementById("startBtn");
+            const pauseBtn = document.getElementById("pauseBtn");
+            const speedBtn = document.getElementById("speedBtn");
+            const bagBtn = document.getElementById("bagBtn");
+            const craftBtn = document.getElementById("craftBtn");
+            const minionSpeedBtn = document.getElementById("minionSpeedBtn");
+            const minionCapBtn = document.getElementById("minionCapBtn");
+            const resetBtn = document.getElementById("resetBtn");
+            const shopEl = document.querySelector(".shop");
+            const shopCollapseBtn = document.getElementById("shopCollapseBtn");
+            const shopExpandBtn = document.getElementById("shopExpandBtn");
+
+            const world = { w: canvas.width, h: canvas.height };
+            const worldAspect = world.w / world.h;
+            const keys = new Set();
+            let staticLayerDirty = true;
+
+            const materialConfig = {
+                wood: { color: "#2a9d8f", shape: "square", size: 12, value: 1, respawn: 240 },
+                stone: { color: "#6c757d", shape: "circle", size: 13, value: 2, respawn: 320 },
+                crystal: { color: "#00b4d8", shape: "diamond", size: 11, value: 4, respawn: 460 }
+            };
+
+            const depot = { x: world.w - 128, y: world.h - 108, w: 108, h: 88 };
+
+            const save = loadSave();
+
+            const game = {
+                running: false,
+                started: false,
+                dayTick: 0,
+                depositPulse: 0,
+                minionPulse: 0,
+                player: {
+                    x: world.w / 2,
+                    y: world.h / 2,
+                    r: 14,
+                    speed: BASE_PLAYER_SPEED + save.speedLevel * 0.25
+                },
+                inventory: { wood: 0, stone: 0, crystal: 0 },
+                nodes: [],
+                minionUnits: [],
+                touchTarget: null
+            };
+
+            function loadSave() {
+                try {
+                    const data = JSON.parse(localStorage.getItem(STORAGE_KEY) || "{}");
+                    return {
+                        stored: Number.isFinite(data.stored) ? data.stored : 0,
+                        bestStored: Number.isFinite(data.bestStored) ? data.bestStored : 0,
+                        bankWood: Number.isFinite(data.bankWood) ? data.bankWood : 0,
+                        bankStone: Number.isFinite(data.bankStone) ? data.bankStone : 0,
+                        bankCrystal: Number.isFinite(data.bankCrystal) ? data.bankCrystal : 0,
+                        minions: Number.isFinite(data.minions) ? data.minions : 0,
+                        minionSpeedLevel: Number.isFinite(data.minionSpeedLevel) ? data.minionSpeedLevel : 0,
+                        minionCapacityLevel: Number.isFinite(data.minionCapacityLevel) ? data.minionCapacityLevel : 0,
+                        speedLevel: Number.isFinite(data.speedLevel) ? data.speedLevel : 0,
+                        bagLevel: Number.isFinite(data.bagLevel) ? data.bagLevel : 0
+                    };
+                } catch {
+                    return {
+                        stored: 0,
+                        bestStored: 0,
+                        bankWood: 0,
+                        bankStone: 0,
+                        bankCrystal: 0,
+                        minions: 0,
+                        minionSpeedLevel: 0,
+                        minionCapacityLevel: 0,
+                        speedLevel: 0,
+                        bagLevel: 0
+                    };
+                }
+            }
+
+            function saveGame() {
+                localStorage.setItem(STORAGE_KEY, JSON.stringify(save));
+            }
+
+            function bagCapacity() {
+                return 10 + save.bagLevel * 4;
+            }
+
+            function inventoryCount() {
+                return game.inventory.wood + game.inventory.stone + game.inventory.crystal;
+            }
+
+            function minionRecipe() {
+                return {
+                    wood: 20 + save.minions * 8,
+                    stone: 12 + save.minions * 6,
+                    crystal: 6 + save.minions * 2
+                };
+            }
+
+            function speedRecipe() {
+                return {
+                    wood: 12 + save.speedLevel * 6,
+                    stone: 8 + save.speedLevel * 4,
+                    crystal: 3 + save.speedLevel * 2
+                };
+            }
+
+            function bagRecipe() {
+                return {
+                    wood: 10 + save.bagLevel * 5,
+                    stone: 10 + save.bagLevel * 5,
+                    crystal: 2 + save.bagLevel * 2
+                };
+            }
+
+            function minionSpeedRecipe() {
+                return {
+                    wood: 14 + save.minionSpeedLevel * 7,
+                    stone: 12 + save.minionSpeedLevel * 5,
+                    crystal: 4 + save.minionSpeedLevel * 2
+                };
+            }
+
+            function minionCapacityRecipe() {
+                return {
+                    wood: 18 + save.minionCapacityLevel * 8,
+                    stone: 14 + save.minionCapacityLevel * 7,
+                    crystal: 5 + save.minionCapacityLevel * 3
+                };
+            }
+
+            function minionCarryCapacity() {
+                return 1 + save.minionCapacityLevel;
+            }
+
+            function minionMoveSpeed(index) {
+                return 1.3 + (index % 3) * 0.12 + save.minionSpeedLevel * 0.2;
+            }
+
+            function shopCostMarkup(cost) {
+                return `<span class="shop-btn-costs">`
+                    + `<span class="cost-chip"><span class="res-icon wood"></span>${cost.wood}</span>`
+                    + `<span class="cost-chip"><span class="res-icon stone"></span>${cost.stone}</span>`
+                    + `<span class="cost-chip"><span class="res-icon crystal"></span>${cost.crystal}</span>`
+                    + `</span>`;
+            }
+
+            function setShopButtonContent(button, label, levelText, cost) {
+                button.innerHTML = `<span class="shop-btn-title"><span>${label}</span><span class="shop-btn-level">${levelText}</span></span>${shopCostMarkup(cost)}`;
+            }
+
+            function refreshHud() {
+                bagWoodHudEl.textContent = String(game.inventory.wood);
+                bagStoneHudEl.textContent = String(game.inventory.stone);
+                bagCrystalHudEl.textContent = String(game.inventory.crystal);
+                bankWoodHudEl.textContent = String(save.bankWood);
+                bankStoneHudEl.textContent = String(save.bankStone);
+                bankCrystalHudEl.textContent = String(save.bankCrystal);
+                storedEl.textContent = String(save.stored);
+                bestStoredEl.textContent = String(save.bestStored);
+                capacityEl.textContent = `${inventoryCount()}/${bagCapacity()}`;
+                minionsEl.textContent = String(save.minions);
+                const speedCost = speedRecipe();
+                const bagCost = bagRecipe();
+                setShopButtonContent(speedBtn, "Player Speed", `Lv ${save.speedLevel}`, speedCost);
+                setShopButtonContent(bagBtn, "Bag Capacity", `Lv ${save.bagLevel}`, bagCost);
+                const recipe = minionRecipe();
+                setShopButtonContent(craftBtn, "Craft Minion", `Owned ${save.minions}`, recipe);
+                const minionSpeedCost = minionSpeedRecipe();
+                setShopButtonContent(minionSpeedBtn, "Minion Speed", `Lv ${save.minionSpeedLevel}`, minionSpeedCost);
+                const minionCapCost = minionCapacityRecipe();
+                setShopButtonContent(minionCapBtn, "Minion Capacity", `Lv ${save.minionCapacityLevel}`, minionCapCost);
+                pauseBtn.textContent = game.running ? "Pause" : "Resume";
+            }
+
+            function setShopCollapsed(collapsed) {
+                shopEl.classList.toggle("collapsed", collapsed);
+            }
+
+            function fitCanvasToStage() {
+                const availableW = stageEl.clientWidth;
+                const availableH = stageEl.clientHeight;
+                if (availableW <= 0 || availableH <= 0) return;
+
+                let drawW = availableW;
+                let drawH = drawW / worldAspect;
+
+                if (drawH > availableH) {
+                    drawH = availableH;
+                    drawW = drawH * worldAspect;
+                }
+
+                mapFrameEl.style.width = `${Math.floor(drawW)}px`;
+                mapFrameEl.style.height = `${Math.floor(drawH)}px`;
+            }
+
+            function drawDepot(targetCtx) {
+                const depotRadius = 12;
+                const depotInset = 6;
+
+                targetCtx.save();
+                targetCtx.shadowColor = "#ffb36666";
+                targetCtx.shadowBlur = 16;
+                targetCtx.fillStyle = "#f4a2612e";
+                targetCtx.beginPath();
+                targetCtx.roundRect(depot.x, depot.y, depot.w, depot.h, depotRadius);
+                targetCtx.fill();
+                targetCtx.restore();
+
+                const depotGradient = targetCtx.createLinearGradient(depot.x, depot.y, depot.x, depot.y + depot.h);
+                depotGradient.addColorStop(0, "#ffbf7a55");
+                depotGradient.addColorStop(1, "#d9863a42");
+                targetCtx.fillStyle = depotGradient;
+                targetCtx.beginPath();
+                targetCtx.roundRect(depot.x, depot.y, depot.w, depot.h, depotRadius);
+                targetCtx.fill();
+
+                targetCtx.strokeStyle = "#ffb366";
+                targetCtx.lineWidth = 2.5;
+                targetCtx.beginPath();
+                targetCtx.roundRect(depot.x, depot.y, depot.w, depot.h, depotRadius);
+                targetCtx.stroke();
+
+                targetCtx.strokeStyle = "#ffe0ba66";
+                targetCtx.lineWidth = 1.5;
+                targetCtx.beginPath();
+                targetCtx.roundRect(depot.x + depotInset, depot.y + depotInset, depot.w - depotInset * 2, depot.h - depotInset * 2, depotRadius - 4);
+                targetCtx.stroke();
+
+                targetCtx.fillStyle = "#ffcf9a33";
+                for (let i = 0; i < 5; i += 1) {
+                    const stripeX = depot.x + 12 + i * 18;
+                    targetCtx.fillRect(stripeX, depot.y + 30, 8, depot.h - 42);
+                }
+
+                targetCtx.fillStyle = "#1b2f45cc";
+                targetCtx.beginPath();
+                targetCtx.roundRect(depot.x + 10, depot.y + 8, 72, 20, 8);
+                targetCtx.fill();
+                targetCtx.fillStyle = "#ffd9b2";
+                targetCtx.font = "700 11px Space Grotesk, sans-serif";
+                targetCtx.textAlign = "left";
+                targetCtx.textBaseline = "alphabetic";
+                targetCtx.fillText("DEPOT", depot.x + 20, depot.y + 22);
+            }
+
+            function rebuildStaticLayer() {
+                staticCanvas.width = world.w;
+                staticCanvas.height = world.h;
+
+                staticCtx.clearRect(0, 0, world.w, world.h);
+                staticCtx.fillStyle = "#132437";
+                staticCtx.fillRect(0, 0, world.w, world.h);
+
+                staticCtx.save();
+                staticCtx.globalAlpha = 0.2;
+                for (let i = 0; i < 9; i += 1) {
+                    staticCtx.strokeStyle = i % 2 === 0 ? "#9fd3c780" : "#f3c67780";
+                    staticCtx.beginPath();
+                    staticCtx.arc(world.w * 0.5, world.h * 0.5, 60 + i * 45, 0, Math.PI * 2);
+                    staticCtx.stroke();
+                }
+                staticCtx.restore();
+
+                drawDepot(staticCtx);
+                staticLayerDirty = false;
+            }
+
+            function togglePause() {
+                if (!game.started) return;
+                game.running = !game.running;
+                if (!game.running) keys.clear();
+                refreshHud();
+            }
+
+            function random(min, max) {
+                return Math.random() * (max - min) + min;
+            }
+
+            function createNode(type) {
+                const config = materialConfig[type];
+                return {
+                    type,
+                    x: random(26, world.w - 150),
+                    y: random(26, world.h - 26),
+                    size: config.size,
+                    active: true,
+                    timer: 0
+                };
+            }
+
+            function seedWorld() {
+                game.nodes = [];
+                for (let i = 0; i < 13; i += 1) game.nodes.push(createNode("wood"));
+                for (let i = 0; i < 10; i += 1) game.nodes.push(createNode("stone"));
+                for (let i = 0; i < 6; i += 1) game.nodes.push(createNode("crystal"));
+            }
+
+            function minionDepotPoint(index) {
+                const col = index % 5;
+                const row = Math.floor(index / 5);
+                return {
+                    x: depot.x + 16 + col * 16,
+                    y: depot.y + 38 + row * 16
+                };
+            }
+
+            function createMinionUnit(index) {
+                const home = minionDepotPoint(index);
+                return {
+                    x: home.x,
+                    y: home.y,
+                    state: "idle",
+                    targetNodeIndex: -1,
+                    carryType: null,
+                    carryLoad: 0,
+                    carry: { wood: 0, stone: 0, crystal: 0 },
+                    speed: minionMoveSpeed(index)
+                };
+            }
+
+            function syncMinionUnits(resetPositions = false) {
+                while (game.minionUnits.length < save.minions) {
+                    game.minionUnits.push(createMinionUnit(game.minionUnits.length));
+                }
+                if (game.minionUnits.length > save.minions) {
+                    game.minionUnits.length = save.minions;
+                }
+
+                for (let i = 0; i < game.minionUnits.length; i += 1) {
+                    const minion = game.minionUnits[i];
+                    const home = minionDepotPoint(i);
+                    minion.speed = minionMoveSpeed(i);
+                    if (resetPositions) {
+                        minion.x = home.x;
+                        minion.y = home.y;
+                        minion.state = "idle";
+                        minion.targetNodeIndex = -1;
+                        minion.carryType = null;
+                        minion.carryLoad = 0;
+                        minion.carry.wood = 0;
+                        minion.carry.stone = 0;
+                        minion.carry.crystal = 0;
+                    }
+                }
+            }
+
+            function resetSession() {
+                game.player.x = world.w / 2;
+                game.player.y = world.h / 2;
+                game.player.speed = BASE_PLAYER_SPEED + save.speedLevel * 0.25;
+                game.inventory.wood = 0;
+                game.inventory.stone = 0;
+                game.inventory.crystal = 0;
+                game.dayTick = 0;
+                game.depositPulse = 0;
+                game.minionPulse = 0;
+                seedWorld();
+                syncMinionUnits(true);
+                refreshHud();
+            }
+
+            function distanceSq(a, b) {
+                const dx = a.x - b.x;
+                const dy = a.y - b.y;
+                return dx * dx + dy * dy;
+            }
+
+            function movePlayer() {
+                let vx = 0;
+                let vy = 0;
+                if (keys.has("arrowup") || keys.has("w")) vy -= 1;
+                if (keys.has("arrowdown") || keys.has("s")) vy += 1;
+                if (keys.has("arrowleft") || keys.has("a")) vx -= 1;
+                if (keys.has("arrowright") || keys.has("d")) vx += 1;
+
+                if (game.touchTarget) {
+                    const dx = game.touchTarget.x - game.player.x;
+                    const dy = game.touchTarget.y - game.player.y;
+                    const dSq = dx * dx + dy * dy;
+                    if (dSq > 36) {
+                        const invD = 1 / Math.sqrt(dSq);
+                        vx += dx * invD;
+                        vy += dy * invD;
+                    }
+                }
+
+                if (vx !== 0 || vy !== 0) {
+                    const magSq = vx * vx + vy * vy;
+                    const invMag = 1 / Math.sqrt(magSq);
+                    game.player.x += (vx * invMag) * game.player.speed;
+                    game.player.y += (vy * invMag) * game.player.speed;
+                }
+
+                game.player.x = Math.max(game.player.r, Math.min(world.w - game.player.r, game.player.x));
+                game.player.y = Math.max(game.player.r, Math.min(world.h - game.player.r, game.player.y));
+            }
+
+            function drawDiamond(x, y, size, color) {
+                ctx.fillStyle = color;
+                ctx.beginPath();
+                ctx.moveTo(x, y - size);
+                ctx.lineTo(x + size, y);
+                ctx.lineTo(x, y + size);
+                ctx.lineTo(x - size, y);
+                ctx.closePath();
+                ctx.fill();
+            }
+
+            function drawNode(node) {
+                const config = materialConfig[node.type];
+                ctx.fillStyle = config.color;
+
+                if (config.shape === "square") {
+                    ctx.fillRect(node.x - node.size / 2, node.y - node.size / 2, node.size, node.size);
+                } else if (config.shape === "circle") {
+                    ctx.beginPath();
+                    ctx.arc(node.x, node.y, node.size * 0.5, 0, Math.PI * 2);
+                    ctx.fill();
+                } else {
+                    drawDiamond(node.x, node.y, node.size * 0.7, config.color);
+                }
+            }
+
+            function canDeposit() {
+                return game.player.x > depot.x && game.player.x < depot.x + depot.w
+                    && game.player.y > depot.y && game.player.y < depot.y + depot.h;
+            }
+
+            function depositInventory() {
+                const carried = inventoryCount();
+                if (carried === 0 || !canDeposit()) return;
+
+                const gained = game.inventory.wood * 1 + game.inventory.stone * 2 + game.inventory.crystal * 4;
+                save.stored += gained;
+                if (save.stored > save.bestStored) save.bestStored = save.stored;
+                save.bankWood += game.inventory.wood;
+                save.bankStone += game.inventory.stone;
+                save.bankCrystal += game.inventory.crystal;
+                game.depositPulse = gained;
+
+                game.inventory.wood = 0;
+                game.inventory.stone = 0;
+                game.inventory.crystal = 0;
+
+                saveGame();
+            }
+
+            function moveEntityTowards(entity, targetX, targetY, speed) {
+                const dx = targetX - entity.x;
+                const dy = targetY - entity.y;
+                const dSq = dx * dx + dy * dy;
+                if (dSq <= speed * speed) {
+                    entity.x = targetX;
+                    entity.y = targetY;
+                    return true;
+                }
+
+                const invD = 1 / Math.sqrt(dSq);
+                entity.x += dx * invD * speed;
+                entity.y += dy * invD * speed;
+                return false;
+            }
+
+            function pickClosestActiveNodeIndex(origin) {
+                let bestIndex = -1;
+                let bestDistSq = Infinity;
+                for (let i = 0; i < game.nodes.length; i += 1) {
+                    const node = game.nodes[i];
+                    if (!node.active) continue;
+                    const distSq = distanceSq(origin, node);
+                    if (distSq < bestDistSq) {
+                        bestDistSq = distSq;
+                        bestIndex = i;
+                    }
+                }
+                return bestIndex;
+            }
+
+            function updateMinions() {
+                if (game.minionUnits.length === 0) return;
+
+                for (let i = 0; i < game.minionUnits.length; i += 1) {
+                    const minion = game.minionUnits[i];
+                    const home = minionDepotPoint(i);
+
+                    if (minion.state === "idle") {
+                        const nodeIndex = pickClosestActiveNodeIndex(minion);
+                        if (nodeIndex === -1) {
+                            moveEntityTowards(minion, home.x, home.y, minion.speed);
+                            continue;
+                        }
+                        minion.targetNodeIndex = nodeIndex;
+                        minion.state = "toNode";
+                    }
+
+                    if (minion.state === "toNode") {
+                        const targetNode = game.nodes[minion.targetNodeIndex];
+                        if (!targetNode || !targetNode.active) {
+                            minion.state = "idle";
+                            minion.targetNodeIndex = -1;
+                            continue;
+                        }
+
+                        const reached = moveEntityTowards(minion, targetNode.x, targetNode.y, minion.speed);
+                        if (reached) {
+                            minion.carryType = targetNode.type;
+                            minion.carry[targetNode.type] += 1;
+                            minion.carryLoad += 1;
+                            targetNode.active = false;
+                            targetNode.timer = materialConfig[targetNode.type].respawn;
+                            minion.targetNodeIndex = -1;
+                            if (minion.carryLoad >= minionCarryCapacity()) {
+                                minion.state = "toDepot";
+                            } else {
+                                minion.state = "idle";
+                            }
+                        }
+                    }
+
+                    if (minion.state === "toDepot") {
+                        const reached = moveEntityTowards(minion, home.x, home.y, minion.speed);
+                        if (reached && minion.carryLoad > 0) {
+                            const gainedWood = minion.carry.wood;
+                            const gainedStone = minion.carry.stone;
+                            const gainedCrystal = minion.carry.crystal;
+                            save.bankWood += gainedWood;
+                            save.bankStone += gainedStone;
+                            save.bankCrystal += gainedCrystal;
+
+                            const gainedValue = gainedWood * materialConfig.wood.value
+                                + gainedStone * materialConfig.stone.value
+                                + gainedCrystal * materialConfig.crystal.value;
+                            game.minionPulse = Math.min(999, game.minionPulse + gainedValue);
+
+                            minion.carryType = null;
+                            minion.carryLoad = 0;
+                            minion.carry.wood = 0;
+                            minion.carry.stone = 0;
+                            minion.carry.crystal = 0;
+                            minion.state = "idle";
+                        }
+                    }
+                }
+            }
+
+            function tickGame() {
+                if (!game.running) return;
+
+                game.dayTick += 1;
+
+                movePlayer();
+                depositInventory();
+                updateMinions();
+
+                let carried = inventoryCount();
+                const maxCarry = bagCapacity();
+
+                for (const node of game.nodes) {
+                    if (!node.active) {
+                        node.timer -= 1;
+                        if (node.timer <= 0) {
+                            node.active = true;
+                            node.x = random(26, world.w - 150);
+                            node.y = random(26, world.h - 26);
+                        }
+                        continue;
+                    }
+
+                    if (carried >= maxCarry) continue;
+
+                    const hitRadius = game.player.r + node.size * 0.6;
+                    if (distanceSq(game.player, node) <= hitRadius * hitRadius) {
+                        game.inventory[node.type] += 1;
+                        carried += 1;
+                        node.active = false;
+                        node.timer = materialConfig[node.type].respawn;
+                    }
+                }
+
+                if (game.depositPulse > 0) game.depositPulse = Math.max(0, game.depositPulse - 0.08);
+                if (game.minionPulse > 0) game.minionPulse = Math.max(0, game.minionPulse - 0.04);
+
+                if (game.dayTick % 120 === 0) saveGame();
+                refreshHud();
+            }
+
+            function render() {
+                if (staticLayerDirty) {
+                    rebuildStaticLayer();
+                }
+
+                ctx.clearRect(0, 0, world.w, world.h);
+                ctx.drawImage(staticCanvas, 0, 0);
+
+                for (let i = 0; i < game.minionUnits.length; i += 1) {
+                    const minion = game.minionUnits[i];
+                    ctx.save();
+                    ctx.shadowColor = "#7fd7ffaa";
+                    ctx.shadowBlur = 10;
+                    ctx.fillStyle = "#7fd7ff";
+                    ctx.fillRect(minion.x - 6, minion.y - 6, 12, 12);
+                    ctx.shadowBlur = 0;
+                    ctx.strokeStyle = "#0b1422";
+                    ctx.lineWidth = 2;
+                    ctx.strokeRect(minion.x - 6, minion.y - 6, 12, 12);
+                    ctx.restore();
+
+                    if (minion.carryType) {
+                        ctx.fillStyle = materialConfig[minion.carryType].color;
+                        ctx.beginPath();
+                        ctx.arc(minion.x, minion.y - 10, 4, 0, Math.PI * 2);
+                        ctx.fill();
+
+                        if (minion.carryLoad > 1) {
+                            ctx.fillStyle = "#f4f8ff";
+                            ctx.font = "700 10px Space Grotesk, sans-serif";
+                            ctx.textAlign = "left";
+                            ctx.textBaseline = "alphabetic";
+                            ctx.fillText(String(minion.carryLoad), minion.x + 5, minion.y - 7);
+                        }
+                    }
+                }
+
+                for (const node of game.nodes) {
+                    if (!node.active) continue;
+                    drawNode(node);
+                }
+
+                ctx.save();
+                ctx.shadowColor = "#ffd166aa";
+                ctx.shadowBlur = 14;
+                ctx.fillStyle = "#ffd166";
+                ctx.beginPath();
+                ctx.arc(game.player.x, game.player.y, game.player.r, 0, Math.PI * 2);
+                ctx.fill();
+                ctx.shadowBlur = 0;
+                ctx.strokeStyle = "#0b1422";
+                ctx.lineWidth = 3;
+                ctx.stroke();
+                ctx.restore();
+
+                const carryNow = inventoryCount();
+                const inDepot = canDeposit();
+                if (inDepot && carryNow > 0) {
+                    ctx.fillStyle = "#1f7a56";
+                    ctx.font = "700 16px Space Grotesk, sans-serif";
+                    ctx.fillText("Depositing...", depot.x - 12, depot.y - 10);
+                }
+
+                if (game.depositPulse > 0) {
+                    ctx.fillStyle = "#1f7a56";
+                    ctx.font = "700 18px Space Grotesk, sans-serif";
+                    ctx.fillText(`+${Math.ceil(game.depositPulse)} stored`, depot.x - 8, depot.y - 34);
+                }
+
+                if (game.minionPulse > 0) {
+                    ctx.fillStyle = "#1f7a56";
+                    ctx.font = "700 14px Space Grotesk, sans-serif";
+                    ctx.fillText(`Minions +${Math.ceil(game.minionPulse)} bank`, depot.x - 8, depot.y - 52);
+                }
+
+                if (!game.running) {
+                    ctx.fillStyle = "#112233cc";
+                    ctx.fillRect(0, 0, world.w, world.h);
+                    ctx.fillStyle = "#f8fcff";
+                    ctx.textAlign = "center";
+                    ctx.font = "700 44px Space Grotesk, sans-serif";
+                    ctx.fillText("Meadow Gatherer", world.w / 2, world.h / 2 - 20);
+
+                    ctx.fillStyle = "#cde6f2";
+                    ctx.font = "500 20px Space Grotesk, sans-serif";
+                    if (game.started) {
+                        ctx.fillText("Paused - Press Pause/Resume or P", world.w / 2, world.h / 2 + 20);
+                    } else {
+                        ctx.fillText("Collect, relax, and deposit at your own pace", world.w / 2, world.h / 2 + 20);
+                    }
+
+                    ctx.fillStyle = "#e9f4fb";
+                    ctx.font = "500 17px Space Grotesk, sans-serif";
+                    ctx.fillText("Move: Arrow Keys / WASD (or touch drag)", world.w / 2, world.h / 2 + 56);
+                    ctx.fillText("Walk into DEPOT to bank materials", world.w / 2, world.h / 2 + 84);
+                    ctx.fillText("Use the FIELD SHOP for Speed, Bag, and Minion crafting", world.w / 2, world.h / 2 + 112);
+                    ctx.fillText("Wood: green square | Stone: gray circle | Crystal: blue diamond", world.w / 2, world.h / 2 + 140);
+                    ctx.fillText("Depot is orange. Banked resources fund all upgrades.", world.w / 2, world.h / 2 + 168);
+                }
+            }
+
+            function loop() {
+                tickGame();
+                render();
+                requestAnimationFrame(loop);
+            }
+
+            window.addEventListener("keydown", (e) => {
+                const key = e.key.toLowerCase();
+                if (key === "p" || key === "escape") {
+                    e.preventDefault();
+                    togglePause();
+                    return;
+                }
+                keys.add(e.key.toLowerCase());
+            });
+
+            window.addEventListener("keyup", (e) => {
+                keys.delete(e.key.toLowerCase());
+            });
+
+            window.addEventListener("resize", fitCanvasToStage);
+
+            function updateTouchTarget(e) {
+                const rect = canvas.getBoundingClientRect();
+                const touch = e.touches[0];
+                if (!touch) return;
+                game.touchTarget = {
+                    x: ((touch.clientX - rect.left) / rect.width) * world.w,
+                    y: ((touch.clientY - rect.top) / rect.height) * world.h
+                };
+            }
+
+            canvas.addEventListener("touchstart", (e) => {
+                e.preventDefault();
+                updateTouchTarget(e);
+            }, { passive: false });
+
+            canvas.addEventListener("touchmove", (e) => {
+                e.preventDefault();
+                updateTouchTarget(e);
+            }, { passive: false });
+
+            canvas.addEventListener("touchend", () => {
+                game.touchTarget = null;
+            });
+
+            startBtn.addEventListener("click", () => {
+                if (!game.started) {
+                    game.started = true;
+                } else {
+                    resetSession();
+                }
+
+                game.running = true;
+                startBtn.textContent = "Restart Day";
+                refreshHud();
+            });
+
+            pauseBtn.addEventListener("click", () => {
+                togglePause();
+            });
+
+            speedBtn.addEventListener("click", () => {
+                const recipe = speedRecipe();
+                if (save.bankWood < recipe.wood) return;
+                if (save.bankStone < recipe.stone) return;
+                if (save.bankCrystal < recipe.crystal) return;
+
+                save.bankWood -= recipe.wood;
+                save.bankStone -= recipe.stone;
+                save.bankCrystal -= recipe.crystal;
+                save.speedLevel += 1;
+                game.player.speed = BASE_PLAYER_SPEED + save.speedLevel * 0.25;
+                saveGame();
+                refreshHud();
+            });
+
+            bagBtn.addEventListener("click", () => {
+                const recipe = bagRecipe();
+                if (save.bankWood < recipe.wood) return;
+                if (save.bankStone < recipe.stone) return;
+                if (save.bankCrystal < recipe.crystal) return;
+
+                save.bankWood -= recipe.wood;
+                save.bankStone -= recipe.stone;
+                save.bankCrystal -= recipe.crystal;
+                save.bagLevel += 1;
+                saveGame();
+                refreshHud();
+            });
+
+            craftBtn.addEventListener("click", () => {
+                const recipe = minionRecipe();
+                if (save.bankWood < recipe.wood) return;
+                if (save.bankStone < recipe.stone) return;
+                if (save.bankCrystal < recipe.crystal) return;
+
+                save.bankWood -= recipe.wood;
+                save.bankStone -= recipe.stone;
+                save.bankCrystal -= recipe.crystal;
+                save.minions += 1;
+                syncMinionUnits(false);
+                saveGame();
+                refreshHud();
+            });
+
+            minionSpeedBtn.addEventListener("click", () => {
+                const recipe = minionSpeedRecipe();
+                if (save.bankWood < recipe.wood) return;
+                if (save.bankStone < recipe.stone) return;
+                if (save.bankCrystal < recipe.crystal) return;
+
+                save.bankWood -= recipe.wood;
+                save.bankStone -= recipe.stone;
+                save.bankCrystal -= recipe.crystal;
+                save.minionSpeedLevel += 1;
+                syncMinionUnits(false);
+                saveGame();
+                refreshHud();
+            });
+
+            minionCapBtn.addEventListener("click", () => {
+                const recipe = minionCapacityRecipe();
+                if (save.bankWood < recipe.wood) return;
+                if (save.bankStone < recipe.stone) return;
+                if (save.bankCrystal < recipe.crystal) return;
+
+                save.bankWood -= recipe.wood;
+                save.bankStone -= recipe.stone;
+                save.bankCrystal -= recipe.crystal;
+                save.minionCapacityLevel += 1;
+                saveGame();
+                refreshHud();
+            });
+
+            shopCollapseBtn.addEventListener("click", () => {
+                setShopCollapsed(true);
+            });
+
+            shopExpandBtn.addEventListener("click", () => {
+                setShopCollapsed(false);
+            });
+
+            resetBtn.addEventListener("click", () => {
+                localStorage.removeItem(STORAGE_KEY);
+                save.stored = 0;
+                save.bestStored = 0;
+                save.bankWood = 0;
+                save.bankStone = 0;
+                save.bankCrystal = 0;
+                save.minions = 0;
+                save.minionSpeedLevel = 0;
+                save.minionCapacityLevel = 0;
+                save.speedLevel = 0;
+                save.bagLevel = 0;
+                game.started = false;
+                game.running = false;
+                game.minionUnits = [];
+                startBtn.textContent = "Start Day";
+                pauseBtn.textContent = "Pause";
+                resetSession();
+                saveGame();
+            });
+
+            resetSession();
+            setShopCollapsed(false);
+            fitCanvasToStage();
+            render();
+            loop();
+        }());
+    </script>
+</body>
+</html>
