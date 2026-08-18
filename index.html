@@ -544,6 +544,13 @@
             gap: 12px;
         }
 
+        .skilltree-bank {
+            margin-left: auto;
+            margin-right: 4px;
+            flex: 0 1 auto;
+            min-width: 0;
+        }
+
         .popover-head-actions {
             display: inline-flex;
             align-items: center;
@@ -591,8 +598,12 @@
             user-select: none;
             cursor: grab;
             background:
-                radial-gradient(140% 120% at 50% 15%, #2b3d63 0%, #1c2f4f 34%, #122238 62%, #0b1627 100%);
-            box-shadow: inset 0 0 0 1px #7ea6d133, inset 0 0 44px #a788ff1f, inset 0 0 90px #6ea9d91a;
+                radial-gradient(120% 120% at 50% 50%, transparent 48%, #04030d 100%),
+                radial-gradient(150% 130% at 50% 10%, #4a3184 0%, #2b2059 28%, #171236 56%, #090818 100%);
+            box-shadow:
+                inset 0 0 0 1px #b9a4ff33,
+                inset 0 0 70px #8a5cff2b,
+                inset 0 0 150px #35d8c421;
         }
 
         .skilltree-canvas::before,
@@ -605,24 +616,49 @@
 
         .skilltree-canvas::before {
             background:
-                radial-gradient(56% 44% at 18% 22%, #7a8dff30 0%, transparent 72%),
-                radial-gradient(48% 40% at 79% 34%, #79ffe62a 0%, transparent 74%),
-                radial-gradient(52% 42% at 50% 78%, #da8fff24 0%, transparent 76%);
-            opacity: 0.8;
-            animation: mystic-drift 12s ease-in-out infinite alternate;
+                radial-gradient(56% 44% at 16% 20%, #8b6bff4a 0%, transparent 70%),
+                radial-gradient(50% 42% at 82% 30%, #3fe6d13d 0%, transparent 72%),
+                radial-gradient(54% 44% at 46% 82%, #c96bff3d 0%, transparent 76%),
+                radial-gradient(46% 38% at 70% 70%, #ff8ad233 0%, transparent 74%),
+                radial-gradient(38% 34% at 34% 54%, #6ad0ff2e 0%, transparent 76%);
+            opacity: 0.9;
+            filter: blur(6px);
+            animation: mystic-drift 26s ease-in-out infinite alternate,
+                       mystic-hue 42s linear infinite;
         }
 
         .skilltree-canvas::after {
             background:
-                radial-gradient(circle at 12% 18%, #ffffff6e 0 1px, transparent 2px),
-                radial-gradient(circle at 28% 72%, #bfe4ff63 0 1px, transparent 2px),
-                radial-gradient(circle at 63% 24%, #d5bcff78 0 1.2px, transparent 2.4px),
-                radial-gradient(circle at 74% 56%, #8bf5ff61 0 1px, transparent 2px),
-                radial-gradient(circle at 88% 84%, #ffffff52 0 1px, transparent 2px),
-                radial-gradient(circle at 42% 42%, #e1e9ff42 0 1px, transparent 2px);
-            opacity: 0.7;
-            filter: blur(0.2px);
-            animation: mystic-twinkle 6.5s ease-in-out infinite;
+                radial-gradient(circle at 12% 18%, #ffffffcc 0 1.4px, transparent 3px),
+                radial-gradient(circle at 28% 72%, #cfe8ff9e 0 1px, transparent 2.2px),
+                radial-gradient(circle at 63% 24%, #e2ccff c 0 1.6px, transparent 3.4px),
+                radial-gradient(circle at 74% 56%, #9bfaffa1 0 1.1px, transparent 2.4px),
+                radial-gradient(circle at 88% 84%, #ffffff8a 0 1.2px, transparent 2.6px),
+                radial-gradient(circle at 42% 42%, #eef2ff7a 0 1px, transparent 2.2px),
+                radial-gradient(circle at 8% 62%, #d9c4ff8f 0 1.2px, transparent 2.6px),
+                radial-gradient(circle at 54% 12%, #b9f2ff85 0 1px, transparent 2.2px),
+                radial-gradient(circle at 36% 90%, #ffe9c48f 0 1.3px, transparent 2.8px),
+                radial-gradient(circle at 92% 34%, #ffffff70 0 1px, transparent 2.2px),
+                radial-gradient(circle at 20% 40%, #c9b3ff6b 0 0.9px, transparent 2px),
+                radial-gradient(circle at 68% 88%, #a8ecff73 0 1px, transparent 2.2px);
+            opacity: 0.85;
+            animation: mystic-twinkle 7.5s ease-in-out infinite;
+        }
+
+        /* Slow arcane sweep behind the map; sits under everything and never pans. */
+        .skilltree-aura {
+            position: absolute;
+            inset: -30%;
+            pointer-events: none;
+            z-index: 0;
+            background: conic-gradient(from 0deg at 50% 50%,
+                #7a5cff2e 0deg, transparent 52deg,
+                #35e0c82b 108deg, transparent 168deg,
+                #d86bff29 224deg, transparent 286deg,
+                #7a5cff2e 360deg);
+            filter: blur(34px);
+            opacity: 0.9;
+            animation: mystic-aura 56s linear infinite;
         }
 
         .skilltree-canvas.dragging {
@@ -649,9 +685,29 @@
 
         .skilltree-rings circle {
             fill: none;
-            stroke: #b5d1ff38;
-            stroke-width: 0.6;
-            filter: drop-shadow(0 0 1.8px #9bc3ea55);
+            stroke: #cbb4ff5c;
+            stroke-width: 0.5;
+            stroke-dasharray: 3.4 1.7;
+            filter: drop-shadow(0 0 2.4px #a487ff7a);
+            transform-origin: 50% 50%;
+            transform-box: view-box;
+            animation: rune-spin 90s linear infinite;
+        }
+
+        /* Alternating dash patterns and counter-rotation read as concentric sigils
+           rather than plain concentric circles. */
+        .skilltree-rings circle:nth-child(even) {
+            stroke: #7fe9ff4d;
+            stroke-dasharray: 1.1 2.6;
+            stroke-width: 0.42;
+            animation-duration: 132s;
+            animation-direction: reverse;
+        }
+
+        .skilltree-rings circle:nth-child(3n) {
+            stroke: #ffd7a34a;
+            stroke-dasharray: 6.5 2 1 2;
+            animation-duration: 168s;
         }
 
         .skilltree-links {
@@ -663,12 +719,21 @@
         }
 
         .skilltree-links line {
-            stroke: #91b0d35a;
-            stroke-width: 0.45;
+            stroke: #9d8affa1;
+            stroke-width: 0.5;
+            stroke-linecap: round;
+            stroke-dasharray: 2.2 1.9;
+            filter: drop-shadow(0 0 1.7px #8f76ff7a);
+            animation: rune-flow 3.6s linear infinite;
         }
 
+        /* An unlocked branch runs brighter and faster, so energy visibly flows
+           outward along the paths you already own. */
         .skilltree-links line.active {
-            stroke: #b9daffaa;
+            stroke: #d7c6ffe0;
+            stroke-width: 0.72;
+            filter: drop-shadow(0 0 3.2px #b79dffb5);
+            animation-duration: 1.9s;
         }
 
         @keyframes mystic-drift {
@@ -689,7 +754,7 @@
 
         .shop-controls .skill-node {
             position: absolute;
-            width: clamp(115px, 16.25vw, 153px);
+            width: clamp(128px, 17.6vw, 172px);
             transform: translate(-50%, -50%);
             text-align: left;
             z-index: 1;
@@ -1154,6 +1219,7 @@
         <div class="popover-card" role="dialog" aria-modal="true" aria-label="Skill Tree">
             <div class="popover-head">
                 <h3>SKILL TREE</h3>
+                <div class="chip resource-bundle bank-bundle skilltree-bank" title="Banked materials: Wood / Stone / Crystal / Amber / Essence"><span class="ico bank"></span><span>Bank</span><span class="shop-btn-costs hud-bank-costs"><span class="cost-chip"><span class="res-icon wood"></span><strong id="treeBankWood">0</strong></span><span class="cost-chip"><span class="res-icon stone"></span><strong id="treeBankStone">0</strong></span><span class="cost-chip"><span class="res-icon crystal"></span><strong id="treeBankCrystal">0</strong></span><span class="cost-chip"><span class="res-icon amber"></span><strong id="treeBankAmber">0</strong></span><span class="cost-chip"><span class="res-icon essence"></span><strong id="treeBankEssence">0</strong></span></span></div>
                 <div class="popover-head-actions">
                     <div class="zoom-controls" aria-label="Skill tree zoom controls">
                         <button id="skillTreeZoomOutBtn" class="secondary" title="Zoom out">-</button>
@@ -1225,6 +1291,13 @@
             const bankStoneHudEl = document.getElementById("bankStoneHud");
             const bankCrystalHudEl = document.getElementById("bankCrystalHud");
             const bankAmberHudEl = document.getElementById("bankAmberHud");
+            const treeBankEls = {
+                wood: document.getElementById("treeBankWood"),
+                stone: document.getElementById("treeBankStone"),
+                crystal: document.getElementById("treeBankCrystal"),
+                amber: document.getElementById("treeBankAmber"),
+                essence: document.getElementById("treeBankEssence")
+            };
             const storedEl = document.getElementById("stored");
             const bestStoredEl = document.getElementById("bestStored");
             const capacityEl = document.getElementById("capacity");
@@ -1294,10 +1367,13 @@
                 "minionSpeed",
                 "minionCapacity",
                 "gathererFocus",
+                "minionArmor",
+                "minionArmor2",
                 "turret",
                 "sniperTurret",
                 "slowTurret",
                 "turretCap",
+                "turretHaste",
                 "spawnerWood",
                 "spawnerStone",
                 "spawnerCrystal",
@@ -1316,6 +1392,9 @@
                 sniperTurret: { label: "Unlock Snipers", cost: { wood: 24, stone: 26 }, requires: ["turret"] },
                 slowTurret: { label: "Unlock Slow Field", cost: { crystal: 14, amber: 9, essence: 2 }, requires: ["sniperTurret"] },
                 turretCap: { label: "Unlock Turret Capacity", cost: { crystal: 18, amber: 10, essence: 3 }, requires: ["slowTurret"] },
+                minionArmor2: { label: "Unlock Minion Plating", desc: "Doubles minion health again, 4x in total", cost: { stone: 180, crystal: 90, amber: 60, essence: 80 }, requires: ["minionArmor"] },
+                minionArmor: { label: "Unlock Minion Armor", desc: "Doubles the health of every gatherer and defender", cost: { stone: 90, crystal: 48, amber: 48 }, requires: ["defender"] },
+                turretHaste: { label: "Unlock Rapid Fire", desc: "All sentries and snipers fire 30% faster", cost: { crystal: 240, amber: 140, essence: 50 }, requires: ["slowTurret"] },
                 spawnerWood: { label: "Unlock Wood Spawner", cost: { wood: 12, stone: 18 }, requires: [] },
                 spawnerStone: { label: "Unlock Stone Spawner", cost: { wood: 22, stone: 12 }, requires: ["spawnerWood"] },
                 spawnerCrystal: { label: "Unlock Crystal Spawner", cost: { wood: 20, amber: 6 }, requires: ["spawnerStone"] },
@@ -1327,6 +1406,8 @@
                 bag: 2,
                 gatherer: 3,
                 gathererFocus: 5,
+                minionArmor: 5,
+                minionArmor2: 6,
                 defender: 4,
                 minionSpeed: 4,
                 minionCapacity: 4,
@@ -1334,6 +1415,7 @@
                 sniperTurret: 2,
                 slowTurret: 3,
                 turretCap: 4,
+                turretHaste: 4,
                 spawnerWood: 1,
                 spawnerStone: 2,
                 spawnerCrystal: 3,
@@ -1346,12 +1428,15 @@
                 gatherer: "minionCore",
                 gathererFocus: "minionCore",
                 defender: "defender",
+                minionArmor: "minionArmor",
+                minionArmor2: "minionArmor",
                 minionSpeed: "minionCore",
                 minionCapacity: "minionCapacity",
                 turret: "defense",
                 sniperTurret: "defense",
                 slowTurret: "defense",
                 turretCap: "defense",
+                turretHaste: "defenseHaste",
                 spawnerWood: "economy",
                 spawnerStone: "economy",
                 spawnerCrystal: "economy",
@@ -1362,8 +1447,10 @@
                 player: 270,
                 minionCore: 246,
                 defender: 224,
+                minionArmor: 205,
                 minionCapacity: 272,
                 defense: 190,
+                defenseHaste: 163,
                 economy: 20
             };
             const UPGRADE_SKILL_BY_CONTROL = {
@@ -1393,7 +1480,9 @@
             const skillTreeMapState = {
                 mapEl: null,
                 mapSize: 1000,
-                zoom: 1,
+                // The canvas grew so tiers clear a full node box; open one step out so
+                // the default framing still shows the whole tree.
+                zoom: 0.9,
                 minZoom: 0.5,
                 maxZoom: 1,
                 panX: 0,
@@ -1439,7 +1528,7 @@
 
             const depot = { x: (world.w - W(108)) / 2, y: (world.h - W(88)) / 2, w: W(108), h: W(88) };
             const DEPOT_MAX_HP = 100;
-            const START_BUDGET = { wood: 4000, stone: 3000, crystal: 0, amber: 0 };
+            const START_BUDGET = { wood: 4000, stone: 3000, crystal: 100, amber: 100,essence:100 };
             const START_WAVE_COUNT = 9;
             const WAVE_START_DELAY = 0;
             const WAVE_BREAK_TICKS = 320;
@@ -1613,7 +1702,7 @@
                     return {
                         stored: Number.isFinite(data.stored) ? data.stored : 0,
                         bestStored: Number.isFinite(data.bestStored) ? data.bestStored : 0,
-                        essence: Number.isFinite(data.essence) ? Math.max(0, Math.floor(data.essence)) : 0,
+                        essence: Number.isFinite(data.essence) ? Math.max(0, Math.floor(data.essence)) : START_BUDGET.essence,
                         globalMultiplierLevel: Number.isFinite(data.globalMultiplierLevel) ? Math.max(0, Math.floor(data.globalMultiplierLevel)) : 0,
                         worldAge: Number.isFinite(data.worldAge) ? data.worldAge : 0,
                         bankWood: Number.isFinite(data.bankWood) ? data.bankWood : START_BUDGET.wood,
@@ -1718,6 +1807,7 @@
                 if (!hasBankForCost(def.cost)) return false;
                 spendBankForCost(def.cost);
                 save.unlockedSkills[skillId] = true;
+                syncMinionHealthToSkills();
                 saveGame();
                 refreshHud();
                 return true;
@@ -1861,7 +1951,9 @@
                 const viewportH = skillTreeControlsEl.clientHeight;
                 if (viewportW <= 0 || viewportH <= 0) return;
 
-                const mapSize = Math.max(900, Math.ceil(Math.max(viewportW, viewportH) * 1.35));
+                // Tier spacing is a percentage of this canvas, so it has to be wide
+                // enough that adjacent tiers clear a full node box.
+                const mapSize = Math.max(1000, Math.ceil(Math.max(viewportW, viewportH) * 1.5));
                 skillTreeMapState.mapSize = mapSize;
                 skillTreeMapState.mapEl.style.width = `${mapSize}px`;
                 skillTreeMapState.mapEl.style.height = `${mapSize}px`;
@@ -1943,7 +2035,9 @@
                 }
 
                 const radiusMin = 9;
-                const radiusMax = 40;
+                // Spread grows with the tier count so the gap between rings stays put
+                // instead of compressing every time a deeper skill is added.
+                const radiusMax = radiusMin + (maxTier - 1) * 7.8;
                 const radiusStep = maxTier > 1 ? ((radiusMax - radiusMin) / (maxTier - 1)) : 0;
 
                 return { maxTier, radiusMin, radiusStep };
@@ -1965,8 +2059,8 @@
                     const x = 50 + Math.cos(angle) * radius;
                     const y = 50 + Math.sin(angle) * radius;
                     positions[skillId] = {
-                        x: Math.max(12, Math.min(88, x)),
-                        y: Math.max(12, Math.min(88, y))
+                        x: Math.max(6, Math.min(94, x)),
+                        y: Math.max(6, Math.min(94, y))
                     };
                 }
 
@@ -2083,6 +2177,7 @@
                 game.enemies = Array.isArray(snapshot.enemies) ? snapshot.enemies : [];
                 game.turrets = Array.isArray(snapshot.turrets) ? snapshot.turrets : [];
                 game.minionUnits = Array.isArray(snapshot.minionUnits) ? snapshot.minionUnits : [];
+                syncMinionHealthToSkills();   // restored minions carry stale maxHp
                 game.nextMinionId = Number.isFinite(snapshot.nextMinionId) ? Math.max(1, Math.floor(snapshot.nextMinionId)) : 1;
                 game.nextMinionSlot = Number.isFinite(snapshot.nextMinionSlot) ? Math.max(0, Math.floor(snapshot.nextMinionSlot)) : 0;
                 game.nextEnemyId = Number.isFinite(snapshot.nextEnemyId) ? Math.max(1, Math.floor(snapshot.nextEnemyId)) : 1;
@@ -2253,7 +2348,7 @@
             }
 
             function resourceMultiplier() {
-                return 1 + save.globalMultiplierLevel * 0.15;
+                return 1 + save.globalMultiplierLevel * 0.1;
             }
 
             function costAmount(cost, type) {
@@ -2456,6 +2551,22 @@
                 el.textContent = formatFn(value);
             }
 
+            // Mirrors the main HUD bank into the skill tree header, which covers the
+            // main HUD while it is open. Cached per element so it only touches the DOM
+            // on a real change, like setHudNumber.
+            const treeBankCache = {};
+
+            function refreshSkillTreeBank() {
+                for (const type of RESOURCE_TYPES) {
+                    const el = treeBankEls[type];
+                    if (!el) continue;
+                    const value = bankAmount(type);
+                    if (treeBankCache[type] === value) continue;
+                    treeBankCache[type] = value;
+                    el.textContent = type === "essence" ? String(value) : convertNotation(value);
+                }
+            }
+
             function setCapacityHud(current, max) {
                 const prevCurrent = hudNumberCache.capacityCurrent;
                 const prevMax = hudNumberCache.capacityMax;
@@ -2511,6 +2622,7 @@
                 setHudNumber("bankStone", bankStoneHudEl, save.bankStone);
                 setHudNumber("bankCrystal", bankCrystalHudEl, save.bankCrystal);
                 setHudNumber("bankAmber", bankAmberHudEl, save.bankAmber);
+                refreshSkillTreeBank();
                 setHudNumber("stored", storedEl, save.stored);
                 setHudNumber("bestStored", bestStoredEl, save.bestStored);
                 setCapacityHud(currentInventoryCount, currentBagCapacity);
@@ -2662,7 +2774,8 @@
                         .filter(Boolean)
                         .join(", ") || "Free";
                     const affordableText = hasBankForCost(skillDef.cost) ? "Yes" : "No";
-                    const tooltipText = `${skillDef.label}\n${tierLabel}\nStatus: ${statusText}\nRequires: ${requiresText}\nCost: ${costText}\nAffordable: ${affordableText}`;
+                    const descLine = skillDef.desc ? `${skillDef.desc}\n` : "";
+                    const tooltipText = `${skillDef.label}\n${descLine}${tierLabel}\nStatus: ${statusText}\nRequires: ${requiresText}\nCost: ${costText}\nAffordable: ${affordableText}`;
                     const showCost = !unlocked && requirementsMet;
                     setSkillNodeContent(button, skillDef.label, skillDef.cost, tooltipText, showCost);
                     button.disabled = unlocked || !requirementsMet || !hasBankForCost(skillDef.cost);
@@ -3240,6 +3353,7 @@
 
                 skillTreePopoverEl.classList.add("open");
                 skillTreePopoverEl.setAttribute("aria-hidden", "false");
+                refreshSkillTreeBank();   // the HUD pass is throttled; be current on open
                 requestAnimationFrame(() => {
                     syncSkillTreeViewport();
                 });
@@ -3596,10 +3710,38 @@
                 };
             }
 
+            const MINION_ARMOR_MULTIPLIER = 2;
+
+            function minionHealthMultiplier() {
+                let multiplier = 1;
+                if (isSkillUnlocked("minionArmor")) multiplier *= MINION_ARMOR_MULTIPLIER;
+                if (isSkillUnlocked("minionArmor2")) multiplier *= MINION_ARMOR_MULTIPLIER;
+                return multiplier;
+            }
+
+            function minionMaxHpFor(role) {
+                const base = role === "defender" ? 4 : 1;
+                return base * minionHealthMultiplier();
+            }
+
+            // Existing minions carry their own maxHp, so unlocking (or restoring a save
+            // with) the armour skill has to restate it. Current health is rescaled by the
+            // same ratio, which keeps a wounded defender wounded rather than healing it.
+            function syncMinionHealthToSkills() {
+                for (const minion of game.minionUnits) {
+                    const target = minionMaxHpFor(minion.role);
+                    const previous = Number.isFinite(minion.maxHp) && minion.maxHp > 0 ? minion.maxHp : target;
+                    if (target === previous) continue;
+                    const ratio = Number.isFinite(minion.hp) ? clamp(minion.hp / previous, 0, 1) : 1;
+                    minion.maxHp = target;
+                    minion.hp = Math.max(1, Math.round(target * ratio));
+                }
+            }
+
             function createMinionUnit(role = "worker", slotIndex = null) {
                 const resolvedSlot = Number.isFinite(slotIndex) ? Math.max(0, Math.floor(slotIndex)) : game.nextMinionSlot;
                 const home = minionDepotPoint(resolvedSlot);
-                const maxHp = role === "defender" ? 4 : 1;
+                const maxHp = minionMaxHpFor(role);
                 const patrolPoint = role === "defender" ? randomDefenderPatrolPoint() : null;
                 const savedPriority = role === "worker" && save.gathererFocusBySlot
                     ? save.gathererFocusBySlot[String(resolvedSlot)]
@@ -3710,6 +3852,12 @@
                 if (game.pendingSlowTurretPlacements > 0) return "slow";
                 if (game.pendingBasicTurretPlacements > 0) return "basic";
                 return null;
+            }
+
+            const TURRET_HASTE_BONUS = 0.3;
+
+            function turretFireRateMultiplier() {
+                return isSkillUnlocked("turretHaste") ? 1 + TURRET_HASTE_BONUS : 1;
             }
 
             function turretRangeForType(type) {
@@ -4589,9 +4737,13 @@
                     if (turret.cooldown > 0) continue;
 
                     const isSniper = turret.type === "sniper";
-                    const fireCooldown = isSniper
+                    const baseCooldown = isSniper
                         ? Math.max(26, 98 - save.sniperTurrets * 8)
                         : Math.max(8, 36 - save.turrets * 3);
+                    // Applied after the floor so the bonus still bites at max fire rate.
+                    // Rounded because cooldown ticks down in whole steps - a fractional
+                    // value wastes most of a tick and quietly eats part of the bonus.
+                    const fireCooldown = Math.max(1, Math.round(baseCooldown / turretFireRateMultiplier()));
                     const range = isSniper ? SNIPER_TURRET_RANGE : BASIC_TURRET_RANGE;
                     const shotDamage = isSniper ? 3 : 1;
 
