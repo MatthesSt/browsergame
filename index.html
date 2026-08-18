@@ -1309,12 +1309,12 @@
                 defender: { label: "Unlock Defenders", cost: { stone: 16, amber: 4 }, requires: ["gatherer"] },
                 minionSpeed: { label: "Unlock Minion Speed", cost: { stone: 12, crystal: 4 }, requires: ["gatherer"] },
                 minionCapacity: { label: "Unlock Minion Capacity", cost: { wood: 14, amber: 3 }, requires: ["gatherer"] },
-                turret: { label: "Unlock Sentries", cost: { wood: 16, stone: 12, crystal: 4 }, requires: [] },
-                sniperTurret: { label: "Unlock Snipers", cost: { stone: 22, crystal: 8, amber: 5 }, requires: ["turret"] },
+                turret: { label: "Unlock Sentries", cost: { wood: 18, stone: 16 }, requires: [] },
+                sniperTurret: { label: "Unlock Snipers", cost: { wood: 24, stone: 26 }, requires: ["turret"] },
                 slowTurret: { label: "Unlock Slow Field", cost: { crystal: 14, amber: 9, essence: 2 }, requires: ["sniperTurret"] },
                 turretCap: { label: "Unlock Turret Capacity", cost: { crystal: 18, amber: 10, essence: 3 }, requires: ["slowTurret"] },
-                spawnerWood: { label: "Unlock Wood Spawner", cost: { stone: 16, amber: 5 }, requires: [] },
-                spawnerStone: { label: "Unlock Stone Spawner", cost: { wood: 18, crystal: 5 }, requires: ["spawnerWood"] },
+                spawnerWood: { label: "Unlock Wood Spawner", cost: { wood: 12, stone: 18 }, requires: [] },
+                spawnerStone: { label: "Unlock Stone Spawner", cost: { wood: 22, stone: 12 }, requires: ["spawnerWood"] },
                 spawnerCrystal: { label: "Unlock Crystal Spawner", cost: { wood: 20, amber: 6 }, requires: ["spawnerStone"] },
                 spawnerAmber: { label: "Unlock Amber Spawner", cost: { stone: 20, crystal: 6 }, requires: ["spawnerCrystal"] },
                 globalMultiplier: { label: "Unlock Global Mult", cost: { essence: 5 }, requires: ["spawnerAmber"] }
@@ -1436,9 +1436,9 @@
 
             const depot = { x: (world.w - W(108)) / 2, y: (world.h - W(88)) / 2, w: W(108), h: W(88) };
             const DEPOT_MAX_HP = 100;
-            const START_BUDGET = { wood: 40, stone: 30, crystal: 18, amber: 12 };
-            const START_WAVE_COUNT = 1;
-            const WAVE_START_DELAY = 3600;
+            const START_BUDGET = { wood: 4000, stone: 3000, crystal: 0, amber: 0 };
+            const START_WAVE_COUNT = 9;
+            const WAVE_START_DELAY = 0;
             const WAVE_BREAK_TICKS = 320;
             const WAVE_SPAWN_INTERVAL_BASE = 72;
             const WAVE_SPAWN_INTERVAL_MIN = 44;
@@ -1539,6 +1539,7 @@
                 },
                 touchTarget: null,
                 placementPreview: null,
+                sellPulse: null,
                 breach: null
             };
 
@@ -2129,17 +2130,22 @@
                 };
             }
 
+            const SPEED_AMBER_FROM_LEVEL = 15;
+
             function speedRecipe() {
+                // Amber only becomes a requirement deep into the ladder, so the early
+                // game never blocks on a resource the player does not start with.
+                const amberLevels = Math.max(0, save.speedLevel - SPEED_AMBER_FROM_LEVEL + 1);
                 return {
-                    wood: 12 + save.speedLevel * 6,
-                    amber: 2 + save.speedLevel
+                    wood: 7 + save.speedLevel * 3,
+                    amber: amberLevels > 0 ? Math.ceil(amberLevels * 0.5) : 0
                 };
             }
 
             function bagRecipe() {
                 return {
-                    wood: 10 + save.bagLevel * 5,
-                    stone: 10 + save.bagLevel * 5
+                    wood: 6 + save.bagLevel * 3,
+                    stone: 6 + save.bagLevel * 3
                 };
             }
 
@@ -2194,27 +2200,27 @@
                 };
             }
 
-            function turretRecipe() {
+            function turretRecipe(owned = save.turrets) {
                 return {
-                    wood: 12 + save.turrets * 10,
-                    stone: 9 + save.turrets * 8,
-                    crystal: 4 + save.turrets * 4
+                    wood: 12 + owned * 10,
+                    stone: 9 + owned * 8,
+                    crystal: 4 + owned * 4
                 };
             }
 
-            function sniperTurretRecipe() {
+            function sniperTurretRecipe(owned = save.sniperTurrets) {
                 return {
-                    stone: 16 + save.sniperTurrets * 12,
-                    crystal: 7 + save.sniperTurrets * 7,
-                    amber: 5 + save.sniperTurrets * 5
+                    stone: 16 + owned * 12,
+                    crystal: 7 + owned * 7,
+                    amber: 5 + owned * 5
                 };
             }
 
-            function slowTurretRecipe() {
+            function slowTurretRecipe(owned = save.slowTurrets) {
                 return {
-                    wood: 18 + save.slowTurrets * 12,
-                    crystal: 10 + save.slowTurrets * 8,
-                    amber: 8 + save.slowTurrets * 6
+                    wood: 18 + owned * 12,
+                    crystal: 10 + owned * 8,
+                    amber: 8 + owned * 6
                 };
             }
 
@@ -2847,6 +2853,58 @@
                     targetCtx.stroke();
                     targetCtx.restore();
                 }
+            }
+
+            // Right-click sells, but nothing on screen would say so. Hovering a placed
+            // turret with no purchase queued highlights it and quotes the refund.
+            function drawTurretSellHint(targetCtx) {
+                const preview = game.placementPreview;
+                if (!preview || nextPendingTurretType()) return;
+
+                const index = findTurretIndexAt(preview.x, preview.y);
+                if (index === -1) return;
+                const turret = game.turrets[index];
+                const refund = turretSellValue(turret.type || "basic");
+                if (!refund) return;
+
+                targetCtx.save();
+                targetCtx.strokeStyle = "#ffd166cc";
+                targetCtx.lineWidth = 3;
+                targetCtx.setLineDash([9, 8]);
+                targetCtx.beginPath();
+                targetCtx.arc(turret.x, turret.y, 26, 0, Math.PI * 2);
+                targetCtx.stroke();
+                targetCtx.setLineDash([]);
+
+                const label = `Sell +${formatCostShort(refund)}`;
+                targetCtx.font = "700 20px Space Grotesk, sans-serif";
+                targetCtx.textAlign = "center";
+                targetCtx.textBaseline = "alphabetic";
+                const width = targetCtx.measureText(label).width + 21;
+                const boxHeight = 30;
+                const boxTop = turret.y - 66;
+                targetCtx.fillStyle = "#0b1422dd";
+                targetCtx.fillRect(turret.x - width / 2, boxTop, width, boxHeight);
+                targetCtx.strokeStyle = "#ffd16688";
+                targetCtx.lineWidth = 1.5;
+                targetCtx.strokeRect(turret.x - width / 2, boxTop, width, boxHeight);
+                targetCtx.fillStyle = "#ffd166";
+                targetCtx.fillText(label, turret.x, boxTop + 21);
+                targetCtx.restore();
+            }
+
+            function drawSellPulse(targetCtx) {
+                const pulse = game.sellPulse;
+                if (!pulse || pulse.ticks <= 0) return;
+                const life = pulse.ticks / 90;
+                targetCtx.save();
+                targetCtx.globalAlpha = Math.min(1, life * 1.6);
+                targetCtx.fillStyle = "#8ce99a";
+                targetCtx.font = "700 16px Space Grotesk, sans-serif";
+                targetCtx.textAlign = "center";
+                targetCtx.textBaseline = "alphabetic";
+                targetCtx.fillText(`+${pulse.text}`, pulse.x, pulse.y - 26 - (1 - life) * 22);
+                targetCtx.restore();
             }
 
             function drawTurretPlacementPreview(targetCtx) {
@@ -3683,6 +3741,123 @@
                 return true;
             }
 
+            // "12W 9S 4C" - compact enough for a floating label on the map.
+            function formatCostShort(cost) {
+                const parts = [];
+                for (const type of RESOURCE_TYPES) {
+                    const amount = costAmount(cost, type);
+                    if (amount > 0) parts.push(`${amount}${type[0].toUpperCase()}`);
+                }
+                return parts.join(" ");
+            }
+
+            const TURRET_SELL_RATE = 0.75;
+            const TURRET_PICK_RADIUS = W(20);
+
+            function recipeForTurretType(type, owned) {
+                if (type === "sniper") return sniperTurretRecipe(owned);
+                if (type === "slow") return slowTurretRecipe(owned);
+                return turretRecipe(owned);
+            }
+
+            function ownedCountForTurretType(type) {
+                if (type === "sniper") return save.sniperTurrets;
+                if (type === "slow") return save.slowTurrets;
+                return save.turrets;
+            }
+
+            function setOwnedCountForTurretType(type, value) {
+                if (type === "sniper") save.sniperTurrets = value;
+                else if (type === "slow") save.slowTurrets = value;
+                else save.turrets = value;
+            }
+
+            function placementsForTurretType(type) {
+                const key = type === "sniper"
+                    ? "sniperTurretPlacements"
+                    : (type === "slow" ? "slowTurretPlacements" : "turretPlacements");
+                if (!Array.isArray(save[key])) save[key] = [];
+                return save[key];
+            }
+
+            function scaleCost(cost, rate) {
+                const scaled = {};
+                for (const type of RESOURCE_TYPES) {
+                    const amount = costAmount(cost, type);
+                    if (amount > 0) scaled[type] = Math.floor(amount * rate);
+                }
+                return scaled;
+            }
+
+            // What selling this turret pays back. Prices scale with how many of that type
+            // you own, so the refund is quoted at the tier of the unit being removed - the
+            // last one bought - which is the recipe evaluated one below the current count.
+            function turretSellValue(type) {
+                const owned = ownedCountForTurretType(type);
+                if (owned <= 0) return null;
+                return scaleCost(recipeForTurretType(type, owned - 1), TURRET_SELL_RATE);
+            }
+
+            function findTurretIndexAt(x, y) {
+                let bestIndex = -1;
+                let bestDistSq = TURRET_PICK_RADIUS * TURRET_PICK_RADIUS;
+                for (let i = 0; i < game.turrets.length; i += 1) {
+                    const turret = game.turrets[i];
+                    const dx = turret.x - x;
+                    const dy = turret.y - y;
+                    const distSq = dx * dx + dy * dy;
+                    if (distSq <= bestDistSq) {
+                        bestDistSq = distSq;
+                        bestIndex = i;
+                    }
+                }
+                return bestIndex;
+            }
+
+            function removePlacementNear(type, x, y) {
+                const placements = placementsForTurretType(type);
+                let bestIndex = -1;
+                let bestDistSq = Infinity;
+                for (let i = 0; i < placements.length; i += 1) {
+                    const p = placements[i];
+                    if (!p || !Number.isFinite(p.x) || !Number.isFinite(p.y)) continue;
+                    const dx = p.x - x;
+                    const dy = p.y - y;
+                    const distSq = dx * dx + dy * dy;
+                    if (distSq < bestDistSq) {
+                        bestDistSq = distSq;
+                        bestIndex = i;
+                    }
+                }
+                if (bestIndex !== -1) placements.splice(bestIndex, 1);
+            }
+
+            function sellTurretAt(x, y) {
+                const index = findTurretIndexAt(x, y);
+                if (index === -1) return false;
+
+                const turret = game.turrets[index];
+                const type = turret.type || "basic";
+                const refund = turretSellValue(type);
+                if (!refund) return false;
+
+                game.turrets.splice(index, 1);
+                removePlacementNear(type, turret.x, turret.y);
+                setOwnedCountForTurretType(type, Math.max(0, ownedCountForTurretType(type) - 1));
+                refundBankForCost(refund);
+
+                game.sellPulse = {
+                    x: turret.x,
+                    y: turret.y,
+                    ticks: 90,
+                    text: formatCostShort(refund)
+                };
+                playTurretSellSfx();
+                saveGame();
+                refreshHud();
+                return true;
+            }
+
             // Refunds the turret the preview is currently offering. Each recipe scales with its own
             // owned count, so the counter is decremented first: the recipe then reports exactly the
             // price that was paid for this unit.
@@ -4120,16 +4295,13 @@
             function waveSizeFor(waveNumber) {
                 if (waveNumber <= 1) return 1;
                 const slowGrowth = 1
-                    + Math.floor(Math.log2(waveNumber + 1) * 1.15)
-                    + Math.floor(waveNumber / 22);
-                const lateWaveGrowth = Math.floor(Math.max(0, waveNumber - 30) * 0.42);
-                return Math.min(44, Math.max(1, slowGrowth + lateWaveGrowth));
+                    + Math.floor(Math.log2(waveNumber + 1) * 1.7)
+                    + Math.floor(waveNumber / 12);
+                return Math.min(18, Math.max(1, slowGrowth));
             }
 
             function activeEnemyLimitForWave(waveNumber) {
-                const earlyLimit = 2 + Math.floor(waveNumber * 0.2);
-                const lateWaveLimit = Math.floor(Math.max(0, waveNumber - 25) * 0.22);
-                return Math.min(28, Math.max(2, earlyLimit + lateWaveLimit));
+                return Math.min(12, 2 + Math.floor(waveNumber * 0.35));
             }
 
             function waveBreakDuration(waveNumber) {
@@ -4703,6 +4875,9 @@
                 }
                 if (game.depotPulse < 0) game.depotPulse = Math.min(0, game.depotPulse + 0.12);
 
+                if (game.sellPulse && game.sellPulse.ticks > 0) {
+                    game.sellPulse.ticks -= 1;
+                }
                 if (game.dayTick % 15 === 0) syncMusicMood();
                 if (game.dayTick % 120 === 0) captureRuntimeSnapshot();
                 // The full HUD pass walks every shop button and skill node. Nothing in it
@@ -4917,6 +5092,8 @@
                     ctx.fillText(`${Math.floor(game.depotPulse)} depot`, depot.x - 8, depot.y - 70);
                 }
 
+                drawTurretSellHint(ctx);
+                drawSellPulse(ctx);
                 drawTurretPlacementPreview(ctx);
 
                 ctx.restore();
@@ -5378,6 +5555,14 @@
                 }
             }
 
+            // Two quick rising blips: the "resources came back" confirmation.
+            function playTurretSellSfx() {
+                if (!musicState.ctx || !musicState.sfxBus || save.sfxMuted) return;
+                const start = musicState.ctx.currentTime + 0.01;
+                playToneVoice(start, midiToFreq(72), 1, 0.11, musicState.thinPulseWave, 0, false, musicState.sfxBus);
+                playToneVoice(start + 0.07, midiToFreq(79), 2, 0.1, musicState.thinPulseWave, 0, false, musicState.sfxBus);
+            }
+
             // Descending minor figure over the breach overlay. Reuses the track's voices,
             // and stays silent if the audio context was never unlocked or music is muted.
             function playDefeatSting() {
@@ -5522,7 +5707,14 @@
 
             canvas.addEventListener("contextmenu", (e) => {
                 e.preventDefault();
+                // A queued purchase is the more recent intent, so cancel that first;
+                // with nothing pending, right-click sells whatever turret is under it.
                 if (cancelPendingTurretPurchase()) {
+                    updatePlacementPreview(e.clientX, e.clientY);
+                    return;
+                }
+                const point = worldPointFromClient(e.clientX, e.clientY);
+                if (sellTurretAt(point.x, point.y)) {
                     updatePlacementPreview(e.clientX, e.clientY);
                 }
             });
@@ -5540,13 +5732,9 @@
                 canvas.style.cursor = "grabbing";
             });
 
+            // Tracked even with nothing queued: with no pending purchase the pointer
+            // position drives the sell hint instead of the placement preview.
             function updatePlacementPreview(clientX, clientY) {
-                const hadPreview = game.placementPreview !== null;
-                if (!nextPendingTurretType()) {
-                    game.placementPreview = null;
-                    if (hadPreview && !game.running) render();
-                    return;
-                }
                 game.placementPreview = worldPointFromClient(clientX, clientY);
                 if (!game.running) render();
             }
