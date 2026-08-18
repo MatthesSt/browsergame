@@ -1202,7 +1202,10 @@
             const STORAGE_KEY = "meadow-gatherer-save-v1";
             const BACKUP_KEY = "meadow-gatherer-save-v1-backup";
             const BASE_PLAYER_SPEED = 3.5;
-            const PLAYER_SPEED_LEVEL_STEP = 0.25 / WORLD_SCALE;
+            // Same units as BASE_PLAYER_SPEED. The old value divided by WORLD_SCALE,
+            // which shrank each level to under 5% of base while the world itself
+            // scaled up - the upgrade was barely felt.
+            const PLAYER_SPEED_LEVEL_STEP = 0.4;
             const RUNTIME_SNAPSHOT_VERSION = 1;
             const PLAYABLE_WORLD_SIZE_MULTIPLIER = 2;
 
@@ -2142,10 +2145,17 @@
                 };
             }
 
+            const BAG_CRYSTAL_FROM_LEVEL = 10;
+
             function bagRecipe() {
+                // Wood and stone stay linear, but from level 10 crystal enters and grows
+                // quadratically, so late bag levels are gated on crystal rather than on
+                // the two resources sitting either side of the depot.
+                const crystalLevels = Math.max(0, save.bagLevel - BAG_CRYSTAL_FROM_LEVEL + 1);
                 return {
                     wood: 6 + save.bagLevel * 3,
-                    stone: 6 + save.bagLevel * 3
+                    stone: 6 + save.bagLevel * 3,
+                    crystal: crystalLevels > 0 ? crystalLevels * (crystalLevels + 5) : 0
                 };
             }
 
