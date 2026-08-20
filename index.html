@@ -1620,9 +1620,10 @@
             const DEFENDER_AGGRO_RADIUS = W(320);
             const DEFENDER_TOWER_ALERT_RADIUS = W(460);
             // Haste spell: burns aether to double every minion's pace for a minute.
-            const MINION_HASTE_DURATION_TICKS = 3600;   // 60 ticks a second
+            const TICKS_PER_MINUTE = 60 * 60;   // 60 ticks a second
+            const MINION_HASTE_DURATION_TICKS = TICKS_PER_MINUTE;
             const MINION_HASTE_MULTIPLIER = 2;
-            const MINION_HASTE_COST = { aether: 6 };
+            const MINION_HASTE_BASE_COST = 10;
             const DEFENDER_BASE_SPEED_BONUS = 0.45;
             const DEFENDER_CHASE_SPEED_BONUS = 0.75;
             const DEFENDER_REGEN_PER_TICK = 0.05;
@@ -2366,7 +2367,7 @@
                 game.waveIntroPendingType = typeof snapshot.waveIntroPendingType === "string" ? snapshot.waveIntroPendingType : null;
                 game.towerHp = Number.isFinite(snapshot.towerHp) ? clamp(snapshot.towerHp, 0, TOWER_MAX_HP) : TOWER_MAX_HP;
                 game.minionHasteTicks = Number.isFinite(snapshot.minionHasteTicks)
-                    ? clamp(Math.floor(snapshot.minionHasteTicks), 0, MINION_HASTE_DURATION_TICKS)
+                    ? Math.max(0, Math.floor(snapshot.minionHasteTicks))
                     : 0;
 
                 const player = snapshot.player && typeof snapshot.player === "object" ? snapshot.player : {};
@@ -2702,12 +2703,23 @@
                 return minionHasteActive() ? speed * MINION_HASTE_MULTIPLIER : speed;
             }
 
-            function castMinionHaste() {
-                if (!canUseUpgrade("minionHaste") || minionHasteActive()) return;
-                if (!hasBankForCost(MINION_HASTE_COST)) return;
+            // Stacking gets steadily pricier: every whole minute still on the clock adds
+            // an aether to the next cast.
+            function minionHasteRecipe() {
+                const bankedMinutes = Math.floor(game.minionHasteTicks / TICKS_PER_MINUTE);
+                return { aether: MINION_HASTE_BASE_COST + bankedMinutes };
+            }
 
-                spendBankForCost(MINION_HASTE_COST);
-                game.minionHasteTicks = MINION_HASTE_DURATION_TICKS;
+            function castMinionHaste() {
+                if (!canUseUpgrade("minionHaste")) return;
+                // Priced against the clock as it stands, before this cast extends it.
+                const recipe = minionHasteRecipe();
+                if (!hasBankForCost(recipe)) return;
+
+                // Casting again while the spell runs stacks another minute onto the clock
+                // rather than being refused or restarting it.
+                spendBankForCost(recipe);
+                game.minionHasteTicks += MINION_HASTE_DURATION_TICKS;
                 saveGame();
                 refreshHud();
             }
@@ -2951,7 +2963,7 @@
                     minionHasteBtn,
                     "Haste Spell",
                     hasteRunning ? `Active ${formatWaveCountdown(game.minionHasteTicks)}` : `x${MINION_HASTE_MULTIPLIER} for 1:00`,
-                    MINION_HASTE_COST
+                    minionHasteRecipe()
                 );
 
                 setButtonVisible(speedBtn, speedUnlocked);
@@ -2993,7 +3005,7 @@
                 setButtonDisabled(defenderBtn, !defenderUnlocked);
                 setButtonDisabled(minionSpeedBtn, !minionSpeedUnlocked);
                 setButtonDisabled(minionCapBtn, !minionCapacityUnlocked);
-                setButtonDisabled(minionHasteBtn, !minionHasteUnlocked || hasteRunning || !hasBankForCost(MINION_HASTE_COST));
+                setButtonDisabled(minionHasteBtn, !minionHasteUnlocked || !hasBankForCost(minionHasteRecipe()));
 
                 refreshShopGroupVisibility();
 
