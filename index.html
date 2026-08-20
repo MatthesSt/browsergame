@@ -229,7 +229,7 @@
         .ico.best { background: #ffd166; border-radius: 50%; }
         .ico.capacity { background: #6c757d; }
         .ico.minion { background: #f4a261; }
-        .ico.depot { background: #e76f51; border-radius: 50%; }
+        .ico.tower { background: #e76f51; border-radius: 50%; }
         .ico.stamina { background: #7fd7ff; border-radius: 999px; }
         .ico.essence { background: #d7b7ff; border-radius: 50%; box-shadow: 0 0 6px #b288ff; }
         .ico.wave { background: #9be7ff; border-radius: 50%; }
@@ -440,6 +440,17 @@
             display: flex;
         }
 
+        /* An open popover covers the app, but the drifting ambient blobs behind the
+           shell keep moving, so the shell's full-window backdrop blur is recomputed
+           every frame for pixels nobody can see. Park both while one is open. */
+        body:has(.popover-backdrop.open) .shell {
+            backdrop-filter: none;
+        }
+
+        body:has(.popover-backdrop.open) .ambient {
+            display: none;
+        }
+
         /* Qualified with .popover-card so it wins over the full-screen sizing that
            rule declares further down the sheet. */
         .popover-card.confirm-card {
@@ -623,8 +634,8 @@
                 radial-gradient(38% 34% at 34% 54%, #6ad0ff2e 0%, transparent 76%);
             opacity: 0.9;
             filter: blur(6px);
-            animation: mystic-drift 26s ease-in-out infinite alternate,
-                       mystic-hue 42s linear infinite;
+            will-change: transform;
+            animation: mystic-drift 26s ease-in-out infinite alternate;
         }
 
         .skilltree-canvas::after {
@@ -658,7 +669,6 @@
                 #7a5cff2e 360deg);
             filter: blur(34px);
             opacity: 0.9;
-            animation: mystic-aura 56s linear infinite;
         }
 
         .skilltree-canvas.dragging {
@@ -683,21 +693,24 @@
             pointer-events: none;
         }
 
+        /* No drop-shadow here: these circles rotate forever, and a filter forces the
+           whole rings layer to re-rasterise on every frame. A slightly stronger stroke
+           reads the same and stays on the compositor. */
         .skilltree-rings circle {
             fill: none;
-            stroke: #cbb4ff5c;
+            stroke: #cbb4ff70;
             stroke-width: 0.5;
             stroke-dasharray: 3.4 1.7;
-            filter: drop-shadow(0 0 2.4px #a487ff7a);
             transform-origin: 50% 50%;
             transform-box: view-box;
+            will-change: transform;
             animation: rune-spin 90s linear infinite;
         }
 
         /* Alternating dash patterns and counter-rotation read as concentric sigils
            rather than plain concentric circles. */
         .skilltree-rings circle:nth-child(even) {
-            stroke: #7fe9ff4d;
+            stroke: #7fe9ff63;
             stroke-dasharray: 1.1 2.6;
             stroke-width: 0.42;
             animation-duration: 132s;
@@ -705,7 +718,7 @@
         }
 
         .skilltree-rings circle:nth-child(3n) {
-            stroke: #ffd7a34a;
+            stroke: #ffd7a361;
             stroke-dasharray: 6.5 2 1 2;
             animation-duration: 168s;
         }
@@ -718,27 +731,37 @@
             pointer-events: none;
         }
 
+        /* The links sit in a 100x100 viewBox stretched over the whole panel, so a
+           stroke-width in user units blows up to several pixels. non-scaling-stroke
+           keeps them hairline-thin whatever the panel size. */
         .skilltree-links line {
-            stroke: #9d8affa1;
-            stroke-width: 0.5;
+            stroke: #a794ff8f;
+            stroke-width: 1.2;
+            vector-effect: non-scaling-stroke;
             stroke-linecap: round;
-            stroke-dasharray: 2.2 1.9;
-            filter: drop-shadow(0 0 1.7px #8f76ff7a);
-            animation: rune-flow 3.6s linear infinite;
+            stroke-dasharray: 5 5;
         }
 
-        /* An unlocked branch runs brighter and faster, so energy visibly flows
-           outward along the paths you already own. */
+        /* Only unlocked branches animate. A dashoffset animation repaints its whole
+           SVG layer every frame, so running it on every link - filtered, no less -
+           kept the panel busy repainting while you were just reading it. */
         .skilltree-links line.active {
-            stroke: #d7c6ffe0;
-            stroke-width: 0.72;
-            filter: drop-shadow(0 0 3.2px #b79dffb5);
-            animation-duration: 1.9s;
+            stroke: #d7c6ffc4;
+            stroke-width: 1.6;
+            filter: drop-shadow(0 0 2px #b79dff8a);
+            animation: rune-flow 1.9s linear infinite;
         }
 
+        @keyframes rune-flow {
+            from { stroke-dashoffset: 0; }
+            to { stroke-dashoffset: -20; }
+        }
+
+        /* Translate only - animating scale on a blurred layer re-rasterises the blur
+           every frame, while a pure translate rides the compositor. */
         @keyframes mystic-drift {
-            from { transform: translate3d(-1.2%, -0.8%, 0) scale(1); }
-            to { transform: translate3d(1.4%, 1%, 0) scale(1.03); }
+            from { transform: translate3d(-1.2%, -0.8%, 0); }
+            to { transform: translate3d(1.4%, 1%, 0); }
         }
 
         @keyframes mystic-twinkle {
@@ -941,6 +964,11 @@
             border-radius: 1px;
         }
 
+        .res-icon.aether {
+            background: #b57bff;
+            clip-path: polygon(50% 0, 61% 35%, 100% 50%, 61% 65%, 50% 100%, 39% 65%, 0 50%, 39% 35%);
+        }
+
         .res-icon.essence {
             background: #d7b7ff;
             border-radius: 50%;
@@ -1120,7 +1148,7 @@
                     <div id="audioPanel" class="audio-panel" hidden>
                         <div class="audio-panel-row">
                             <span>Music</span>
-                            <button id="muteBtn" class="secondary" aria-pressed="true">On</button>
+                            <button id="muteBtn" class="secondary" aria-pressed="false">Off</button>
                         </div>
                         <div class="audio-panel-row">
                             <span>Effects</span>
@@ -1136,8 +1164,8 @@
             <div class="hud-bar overlay" aria-hidden="true">
                 <div class="hud-row">
                     <div class="hud-section hud-section-resources">
-                        <div class="chip resource-bundle bag-bundle" title="Bag materials: Wood / Stone / Crystal / Amber"><span class="ico bag"></span><span>Bag</span><span class="bag-cap-inline" title="Bag capacity used / maximum"><span>Cap</span><strong id="capacity">10</strong></span><span class="shop-btn-costs hud-bank-costs"><span class="cost-chip"><span class="res-icon wood"></span><strong id="bagWoodHud">0</strong></span><span class="cost-chip"><span class="res-icon stone"></span><strong id="bagStoneHud">0</strong></span><span class="cost-chip"><span class="res-icon crystal"></span><strong id="bagCrystalHud">0</strong></span><span class="cost-chip"><span class="res-icon amber"></span><strong id="bagAmberHud">0</strong></span></span></div>
-                        <div class="chip resource-bundle bank-bundle" title="Banked materials: Wood / Stone / Crystal / Amber / Essence"><span class="ico bank"></span><span>Bank</span><span class="shop-btn-costs hud-bank-costs"><span class="cost-chip"><span class="res-icon wood"></span><strong id="bankWoodHud">0</strong></span><span class="cost-chip"><span class="res-icon stone"></span><strong id="bankStoneHud">0</strong></span><span class="cost-chip"><span class="res-icon crystal"></span><strong id="bankCrystalHud">0</strong></span><span class="cost-chip"><span class="res-icon amber"></span><strong id="bankAmberHud">0</strong></span><span class="cost-chip"><span class="res-icon essence"></span><strong id="essence">0</strong></span></span></div>
+                        <div class="chip resource-bundle bag-bundle" title="Bag materials: Wood / Stone / Crystal / Amber / Aether"><span class="ico bag"></span><span>Bag</span><span class="bag-cap-inline" title="Bag capacity used / maximum"><span>Cap</span><strong id="capacity">10</strong></span><span class="shop-btn-costs hud-bank-costs"><span class="cost-chip"><span class="res-icon wood"></span><strong id="bagWoodHud">0</strong></span><span class="cost-chip"><span class="res-icon stone"></span><strong id="bagStoneHud">0</strong></span><span class="cost-chip"><span class="res-icon crystal"></span><strong id="bagCrystalHud">0</strong></span><span class="cost-chip"><span class="res-icon amber"></span><strong id="bagAmberHud">0</strong></span><span class="cost-chip"><span class="res-icon aether"></span><strong id="bagAetherHud">0</strong></span></span></div>
+                        <div class="chip resource-bundle bank-bundle" title="Banked materials: Wood / Stone / Crystal / Amber / Aether / Essence"><span class="ico bank"></span><span>Bank</span><span class="shop-btn-costs hud-bank-costs"><span class="cost-chip"><span class="res-icon wood"></span><strong id="bankWoodHud">0</strong></span><span class="cost-chip"><span class="res-icon stone"></span><strong id="bankStoneHud">0</strong></span><span class="cost-chip"><span class="res-icon crystal"></span><strong id="bankCrystalHud">0</strong></span><span class="cost-chip"><span class="res-icon amber"></span><strong id="bankAmberHud">0</strong></span><span class="cost-chip"><span class="res-icon aether"></span><strong id="bankAetherHud">0</strong></span><span class="cost-chip"><span class="res-icon essence"></span><strong id="essence">0</strong></span></span></div>
                     </div>
                     <div class="hud-spacer" aria-hidden="true"></div>
                     <div class="hud-section hud-section-wave">
@@ -1219,7 +1247,7 @@
         <div class="popover-card" role="dialog" aria-modal="true" aria-label="Skill Tree">
             <div class="popover-head">
                 <h3>SKILL TREE</h3>
-                <div class="chip resource-bundle bank-bundle skilltree-bank" title="Banked materials: Wood / Stone / Crystal / Amber / Essence"><span class="ico bank"></span><span>Bank</span><span class="shop-btn-costs hud-bank-costs"><span class="cost-chip"><span class="res-icon wood"></span><strong id="treeBankWood">0</strong></span><span class="cost-chip"><span class="res-icon stone"></span><strong id="treeBankStone">0</strong></span><span class="cost-chip"><span class="res-icon crystal"></span><strong id="treeBankCrystal">0</strong></span><span class="cost-chip"><span class="res-icon amber"></span><strong id="treeBankAmber">0</strong></span><span class="cost-chip"><span class="res-icon essence"></span><strong id="treeBankEssence">0</strong></span></span></div>
+                <div class="chip resource-bundle bank-bundle skilltree-bank" title="Banked materials: Wood / Stone / Crystal / Amber / Aether / Essence"><span class="ico bank"></span><span>Bank</span><span class="shop-btn-costs hud-bank-costs"><span class="cost-chip"><span class="res-icon wood"></span><strong id="treeBankWood">0</strong></span><span class="cost-chip"><span class="res-icon stone"></span><strong id="treeBankStone">0</strong></span><span class="cost-chip"><span class="res-icon crystal"></span><strong id="treeBankCrystal">0</strong></span><span class="cost-chip"><span class="res-icon amber"></span><strong id="treeBankAmber">0</strong></span><span class="cost-chip"><span class="res-icon aether"></span><strong id="treeBankAether">0</strong></span><span class="cost-chip"><span class="res-icon essence"></span><strong id="treeBankEssence">0</strong></span></span></div>
                 <div class="popover-head-actions">
                     <div class="zoom-controls" aria-label="Skill tree zoom controls">
                         <button id="skillTreeZoomOutBtn" class="secondary" title="Zoom out">-</button>
@@ -1263,7 +1291,6 @@
             const ENTITY_SIZE_SCALE = 1.35;
             const E = (value) => W(value * ENTITY_SIZE_SCALE);
             const ENEMY_VISUAL_SCALE = 0.58;
-            const SPAWNER_REGION_SCALE = 1.35;
             const ENEMY_SPEED_MULTIPLIER = 0.78;
             const STORAGE_KEY = "meadow-gatherer-save-v1";
             const BACKUP_KEY = "meadow-gatherer-save-v1-backup";
@@ -1273,7 +1300,9 @@
             // scaled up - the upgrade was barely felt.
             const PLAYER_SPEED_LEVEL_STEP = 0.4;
             const RUNTIME_SNAPSHOT_VERSION = 1;
-            const PLAYABLE_WORLD_SIZE_MULTIPLIER = 2;
+            // Total map size, base view times this. It absorbed the separate padding
+            // scale, so the map is the same 4x base it has been - one number to grow.
+            const PLAYABLE_WORLD_SIZE_MULTIPLIER = 8;
 
             const stageEl = document.querySelector(".stage");
             const mapFrameEl = document.querySelector(".map-frame");
@@ -1287,15 +1316,18 @@
             const bagStoneHudEl = document.getElementById("bagStoneHud");
             const bagCrystalHudEl = document.getElementById("bagCrystalHud");
             const bagAmberHudEl = document.getElementById("bagAmberHud");
+            const bagAetherHudEl = document.getElementById("bagAetherHud");
             const bankWoodHudEl = document.getElementById("bankWoodHud");
             const bankStoneHudEl = document.getElementById("bankStoneHud");
             const bankCrystalHudEl = document.getElementById("bankCrystalHud");
             const bankAmberHudEl = document.getElementById("bankAmberHud");
+            const bankAetherHudEl = document.getElementById("bankAetherHud");
             const treeBankEls = {
                 wood: document.getElementById("treeBankWood"),
                 stone: document.getElementById("treeBankStone"),
                 crystal: document.getElementById("treeBankCrystal"),
                 amber: document.getElementById("treeBankAmber"),
+                aether: document.getElementById("treeBankAether"),
                 essence: document.getElementById("treeBankEssence")
             };
             const storedEl = document.getElementById("stored");
@@ -1350,15 +1382,26 @@
 
             const BASE_VIEW_W = W(1920);
             const BASE_VIEW_H = W(1080);
+            // The tower stands at the origin, so both rectangles below run -x..x by -y..y:
+            // four quadrants around it.
+            //
+            // The whole map is in play: spawners, their discs, the ground enemies march
+            // in across and the ground the player roams are all the same rectangle.
+            const WORLD_HALF_W = BASE_VIEW_W * PLAYABLE_WORLD_SIZE_MULTIPLIER * 0.5;
+            const WORLD_HALF_H = BASE_VIEW_H * PLAYABLE_WORLD_SIZE_MULTIPLIER * 0.5;
             const world = {
-                w: BASE_VIEW_W * PLAYABLE_WORLD_SIZE_MULTIPLIER,
-                h: BASE_VIEW_H * PLAYABLE_WORLD_SIZE_MULTIPLIER
+                w: WORLD_HALF_W * 2,
+                h: WORLD_HALF_H * 2,
+                minX: -WORLD_HALF_W,
+                maxX: WORLD_HALF_W,
+                minY: -WORLD_HALF_H,
+                maxY: WORLD_HALF_H
             };
             // The viewport follows the on-screen frame's aspect (see fitCanvasToStage) so the map
             // fills the stage without stretching. Vertical coverage stays fixed at BASE_VIEW_H.
             const viewport = { w: canvas.width, h: canvas.height };
-            const RESOURCE_TYPES = ["wood", "stone", "crystal", "amber", "essence"];
-            const GATHERER_PRIORITY_MODES = ["auto", "wood", "stone", "crystal", "amber"];
+            const RESOURCE_TYPES = ["wood", "stone", "crystal", "amber", "aether", "essence"];
+            const GATHERER_PRIORITY_MODES = ["auto", "wood", "stone", "crystal", "amber", "aether"];
             const SKILL_TREE_ORDER = [
                 "speed",
                 "bag",
@@ -1498,9 +1541,16 @@
                 suppressClick: false,
                 handlersBound: false
             };
+            // 1 is native scale - there is nothing to gain from magnifying further - and
+            // 0.25 pulls back far enough to take in the whole field at once.
+            const MIN_MAP_ZOOM = 0.25;
+            const MAX_MAP_ZOOM = 1;
+            const MAP_ZOOM_STEP = 1.12;
+
             const cameraState = {
                 x: 0,
                 y: 0,
+                zoom: 1,
                 dragging: false,
                 pointerId: null,
                 startClientX: 0,
@@ -1516,7 +1566,8 @@
                 wood: { color: "#2a9d8f", shape: "square", size: E(12) / WORLD_SCALE, value: 1, respawn: 240 },
                 stone: { color: "#6c757d", shape: "circle", size: E(13) / WORLD_SCALE, value: 2, respawn: 320 },
                 crystal: { color: "#00b4d8", shape: "diamond", size: E(11) / WORLD_SCALE, value: 4, respawn: 460 },
-                amber: { color: "#f4a261", shape: "triangle", size: E(12) / WORLD_SCALE, value: 6, respawn: 540 }
+                amber: { color: "#f4a261", shape: "triangle", size: E(12) / WORLD_SCALE, value: 6, respawn: 540 },
+                aether: { color: "#b57bff", shape: "star", size: E(13) / WORLD_SCALE, value: 11, respawn: 1200}
             };
 
             const enemyTypeConfig = {
@@ -1526,9 +1577,9 @@
                 hunter: { key: "hunter", color: "#8de969", stroke: "#2f5b22", r: E(9), hp: 2, speed: W(2.0) * ENEMY_SPEED_MULTIPLIER, damage: 3, shape: "circle", minionFocus: true, minionShotRange: W(72), minionShotCooldown: 16, laserColor: "#b8ff7f" }
             };
 
-            const depot = { x: (world.w - W(108)) / 2, y: (world.h - W(88)) / 2, w: W(108), h: W(88) };
-            const DEPOT_MAX_HP = 100;
-            const START_BUDGET = { wood: 40, stone: 30, crystal: 0, amber: 0,essence:0 };
+            const tower = { x: -W(108) / 2, y: -W(88) / 2, w: W(108), h: W(88) };
+            const TOWER_MAX_HP = 100;
+            const START_BUDGET = { wood: 40, stone: 30, crystal: 0, amber: 0, aether: 0, essence: 0 };
             const START_WAVE_COUNT = 1;
             const WAVE_START_DELAY = 3600;
             const WAVE_BREAK_TICKS = 320;
@@ -1560,32 +1611,52 @@
             const DEFENDER_PATROL_IDLE_MIN_TICKS = 90;
             const DEFENDER_PATROL_IDLE_MAX_TICKS = 210;
             const DEFENDER_AGGRO_RADIUS = W(320);
-            const DEFENDER_DEPOT_ALERT_RADIUS = W(460);
+            const DEFENDER_TOWER_ALERT_RADIUS = W(460);
             const DEFENDER_BASE_SPEED_BONUS = 0.45;
             const DEFENDER_CHASE_SPEED_BONUS = 0.75;
             const DEFENDER_REGEN_PER_TICK = 0.05;
             const DEFENDER_KILL_RECOIL_DAMAGE = 0.6;
-            const SPAWNER_MARGIN = W(100);
-            const CORNER_SPAWN_WIDTH = W(420 * SPAWNER_REGION_SCALE);
-            const CORNER_SPAWN_HEIGHT = W(260 * SPAWNER_REGION_SCALE);
-            const SIDE_SPAWN_WIDTH = W(300 * SPAWNER_REGION_SCALE);
-            const SIDE_SPAWN_HEIGHT = W(220 * SPAWNER_REGION_SCALE);
-            const SPAWNER_INWARD_RATIO = 0.05;
-            const DEPOT_CENTER_X = depot.x + depot.w * 0.5;
-            const DEPOT_CENTER_Y = depot.y + depot.h * 0.5;
-            const SIDE_SPAWNER_X_OFFSET = (DEPOT_CENTER_X - SPAWNER_MARGIN) * (0.5 + SPAWNER_INWARD_RATIO);
-            const TOP_SPAWNER_Y = SPAWNER_MARGIN + (DEPOT_CENTER_Y - SPAWNER_MARGIN) * SPAWNER_INWARD_RATIO;
-            const BOTTOM_SPAWNER_Y = world.h - TOP_SPAWNER_Y;
-            const TOP_LEFT_SPAWNER_X = SPAWNER_MARGIN + (DEPOT_CENTER_X - SPAWNER_MARGIN) * SPAWNER_INWARD_RATIO;
-            const TOP_RIGHT_SPAWNER_X = world.w - TOP_LEFT_SPAWNER_X;
-            const spawners = [
-                { type: "wood", corner: "left-mid", x: SIDE_SPAWNER_X_OFFSET, y: DEPOT_CENTER_Y, timer: 0 },
-                { type: "stone", corner: "right-mid", x: world.w - SIDE_SPAWNER_X_OFFSET, y: DEPOT_CENTER_Y, timer: 0 },
-                { type: "crystal", corner: "top-left", x: TOP_LEFT_SPAWNER_X, y: TOP_SPAWNER_Y, timer: 0 },
-                { type: "amber", corner: "top-right", x: TOP_RIGHT_SPAWNER_X, y: TOP_SPAWNER_Y, timer: 0 },
-                { type: "amber", corner: "bottom-left", x: TOP_LEFT_SPAWNER_X, y: BOTTOM_SPAWNER_Y, timer: 0 },
-                { type: "crystal", corner: "bottom-right", x: TOP_RIGHT_SPAWNER_X, y: BOTTOM_SPAWNER_Y, timer: 0 }
+            // Spawn areas are discs around their spawner, sized by tier: the far ring
+            // seeds a wider field than the near one.
+            const SPAWN_RADIUS_BY_TIER = {
+                1: W(196),
+                2: W(251),
+                3: W(196)
+            };
+            const TOWER_CENTER_X = tower.x + tower.w * 0.5;
+            const TOWER_CENTER_Y = tower.y + tower.h * 0.5;
+            // Spawners sit on tier rings around the tower, placed by polar coordinates:
+            // the tier fixes how far out a field is, the entry fixes its bearing. Tier 1
+            // is the short walk from the tower, tier 2 the long one - so a resource's tier
+            // is what its distance means.
+            const SPAWNER_TIER_DISTANCE = {
+                1: W(920),
+                2: W(1830),
+                // Tier 3 rides due north and south - the long haul, and the only ring
+                // whose reach is bounded by the map's height rather than its width.
+                3: W(3200)
+            };
+            const SPAWNER_LAYOUT = [
+                { type: "wood", tier: 1, angle: 180 },
+                { type: "stone", tier: 1, angle: 0 },
+                { type: "crystal", tier: 2, angle: -150 },
+                { type: "amber", tier: 2, angle: -30 },
+                { type: "amber", tier: 2, angle: 150 },
+                { type: "crystal", tier: 2, angle: 30 },
+                { type: "aether", tier: 3, angle: -90 },
+                { type: "aether", tier: 3, angle: 90 }
             ];
+            const spawners = SPAWNER_LAYOUT.map((entry) => {
+                const distance = SPAWNER_TIER_DISTANCE[entry.tier];
+                const bearing = (entry.angle * Math.PI) / 180;
+                return {
+                    type: entry.type,
+                    tier: entry.tier,
+                    x: Math.cos(bearing) * distance,
+                    y: Math.sin(bearing) * distance,
+                    timer: 0
+                };
+            });
             const BASE_ACTIVE_NODES_PER_SPAWNER = Math.max(1, Math.floor(MAX_ACTIVE_NODES / spawners.length));
             const INITIAL_WAVE_NUMBER = Math.max(0, Math.floor(START_WAVE_COUNT) - 1);
 
@@ -1597,22 +1668,22 @@
                 dayTick: 0,
                 depositPulse: 0,
                 minionPulse: 0,
-                depotPulse: 0,
+                towerPulse: 0,
                 waveNumber: INITIAL_WAVE_NUMBER,
                 waveRemainingSpawns: 0,
                 waveSpawnTimer: 0,
                 waveBreakTimer: WAVE_START_DELAY,
                 waveInProgress: false,
                 waveIntroPendingType: null,
-                depotHp: DEPOT_MAX_HP,
+                towerHp: TOWER_MAX_HP,
                 player: {
-                    x: world.w / 2,
-                    y: world.h / 2,
+                    x: 0,
+                    y: 0,
                     r: E(14) / WORLD_SCALE,
                     speed: BASE_PLAYER_SPEED + save.speedLevel * PLAYER_SPEED_LEVEL_STEP,
                     stamina: PLAYER_STAMINA_MAX
                 },
-                inventory: { wood: 0, stone: 0, crystal: 0, amber: 0 },
+                inventory: { wood: 0, stone: 0, crystal: 0, amber: 0, aether: 0 },
                 nodes: [],
                 enemies: [],
                 turrets: [],
@@ -1627,7 +1698,8 @@
                     wood: { key: "", cap: BASE_ACTIVE_NODES_PER_SPAWNER },
                     stone: { key: "", cap: BASE_ACTIVE_NODES_PER_SPAWNER },
                     crystal: { key: "", cap: BASE_ACTIVE_NODES_PER_SPAWNER },
-                    amber: { key: "", cap: BASE_ACTIVE_NODES_PER_SPAWNER }
+                    amber: { key: "", cap: BASE_ACTIVE_NODES_PER_SPAWNER },
+                    aether: { key: "", cap: BASE_ACTIVE_NODES_PER_SPAWNER }
                 },
                 touchTarget: null,
                 placementPreview: null,
@@ -1639,15 +1711,15 @@
                 const angle = (Math.PI * 2 * index) / BASE_MAX_TURRETS - Math.PI * 0.5;
                 const radius = W(94);
                 return {
-                    x: depot.x + depot.w * 0.5 + Math.cos(angle) * radius,
-                    y: depot.y + depot.h * 0.5 + Math.sin(angle) * radius
+                    x: tower.x + tower.w * 0.5 + Math.cos(angle) * radius,
+                    y: tower.y + tower.h * 0.5 + Math.sin(angle) * radius
                 };
             }
 
             function clampTurretPoint(x, y) {
                 return {
-                    x: Math.max(TURRET_EDGE_PADDING, Math.min(world.w - TURRET_EDGE_PADDING, x)),
-                    y: Math.max(TURRET_EDGE_PADDING, Math.min(world.h - TURRET_EDGE_PADDING, y))
+                    x: clamp(x, world.minX + TURRET_EDGE_PADDING, world.maxX - TURRET_EDGE_PADDING),
+                    y: clamp(y, world.minY + TURRET_EDGE_PADDING, world.maxY - TURRET_EDGE_PADDING)
                 };
             }
 
@@ -1671,9 +1743,82 @@
                 return normalized;
             }
 
+            // The depot became the tower, so saves written before the rename still spell
+            // the runtime keys the old way. Remap them once on load instead of teaching
+            // every read site both spellings.
+            function migrateLegacyTowerKeys(data) {
+                // Declared inside the function on purpose: loadSave runs while the module
+                // body is still initialising, so a module-scope const would be in its
+                // temporal dead zone and the throw would be swallowed by loadSave's catch,
+                // quietly resetting the save.
+                const renames = { depotHp: "towerHp", depotPulse: "towerPulse" };
+                const runtimeState = data && typeof data === "object" ? data.runtimeState : null;
+                if (!runtimeState || typeof runtimeState !== "object") return data;
+
+                for (const [oldKey, newKey] of Object.entries(renames)) {
+                    if (!(oldKey in runtimeState)) continue;
+                    if (!(newKey in runtimeState)) runtimeState[newKey] = runtimeState[oldKey];
+                    delete runtimeState[oldKey];
+                }
+
+                if (Array.isArray(runtimeState.minionUnits)) {
+                    for (const minion of runtimeState.minionUnits) {
+                        if (!minion || typeof minion !== "object") continue;
+                        // The old state name matches no branch in the gatherer loop, so a
+                        // minion carrying it would sit still forever.
+                        if (minion.state === "toDepot") minion.state = "toTower";
+                        if (!("isRegeneratingAtDepot" in minion)) continue;
+                        if (!("isRegeneratingAtTower" in minion)) {
+                            minion.isRegeneratingAtTower = Boolean(minion.isRegeneratingAtDepot);
+                        }
+                        delete minion.isRegeneratingAtDepot;
+                    }
+                }
+
+                return data;
+            }
+
+            // Saves written before the map was recentred store absolute 0..w / 0..h
+            // coordinates. Shift every stored point into the tower-at-origin space once,
+            // and stamp the save so it is never shifted twice.
+            function migrateLegacyCoordinates(data) {
+                if (!data || typeof data !== "object" || data.coordOrigin === "tower") return data;
+
+                const shiftX = -world.w * 0.5;
+                const shiftY = -world.h * 0.5;
+                const shift = (entity, xKey, yKey) => {
+                    if (!entity || typeof entity !== "object") return;
+                    if (Number.isFinite(entity[xKey])) entity[xKey] += shiftX;
+                    if (Number.isFinite(entity[yKey])) entity[yKey] += shiftY;
+                };
+
+                for (const key of ["turretPlacements", "sniperTurretPlacements", "slowTurretPlacements"]) {
+                    if (!Array.isArray(data[key])) continue;
+                    for (const placement of data[key]) shift(placement, "x", "y");
+                }
+
+                const runtimeState = data.runtimeState;
+                if (runtimeState && typeof runtimeState === "object") {
+                    shift(runtimeState.player, "x", "y");
+                    for (const key of ["nodes", "enemies", "turrets", "minionUnits"]) {
+                        if (!Array.isArray(runtimeState[key])) continue;
+                        for (const entity of runtimeState[key]) {
+                            shift(entity, "x", "y");
+                            shift(entity, "shotTargetX", "shotTargetY");
+                            shift(entity, "targetX", "targetY");
+                            shift(entity, "patrolTargetX", "patrolTargetY");
+                        }
+                    }
+                }
+
+                data.coordOrigin = "tower";
+                return data;
+            }
+
             function loadSave() {
                 try {
-                    const data = JSON.parse(localStorage.getItem(STORAGE_KEY) || "{}");
+                    const stored = JSON.parse(localStorage.getItem(STORAGE_KEY) || "{}");
+                    const data = migrateLegacyCoordinates(migrateLegacyTowerKeys(stored));
                     const legacySpawnerLevel = Number.isFinite(data.spawnerLevel) ? data.spawnerLevel : 0;
                     const turretCapLevel = Number.isFinite(data.turretCapLevel) ? Math.max(0, Math.floor(data.turretCapLevel)) : 0;
                     const maxTurretsForSave = BASE_MAX_TURRETS + turretCapLevel * TURRET_CAP_STEP;
@@ -1709,6 +1854,7 @@
                         bankStone: Number.isFinite(data.bankStone) ? data.bankStone : START_BUDGET.stone,
                         bankCrystal: Number.isFinite(data.bankCrystal) ? data.bankCrystal : START_BUDGET.crystal,
                         bankAmber: Number.isFinite(data.bankAmber) ? data.bankAmber : START_BUDGET.amber,
+                        bankAether: Number.isFinite(data.bankAether) ? data.bankAether : START_BUDGET.aether,
                         minions: Number.isFinite(data.minions) ? data.minions : 0,
                         defenderMinions: Number.isFinite(data.defenderMinions) ? data.defenderMinions : 0,
                         minionSpeedLevel: Number.isFinite(data.minionSpeedLevel) ? data.minionSpeedLevel : 0,
@@ -1724,14 +1870,18 @@
                         spawnerStoneLevel: Number.isFinite(data.spawnerStoneLevel) ? data.spawnerStoneLevel : legacySpawnerLevel,
                         spawnerCrystalLevel: Number.isFinite(data.spawnerCrystalLevel) ? data.spawnerCrystalLevel : legacySpawnerLevel,
                         spawnerAmberLevel: Number.isFinite(data.spawnerAmberLevel) ? data.spawnerAmberLevel : legacySpawnerLevel,
+                        spawnerAetherLevel: Number.isFinite(data.spawnerAetherLevel) ? data.spawnerAetherLevel : 0,
                         speedLevel: Number.isFinite(data.speedLevel) ? data.speedLevel : 0,
                         bagLevel: Number.isFinite(data.bagLevel) ? data.bagLevel : 0,
                         gathererFocusBySlot,
                         gathererFocusCursor,
                         unlockedSkills,
-                        musicMuted: Boolean(data.musicMuted),
+                        // Music starts off by default; only an explicit unmute in the save turns it on.
+                        musicMuted: data.musicMuted !== false,
                         musicVolume: Number.isFinite(data.musicVolume) ? clamp(data.musicVolume, 0, 1) : 1,
                         sfxMuted: Boolean(data.sfxMuted),
+                        mapZoom: Number.isFinite(data.mapZoom) ? clamp(data.mapZoom, MIN_MAP_ZOOM, MAX_MAP_ZOOM) : 1,
+                        coordOrigin: "tower",
                         runtimeState: data.runtimeState && typeof data.runtimeState === "object" ? data.runtimeState : null
                     };
                 } catch {
@@ -1745,6 +1895,7 @@
                         bankStone: START_BUDGET.stone,
                         bankCrystal: START_BUDGET.crystal,
                         bankAmber: START_BUDGET.amber,
+                        bankAether: START_BUDGET.aether,
                         minions: 0,
                         defenderMinions: 0,
                         minionSpeedLevel: 0,
@@ -1760,14 +1911,17 @@
                         spawnerStoneLevel: 0,
                         spawnerCrystalLevel: 0,
                         spawnerAmberLevel: 0,
+                        spawnerAetherLevel: 0,
                         speedLevel: 0,
                         bagLevel: 0,
                         gathererFocusBySlot: {},
                         gathererFocusCursor: 0,
                         unlockedSkills: normalizeUnlockedSkills(null),
-                        musicMuted: false,
+                        musicMuted: true,
                         musicVolume: 1,
-                        sfxMuted: false,
+                        sfxMuted: true,
+                        mapZoom: 1,
+                        coordOrigin: "tower",
                         runtimeState: null
                     };
                 }
@@ -2079,14 +2233,52 @@
                 return Math.max(min, Math.min(max, value));
             }
 
+            // How much world the viewport covers at the current zoom. Everything that
+            // used to read viewport.w/h as a world extent goes through these.
+            function viewWorldW() {
+                return viewport.w / cameraState.zoom;
+            }
+
+            function viewWorldH() {
+                return viewport.h / cameraState.zoom;
+            }
+
             function clampCameraPosition() {
-                cameraState.x = clamp(cameraState.x, 0, Math.max(0, world.w - viewport.w));
-                cameraState.y = clamp(cameraState.y, 0, Math.max(0, world.h - viewport.h));
+                const viewW = viewWorldW();
+                const viewH = viewWorldH();
+                // Once the view is wider than the map there is nothing to pan to, so the
+                // map is centred instead of pinned against an edge.
+                cameraState.x = viewW >= world.w
+                    ? world.minX - (viewW - world.w) * 0.5
+                    : clamp(cameraState.x, world.minX, world.maxX - viewW);
+                cameraState.y = viewH >= world.h
+                    ? world.minY - (viewH - world.h) * 0.5
+                    : clamp(cameraState.y, world.minY, world.maxY - viewH);
+            }
+
+            function setMapZoom(nextZoom, anchorClientX, anchorClientY) {
+                const zoom = clamp(nextZoom, MIN_MAP_ZOOM, MAX_MAP_ZOOM);
+                if (zoom === cameraState.zoom) return;
+
+                // Whatever sits under the cursor - or the middle of the view, when zooming
+                // by keyboard - stays put while the scale changes.
+                const anchor = Number.isFinite(anchorClientX) && Number.isFinite(anchorClientY)
+                    ? worldPointFromClient(anchorClientX, anchorClientY)
+                    : { x: cameraState.x + viewWorldW() * 0.5, y: cameraState.y + viewWorldH() * 0.5 };
+                const anchorFractionX = (anchor.x - cameraState.x) / viewWorldW();
+                const anchorFractionY = (anchor.y - cameraState.y) / viewWorldH();
+
+                cameraState.zoom = zoom;
+                save.mapZoom = zoom;   // picked up by the next snapshot write
+                cameraState.x = anchor.x - anchorFractionX * viewWorldW();
+                cameraState.y = anchor.y - anchorFractionY * viewWorldH();
+                clampCameraPosition();
+                render();
             }
 
             function centerCameraOn(x, y) {
-                cameraState.x = x - viewport.w * 0.5;
-                cameraState.y = y - viewport.h * 0.5;
+                cameraState.x = x - viewWorldW() * 0.5;
+                cameraState.y = y - viewWorldH() * 0.5;
                 clampCameraPosition();
             }
 
@@ -2098,14 +2290,14 @@
                     dayTick: game.dayTick,
                     depositPulse: game.depositPulse,
                     minionPulse: game.minionPulse,
-                    depotPulse: game.depotPulse,
+                    towerPulse: game.towerPulse,
                     waveNumber: game.waveNumber,
                     waveRemainingSpawns: game.waveRemainingSpawns,
                     waveSpawnTimer: game.waveSpawnTimer,
                     waveBreakTimer: game.waveBreakTimer,
                     waveInProgress: game.waveInProgress,
                     waveIntroPendingType: game.waveIntroPendingType,
-                    depotHp: game.depotHp,
+                    towerHp: game.towerHp,
                     player: {
                         x: game.player.x,
                         y: game.player.y,
@@ -2115,7 +2307,8 @@
                         wood: game.inventory.wood,
                         stone: game.inventory.stone,
                         crystal: game.inventory.crystal,
-                        amber: game.inventory.amber
+                        amber: game.inventory.amber,
+                        aether: game.inventory.aether
                     },
                     nodes: game.nodes,
                     enemies: game.enemies,
@@ -2147,7 +2340,7 @@
                 game.dayTick = Number.isFinite(snapshot.dayTick) ? Math.max(0, Math.floor(snapshot.dayTick)) : 0;
                 game.depositPulse = Number.isFinite(snapshot.depositPulse) ? snapshot.depositPulse : 0;
                 game.minionPulse = Number.isFinite(snapshot.minionPulse) ? snapshot.minionPulse : 0;
-                game.depotPulse = Number.isFinite(snapshot.depotPulse) ? snapshot.depotPulse : 0;
+                game.towerPulse = Number.isFinite(snapshot.towerPulse) ? snapshot.towerPulse : 0;
                 game.waveNumber = Number.isFinite(snapshot.waveNumber) ? Math.max(0, Math.floor(snapshot.waveNumber)) : 0;
                 game.waveRemainingSpawns = Number.isFinite(snapshot.waveRemainingSpawns)
                     ? Math.max(0, Math.floor(snapshot.waveRemainingSpawns))
@@ -2158,12 +2351,12 @@
                     : WAVE_START_DELAY;
                 game.waveInProgress = Boolean(snapshot.waveInProgress);
                 game.waveIntroPendingType = typeof snapshot.waveIntroPendingType === "string" ? snapshot.waveIntroPendingType : null;
-                game.depotHp = Number.isFinite(snapshot.depotHp) ? clamp(snapshot.depotHp, 0, DEPOT_MAX_HP) : DEPOT_MAX_HP;
+                game.towerHp = Number.isFinite(snapshot.towerHp) ? clamp(snapshot.towerHp, 0, TOWER_MAX_HP) : TOWER_MAX_HP;
 
                 const player = snapshot.player && typeof snapshot.player === "object" ? snapshot.player : {};
                 game.player.speed = BASE_PLAYER_SPEED + save.speedLevel * PLAYER_SPEED_LEVEL_STEP;
-                game.player.x = Number.isFinite(player.x) ? clamp(player.x, game.player.r, world.w - game.player.r) : world.w * 0.5;
-                game.player.y = Number.isFinite(player.y) ? clamp(player.y, game.player.r, world.h - game.player.r) : world.h * 0.5;
+                game.player.x = Number.isFinite(player.x) ? clamp(player.x, world.minX + game.player.r, world.maxX - game.player.r) : 0;
+                game.player.y = Number.isFinite(player.y) ? clamp(player.y, world.minY + game.player.r, world.maxY - game.player.r) : 0;
                 game.player.stamina = Number.isFinite(player.stamina) ? clamp(player.stamina, 0, PLAYER_STAMINA_MAX) : PLAYER_STAMINA_MAX;
                 centerCameraOn(game.player.x, game.player.y);
 
@@ -2172,6 +2365,7 @@
                 game.inventory.stone = Number.isFinite(inv.stone) ? Math.max(0, Math.floor(inv.stone)) : 0;
                 game.inventory.crystal = Number.isFinite(inv.crystal) ? Math.max(0, Math.floor(inv.crystal)) : 0;
                 game.inventory.amber = Number.isFinite(inv.amber) ? Math.max(0, Math.floor(inv.amber)) : 0;
+                game.inventory.aether = Number.isFinite(inv.aether) ? Math.max(0, Math.floor(inv.aether)) : 0;
 
                 game.nodes = Array.isArray(snapshot.nodes) ? snapshot.nodes : [];
                 game.enemies = Array.isArray(snapshot.enemies) ? snapshot.enemies : [];
@@ -2211,7 +2405,8 @@
             }
 
             function inventoryCount() {
-                return game.inventory.wood + game.inventory.stone + game.inventory.crystal + game.inventory.amber;
+                return game.inventory.wood + game.inventory.stone + game.inventory.crystal
+                    + game.inventory.amber + game.inventory.aether;
             }
 
             function minionRecipe() {
@@ -2245,7 +2440,7 @@
             function bagRecipe() {
                 // Wood and stone stay linear, but from level 10 crystal enters and grows
                 // quadratically, so late bag levels are gated on crystal rather than on
-                // the two resources sitting either side of the depot.
+                // the two resources sitting either side of the tower.
                 const crystalLevels = Math.max(0, save.bagLevel - BAG_CRYSTAL_FROM_LEVEL + 1);
                 return {
                     wood: 6 + save.bagLevel * 3,
@@ -2258,6 +2453,8 @@
                 if (type === "wood") return save.spawnerWoodLevel;
                 if (type === "stone") return save.spawnerStoneLevel;
                 if (type === "crystal") return save.spawnerCrystalLevel;
+                // No shop upgrade for aether yet - its spells come later.
+                if (type === "aether") return save.spawnerAetherLevel;
                 return save.spawnerAmberLevel;
             }
 
@@ -2405,6 +2602,7 @@
                 if (priority === "stone") return "Stone";
                 if (priority === "crystal") return "Crystal";
                 if (priority === "amber") return "Amber";
+                if (priority === "aether") return "Aether";
                 return "Auto";
             }
 
@@ -2618,10 +2816,12 @@
                 setHudNumber("bagStone", bagStoneHudEl, game.inventory.stone);
                 setHudNumber("bagCrystal", bagCrystalHudEl, game.inventory.crystal);
                 setHudNumber("bagAmber", bagAmberHudEl, game.inventory.amber);
+                setHudNumber("bagAether", bagAetherHudEl, game.inventory.aether);
                 setHudNumber("bankWood", bankWoodHudEl, save.bankWood);
                 setHudNumber("bankStone", bankStoneHudEl, save.bankStone);
                 setHudNumber("bankCrystal", bankCrystalHudEl, save.bankCrystal);
                 setHudNumber("bankAmber", bankAmberHudEl, save.bankAmber);
+                setHudNumber("bankAether", bankAetherHudEl, save.bankAether);
                 refreshSkillTreeBank();
                 setHudNumber("stored", storedEl, save.stored);
                 setHudNumber("bestStored", bestStoredEl, save.bestStored);
@@ -2816,58 +3016,238 @@
                 clampCameraPosition();
             }
 
-            function drawDepot(targetCtx) {
-                const depotRadius = 12;
-                const depotInset = 6;
+            // The tower is drawn from directly above: a stone plinth ringed with
+            // crenellations, a conical shingled roof drawn as radial seams converging on
+            // the apex crystal, and a rune circle that turns as the day runs.
+            const TOWER_RADIUS = Math.min(tower.w, tower.h) * 0.5;
+            const TOWER_WARD_RADIUS = TOWER_RADIUS * 1.18;
+
+            function drawTower(targetCtx) {
+                const cx = TOWER_CENTER_X;
+                const cy = TOWER_CENTER_Y;
+                const R = TOWER_RADIUS;
+                const roofR = R * 0.74;
+                const pulse = 0.5 + 0.5 * Math.sin(game.dayTick * 0.06);
 
                 targetCtx.save();
-                targetCtx.shadowColor = "#ffb36666";
-                targetCtx.shadowBlur = 16;
-                targetCtx.fillStyle = "#f4a2612e";
+
+                // Ground shadow, offset with the light falling from the upper left.
+                targetCtx.fillStyle = "rgba(8, 16, 26, 0.42)";
                 targetCtx.beginPath();
-                targetCtx.roundRect(depot.x, depot.y, depot.w, depot.h, depotRadius);
+                targetCtx.ellipse(cx + R * 0.08, cy + R * 0.11, R * 1.14, R * 1.08, 0, 0, Math.PI * 2);
+                targetCtx.fill();
+
+                const glow = targetCtx.createRadialGradient(cx, cy, R * 0.4, cx, cy, R * 1.9);
+                glow.addColorStop(0, `rgba(255, 186, 110, ${0.15 + pulse * 0.05})`);
+                glow.addColorStop(1, "rgba(255, 186, 110, 0)");
+                targetCtx.fillStyle = glow;
+                targetCtx.beginPath();
+                targetCtx.arc(cx, cy, R * 1.9, 0, Math.PI * 2);
+                targetCtx.fill();
+
+                // Rune circle, drawn outside the ward ring so the two never sit on top
+                // of each other.
+                targetCtx.save();
+                targetCtx.translate(cx, cy);
+                targetCtx.rotate(game.dayTick * 0.0032);
+                targetCtx.strokeStyle = `rgba(255, 214, 160, ${0.16 + pulse * 0.1})`;
+                targetCtx.lineWidth = Math.max(1, R * 0.04);
+                targetCtx.setLineDash([R * 0.15, R * 0.11]);
+                targetCtx.beginPath();
+                targetCtx.arc(0, 0, R * 1.36, 0, Math.PI * 2);
+                targetCtx.stroke();
+                targetCtx.setLineDash([]);
+                targetCtx.strokeStyle = "rgba(159, 211, 199, 0.35)";
+                targetCtx.lineWidth = Math.max(1, R * 0.025);
+                for (let i = 0; i < 8; i += 1) {
+                    targetCtx.rotate(Math.PI / 4);
+                    targetCtx.beginPath();
+                    targetCtx.moveTo(R * 1.45, 0);
+                    targetCtx.lineTo(R * 1.62, 0);
+                    targetCtx.stroke();
+                }
+                targetCtx.restore();
+
+                // Stone plinth.
+                const stone = targetCtx.createRadialGradient(cx - R * 0.35, cy - R * 0.4, R * 0.12, cx, cy, R);
+                stone.addColorStop(0, "#8d9db2");
+                stone.addColorStop(0.6, "#5d708a");
+                stone.addColorStop(1, "#3a4a61");
+                targetCtx.fillStyle = stone;
+                targetCtx.beginPath();
+                targetCtx.arc(cx, cy, R, 0, Math.PI * 2);
+                targetCtx.fill();
+
+                // Battlements, seen from directly above.
+                const merlons = 12;
+                for (let i = 0; i < merlons; i += 1) {
+                    const a0 = (i / merlons) * Math.PI * 2;
+                    const a1 = ((i + 0.55) / merlons) * Math.PI * 2;
+                    targetCtx.beginPath();
+                    targetCtx.arc(cx, cy, R * 1.07, a0, a1);
+                    targetCtx.arc(cx, cy, R * 0.9, a1, a0, true);
+                    targetCtx.closePath();
+                    targetCtx.fillStyle = "#7f90a8";
+                    targetCtx.fill();
+                    targetCtx.strokeStyle = "#26323f";
+                    targetCtx.lineWidth = 1.5;
+                    targetCtx.stroke();
+                }
+
+                // Masonry seams on the parapet walkway.
+                targetCtx.strokeStyle = "rgba(24, 34, 46, 0.45)";
+                targetCtx.lineWidth = 1;
+                targetCtx.beginPath();
+                targetCtx.arc(cx, cy, R * 0.9, 0, Math.PI * 2);
+                targetCtx.stroke();
+                for (let i = 0; i < 24; i += 1) {
+                    const a = (i / 24) * Math.PI * 2;
+                    targetCtx.beginPath();
+                    targetCtx.moveTo(cx + Math.cos(a) * R * 0.75, cy + Math.sin(a) * R * 0.75);
+                    targetCtx.lineTo(cx + Math.cos(a) * R * 0.9, cy + Math.sin(a) * R * 0.9);
+                    targetCtx.stroke();
+                }
+
+                // Braziers burning on the walkway.
+                for (let i = 0; i < 4; i += 1) {
+                    const a = Math.PI / 4 + i * (Math.PI / 2);
+                    targetCtx.save();
+                    targetCtx.translate(cx + Math.cos(a) * R * 0.83, cy + Math.sin(a) * R * 0.83);
+                    targetCtx.rotate(a);
+                    targetCtx.shadowColor = "rgba(255, 190, 110, 0.85)";
+                    targetCtx.shadowBlur = R * 0.16;
+                    targetCtx.fillStyle = `rgba(255, 201, 122, ${0.5 + pulse * 0.35})`;
+                    targetCtx.beginPath();
+                    targetCtx.roundRect(-R * 0.05, -R * 0.055, R * 0.1, R * 0.11, R * 0.03);
+                    targetCtx.fill();
+                    targetCtx.restore();
+                }
+
+                // Conical roof: the cone tip sits at the centre, so every seam runs
+                // outwards from the apex instead of across a flat disc.
+                targetCtx.save();
+                targetCtx.shadowColor = "rgba(6, 12, 22, 0.55)";
+                targetCtx.shadowBlur = R * 0.26;
+                targetCtx.shadowOffsetX = R * 0.05;
+                targetCtx.shadowOffsetY = R * 0.07;
+                const roof = targetCtx.createRadialGradient(cx - R * 0.16, cy - R * 0.18, R * 0.03, cx, cy, roofR);
+                roof.addColorStop(0, "#8d7ada");
+                roof.addColorStop(0.45, "#4c3f92");
+                roof.addColorStop(1, "#221b42");
+                targetCtx.fillStyle = roof;
+                targetCtx.beginPath();
+                targetCtx.arc(cx, cy, roofR, 0, Math.PI * 2);
                 targetCtx.fill();
                 targetCtx.restore();
 
-                const depotGradient = targetCtx.createLinearGradient(depot.x, depot.y, depot.x, depot.y + depot.h);
-                depotGradient.addColorStop(0, "#ffbf7a55");
-                depotGradient.addColorStop(1, "#d9863a42");
-                targetCtx.fillStyle = depotGradient;
+                targetCtx.save();
                 targetCtx.beginPath();
-                targetCtx.roundRect(depot.x, depot.y, depot.w, depot.h, depotRadius);
-                targetCtx.fill();
+                targetCtx.arc(cx, cy, roofR, 0, Math.PI * 2);
+                targetCtx.clip();
 
-                targetCtx.strokeStyle = "#678097";
-                targetCtx.lineWidth = 2;
-                targetCtx.beginPath();
-                targetCtx.roundRect(depot.x, depot.y, depot.w, depot.h, depotRadius);
-                targetCtx.stroke();
-
-                targetCtx.strokeStyle = "#ffe0ba66";
-                targetCtx.lineWidth = 1.5;
-                targetCtx.beginPath();
-                targetCtx.roundRect(depot.x + depotInset, depot.y + depotInset, depot.w - depotInset * 2, depot.h - depotInset * 2, depotRadius - 4);
-                targetCtx.stroke();
-
-                targetCtx.fillStyle = "#ffcf9a33";
-                for (let i = 0; i < 5; i += 1) {
-                    const stripeX = depot.x + 12 + i * 18;
-                    targetCtx.fillRect(stripeX, depot.y + 30, 8, depot.h - 42);
+                // Alternating facets give the cone its faceted, shingled read.
+                for (let i = 0; i < 16; i += 2) {
+                    const a0 = (i / 16) * Math.PI * 2;
+                    const a1 = ((i + 1) / 16) * Math.PI * 2;
+                    targetCtx.fillStyle = "rgba(255, 255, 255, 0.045)";
+                    targetCtx.beginPath();
+                    targetCtx.moveTo(cx, cy);
+                    targetCtx.arc(cx, cy, roofR, a0, a1);
+                    targetCtx.closePath();
+                    targetCtx.fill();
                 }
 
-                targetCtx.fillStyle = "#1b2f45cc";
+                targetCtx.strokeStyle = "rgba(14, 10, 28, 0.6)";
+                targetCtx.lineWidth = Math.max(1, R * 0.018);
+                for (let i = 0; i < 16; i += 1) {
+                    const a = (i / 16) * Math.PI * 2;
+                    targetCtx.beginPath();
+                    targetCtx.moveTo(cx, cy);
+                    targetCtx.lineTo(cx + Math.cos(a) * roofR, cy + Math.sin(a) * roofR);
+                    targetCtx.stroke();
+                }
+
+                // Shingle courses.
+                targetCtx.strokeStyle = "rgba(20, 15, 38, 0.35)";
+                targetCtx.lineWidth = 1;
+                for (let i = 1; i <= 2; i += 1) {
+                    targetCtx.beginPath();
+                    targetCtx.arc(cx, cy, roofR * (0.42 + i * 0.24), 0, Math.PI * 2);
+                    targetCtx.stroke();
+                }
+
+                // Light falling across the upper-left face of the cone.
+                targetCtx.fillStyle = "rgba(255, 240, 214, 0.12)";
                 targetCtx.beginPath();
-                targetCtx.roundRect(depot.x + 10, depot.y + 8, 72, 20, 8);
+                targetCtx.moveTo(cx, cy);
+                targetCtx.arc(cx, cy, roofR, Math.PI * 1.02, Math.PI * 1.62);
+                targetCtx.closePath();
                 targetCtx.fill();
+                targetCtx.restore();
+
+                targetCtx.strokeStyle = "#1a1533";
+                targetCtx.lineWidth = 2;
+                targetCtx.beginPath();
+                targetCtx.arc(cx, cy, roofR, 0, Math.PI * 2);
+                targetCtx.stroke();
+
+                // Apex collar and the focus crystal crowning the spire.
+                targetCtx.fillStyle = "#241c46";
+                targetCtx.beginPath();
+                targetCtx.arc(cx, cy, R * 0.14, 0, Math.PI * 2);
+                targetCtx.fill();
+                targetCtx.strokeStyle = "#15102b";
+                targetCtx.lineWidth = 1.5;
+                targetCtx.stroke();
+
+                targetCtx.save();
+                targetCtx.shadowColor = "rgba(255, 208, 140, 0.95)";
+                targetCtx.shadowBlur = R * (0.24 + pulse * 0.2);
+                const gemW = R * (0.062 + pulse * 0.006);
+                const gemH = R * (0.098 + pulse * 0.008);
+                const gem = targetCtx.createLinearGradient(cx - gemW, cy - gemH, cx + gemW, cy + gemH);
+                gem.addColorStop(0, "#fff6e2");
+                gem.addColorStop(0.5, "#ffcd85");
+                gem.addColorStop(1, "#d9762f");
+                targetCtx.fillStyle = gem;
+                targetCtx.beginPath();
+                targetCtx.moveTo(cx, cy - gemH);
+                targetCtx.lineTo(cx + gemW, cy);
+                targetCtx.lineTo(cx, cy + gemH);
+                targetCtx.lineTo(cx - gemW, cy);
+                targetCtx.closePath();
+                targetCtx.fill();
+                targetCtx.shadowBlur = 0;
+                targetCtx.strokeStyle = "rgba(255, 250, 235, 0.7)";
+                targetCtx.lineWidth = 1;
+                targetCtx.beginPath();
+                targetCtx.moveTo(cx, cy - gemH);
+                targetCtx.lineTo(cx, cy + gemH);
+                targetCtx.stroke();
+                targetCtx.restore();
+
+                // Name plate, kept so the tower still reads as the drop-off point.
+                const plateW = R * 0.94;
+                const plateH = R * 0.3;
+                const plateY = cy + R * 1.22;
+                targetCtx.fillStyle = "#101d2eee";
+                targetCtx.beginPath();
+                targetCtx.roundRect(cx - plateW * 0.5, plateY, plateW, plateH, plateH * 0.42);
+                targetCtx.fill();
+                targetCtx.strokeStyle = "rgba(255, 214, 160, 0.35)";
+                targetCtx.lineWidth = 1;
+                targetCtx.stroke();
                 targetCtx.fillStyle = "#ffd9b2";
-                targetCtx.font = "700 11px Space Grotesk, sans-serif";
-                targetCtx.textAlign = "left";
-                targetCtx.textBaseline = "alphabetic";
-                targetCtx.fillText("DEPOT", depot.x + 20, depot.y + 22);
+                targetCtx.font = `700 ${Math.max(9, Math.round(R * 0.19))}px Space Grotesk, sans-serif`;
+                targetCtx.textAlign = "center";
+                targetCtx.textBaseline = "middle";
+                targetCtx.fillText("TOWER", cx, plateY + plateH * 0.55);
+
+                targetCtx.restore();
             }
 
-            function drawDepotHealthBorder(targetCtx) {
-                const hpRatio = Math.max(0, Math.min(1, game.depotHp / DEPOT_MAX_HP));
+            function drawTowerHealthBorder(targetCtx) {
+                const hpRatio = Math.max(0, Math.min(1, game.towerHp / TOWER_MAX_HP));
                 const criticalHpRatio = 0.1;
                 const blendRatio = Math.max(0, Math.min(1, (hpRatio - criticalHpRatio) / (1 - criticalHpRatio)));
                 const criticalDepth = Math.max(0, (criticalHpRatio - hpRatio) / criticalHpRatio);
@@ -2879,13 +3259,14 @@
                 const color = `rgb(${r}, ${g}, ${b})`;
                 const pulse = 1 + Math.sin(game.dayTick * 0.35) * 0.15 * criticalDepth;
 
+                // A ward ring hugging the battlements, replacing the old box border.
                 targetCtx.save();
                 targetCtx.strokeStyle = color;
                 targetCtx.lineWidth = 3 + criticalDepth * 1.2 * pulse;
                 targetCtx.shadowColor = color;
                 targetCtx.shadowBlur = 8 + criticalDepth * 8 * pulse;
                 targetCtx.beginPath();
-                targetCtx.roundRect(depot.x - 1, depot.y - 1, depot.w + 2, depot.h + 2, 13);
+                targetCtx.arc(TOWER_CENTER_X, TOWER_CENTER_Y, TOWER_WARD_RADIUS, 0, Math.PI * 2);
                 targetCtx.stroke();
                 targetCtx.restore();
             }
@@ -2945,8 +3326,8 @@
 
                 const viewLeft = cameraState.x;
                 const viewTop = cameraState.y;
-                const viewRight = viewLeft + viewport.w;
-                const viewBottom = viewTop + viewport.h;
+                const viewRight = viewLeft + viewWorldW();
+                const viewBottom = viewTop + viewWorldH();
 
                 for (const turret of game.turrets) {
                     const style = TURRET_RANGE_STYLES[turret.type] || TURRET_RANGE_STYLES.basic;
@@ -3079,8 +3460,8 @@
             }
 
             function drawOffscreenPlayerIndicator(targetCtx) {
-                const playerScreenX = game.player.x - cameraState.x;
-                const playerScreenY = game.player.y - cameraState.y;
+                const playerScreenX = (game.player.x - cameraState.x) * cameraState.zoom;
+                const playerScreenY = (game.player.y - cameraState.y) * cameraState.zoom;
                 const margin = 26;
                 const inView = playerScreenX >= 0 && playerScreenX <= viewport.w
                     && playerScreenY >= 0 && playerScreenY <= viewport.h;
@@ -3136,8 +3517,8 @@
                 let offscreenBossCount = 0;
                 for (const enemy of game.enemies) {
                     if (enemy.type !== "boss") continue;
-                    const sx = enemy.x - cameraState.x;
-                    const sy = enemy.y - cameraState.y;
+                    const sx = (enemy.x - cameraState.x) * cameraState.zoom;
+                    const sy = (enemy.y - cameraState.y) * cameraState.zoom;
                     if (sx < 0 || sx > viewport.w || sy < 0 || sy > viewport.h) {
                         offscreenBossCount += 1;
                     }
@@ -3148,8 +3529,8 @@
                 let offscreenIndex = 0;
                 for (const boss of game.enemies) {
                     if (boss.type !== "boss") continue;
-                    const bossScreenX = boss.x - cameraState.x;
-                    const bossScreenY = boss.y - cameraState.y;
+                    const bossScreenX = (boss.x - cameraState.x) * cameraState.zoom;
+                    const bossScreenY = (boss.y - cameraState.y) * cameraState.zoom;
                     if (bossScreenX >= 0 && bossScreenX <= viewport.w && bossScreenY >= 0 && bossScreenY <= viewport.h) {
                         continue;
                     }
@@ -3198,6 +3579,128 @@
                     targetCtx.restore();
 
                     offscreenIndex += 1;
+                }
+            }
+
+            // Ground under each spawner, tinted to the resource it grows and shaped to
+            // contain the spawner's whole spawn rectangle, so no node ever lands on bare
+            // backdrop. Built once: the geometry only depends on world constants.
+            const TERRAIN_STYLES = {
+                wood: { inner: "#1a4038", outer: "#102a29", speck: "#2f7268", accent: "#4d9184", decor: "tuft" },
+                stone: { inner: "#2f3945", outer: "#232a34", speck: "#4d5765", accent: "#6b7683", decor: "pebble" },
+                crystal: { inner: "#11384a", outer: "#0c2634", speck: "#256f8a", accent: "#4a9cb8", decor: "shard" },
+                amber: { inner: "#443019", outer: "#2e2112", speck: "#8a6634", accent: "#ab8348", decor: "fleck" },
+                aether: { inner: "#3a2a5c", outer: "#241a3c", speck: "#6b4fa8", accent: "#a184d6", decor: "shard" }
+            };
+            const TERRAIN_EDGE_STEPS = 56;
+            const TERRAIN_OVERHANG = 1.18;   // keeps the smoothed edge outside the rect
+            let spawnTerrainPatches = null;
+
+            // Deterministic so the ground is identical every frame and every session.
+            function terrainNoise(seed, i) {
+                const value = Math.sin(seed * 127.1 + i * 311.7) * 43758.5453;
+                return value - Math.floor(value);
+            }
+
+            function buildTerrainPatch(spawner, seed) {
+                const region = spawnRegionForSpawner(spawner);
+                const cx = region.cx;
+                const cy = region.cy;
+
+                const rim = [];
+                for (let i = 0; i < TERRAIN_EDGE_STEPS; i += 1) {
+                    const angle = (i / TERRAIN_EDGE_STEPS) * Math.PI * 2;
+                    // The wobble only ever adds, so the outline always sits outside the
+                    // spawn disc and no node can land on bare backdrop.
+                    const reach = region.r * (TERRAIN_OVERHANG + terrainNoise(seed, i) * 0.13);
+                    rim.push({ x: cx + Math.cos(angle) * reach, y: cy + Math.sin(angle) * reach });
+                }
+
+                const path = new Path2D();
+                let previous = rim[rim.length - 1];
+                path.moveTo((previous.x + rim[0].x) * 0.5, (previous.y + rim[0].y) * 0.5);
+                for (let i = 0; i < rim.length; i += 1) {
+                    const current = rim[i];
+                    const next = rim[(i + 1) % rim.length];
+                    path.quadraticCurveTo(current.x, current.y, (current.x + next.x) * 0.5, (current.y + next.y) * 0.5);
+                }
+                path.closePath();
+
+                const decor = [];
+                const decorCount = 26;
+                for (let i = 0; i < decorCount; i += 1) {
+                    const rx = terrainNoise(seed + 5.1, i * 3);
+                    const ry = terrainNoise(seed + 9.7, i * 3 + 1);
+                    const size = 0.5 + terrainNoise(seed + 3.3, i * 3 + 2);
+                    const decorAngle = rx * Math.PI * 2;
+                    const decorDistance = Math.sqrt(ry) * region.r * 0.94;
+                    decor.push({
+                        x: cx + Math.cos(decorAngle) * decorDistance,
+                        y: cy + Math.sin(decorAngle) * decorDistance,
+                        r: W(3) + size * W(4),
+                        rot: rx * Math.PI,
+                        bright: ry > 0.72
+                    });
+                }
+
+                return { region, cx, cy, r: region.r, path, decor, style: TERRAIN_STYLES[spawner.type] };
+            }
+
+            function getSpawnTerrainPatches() {
+                if (!spawnTerrainPatches) {
+                    spawnTerrainPatches = spawners.map((spawner, index) => buildTerrainPatch(spawner, index + 1));
+                }
+                return spawnTerrainPatches;
+            }
+
+            function drawSpawnTerrain(targetCtx) {
+                const patches = getSpawnTerrainPatches();
+
+                for (const patch of patches) {
+                    const style = patch.style;
+                    if (!style) continue;
+
+                    targetCtx.save();
+                    // The patch never moves, so its gradient is built once per context
+                    // instead of every frame.
+                    if (!patch.ground || patch.groundCtx !== targetCtx) {
+                        patch.ground = targetCtx.createRadialGradient(
+                            patch.cx, patch.cy, patch.r * 0.15,
+                            patch.cx, patch.cy, patch.r * 1.2
+                        );
+                        patch.ground.addColorStop(0, style.inner);
+                        patch.ground.addColorStop(1, style.outer);
+                        patch.groundCtx = targetCtx;
+                    }
+                    targetCtx.fillStyle = patch.ground;
+                    targetCtx.fill(patch.path);
+
+                    targetCtx.strokeStyle = `${style.speck}2b`;
+                    targetCtx.lineWidth = 2;
+                    targetCtx.stroke(patch.path);
+
+                    // Everything below is confined to the patch, so the scatter can run
+                    // right up to the edge without spilling onto the backdrop.
+                    targetCtx.clip(patch.path);
+                    for (const item of patch.decor) {
+                        targetCtx.fillStyle = item.bright ? `${style.accent}3d` : `${style.speck}3d`;
+                        targetCtx.beginPath();
+                        if (style.decor === "shard") {
+                            targetCtx.moveTo(item.x, item.y - item.r);
+                            targetCtx.lineTo(item.x + item.r * 0.6, item.y);
+                            targetCtx.lineTo(item.x, item.y + item.r);
+                            targetCtx.lineTo(item.x - item.r * 0.6, item.y);
+                            targetCtx.closePath();
+                        } else if (style.decor === "pebble") {
+                            targetCtx.ellipse(item.x, item.y, item.r, item.r * 0.7, item.rot, 0, Math.PI * 2);
+                        } else if (style.decor === "tuft") {
+                            targetCtx.ellipse(item.x, item.y, item.r * 0.55, item.r * 1.15, item.rot, 0, Math.PI * 2);
+                        } else {
+                            targetCtx.ellipse(item.x, item.y, item.r * 0.9, item.r * 0.75, item.rot, 0, Math.PI * 2);
+                        }
+                        targetCtx.fill();
+                    }
+                    targetCtx.restore();
                 }
             }
 
@@ -3297,22 +3800,231 @@
             // visible area each frame is cheaper, allocates nothing, and stays under the
             // canvas-area limit mobile Safari enforces (~16.7 MP), which the old layer
             // exceeded.
-            function drawBackdrop(targetCtx) {
-                targetCtx.fillStyle = "#132437";
-                targetCtx.fillRect(cameraState.x, cameraState.y, viewport.w, viewport.h);
+            // World-wide ground detail from a single repeating tile: built once, then the
+            // whole visible area is one pattern fill per frame, so the cost is the same
+            // whatever the map size. Kept very low contrast so the spawn fields and the
+            // resources on them stay the things that read.
+            const GROUND_TILE_SIZE = 1024;
+            // Damp forest floor. Everything else on the map is tinted against this, so it
+            // is the one place to change the world's overall mood.
+            const GROUND_BASE_COLOR = "#242e21";
+            let worldGroundPattern = null;
+            let worldGroundPatternCtx = null;
 
-                targetCtx.save();
-                targetCtx.globalAlpha = 0.2;
-                for (let i = 0; i < 9; i += 1) {
-                    targetCtx.strokeStyle = i % 2 === 0 ? "#9fd3c780" : "#f3c67780";
-                    targetCtx.beginPath();
-                    targetCtx.arc(world.w * 0.5, world.h * 0.5, 60 + i * 45, 0, Math.PI * 2);
-                    targetCtx.stroke();
+            function buildWorldGroundTile() {
+                const tile = document.createElement("canvas");
+                tile.width = GROUND_TILE_SIZE;
+                tile.height = GROUND_TILE_SIZE;
+                const tileCtx = tile.getContext("2d");
+                tileCtx.fillStyle = GROUND_BASE_COLOR;
+                tileCtx.fillRect(0, 0, GROUND_TILE_SIZE, GROUND_TILE_SIZE);
+
+                // Each mark is stamped in all nine wrapped positions, so anything crossing
+                // an edge comes back on the far side and the tile repeats seamlessly.
+                const stamp = (draw) => {
+                    for (let ox = -1; ox <= 1; ox += 1) {
+                        for (let oy = -1; oy <= 1; oy += 1) {
+                            tileCtx.save();
+                            tileCtx.translate(ox * GROUND_TILE_SIZE, oy * GROUND_TILE_SIZE);
+                            draw();
+                            tileCtx.restore();
+                        }
+                    }
+                };
+
+                // Patches of moss and bare earth.
+                for (let i = 0; i < 70; i += 1) {
+                    const x = terrainNoise(11.3, i * 3) * GROUND_TILE_SIZE;
+                    const y = terrainNoise(21.7, i * 3 + 1) * GROUND_TILE_SIZE;
+                    const radius = 70 + terrainNoise(31.1, i * 3 + 2) * 180;
+                    const mossy = terrainNoise(41.9, i) > 0.45;
+                    const blob = tileCtx.createRadialGradient(x, y, 0, x, y, radius);
+                    blob.addColorStop(0, mossy ? "#33452a2b" : "#241d1330");
+                    blob.addColorStop(1, `${GROUND_BASE_COLOR}00`);
+                    stamp(() => {
+                        tileCtx.fillStyle = blob;
+                        tileCtx.beginPath();
+                        tileCtx.arc(x, y, radius, 0, Math.PI * 2);
+                        tileCtx.fill();
+                    });
                 }
-                targetCtx.restore();
 
+                // Undergrowth: grass tufts, pebbles and leaf litter rather than stars.
+                tileCtx.lineCap = "round";
+                for (let i = 0; i < 620; i += 1) {
+                    const x = terrainNoise(53.5, i * 2) * GROUND_TILE_SIZE;
+                    const y = terrainNoise(67.2, i * 2 + 1) * GROUND_TILE_SIZE;
+                    const kind = terrainNoise(71.4, i);
+                    const lean = (terrainNoise(83.6, i) - 0.5) * 2.4;
+                    stamp(() => {
+                        if (kind > 0.68) {
+                            tileCtx.strokeStyle = "#5f7f403d";
+                            tileCtx.lineWidth = 1.3;
+                            tileCtx.beginPath();
+                            tileCtx.moveTo(x, y + 3.5);
+                            tileCtx.quadraticCurveTo(x + lean, y, x + lean * 1.6 - 2, y - 4);
+                            tileCtx.moveTo(x, y + 3.5);
+                            tileCtx.quadraticCurveTo(x + lean + 1.4, y + 0.5, x + lean * 1.4 + 2.6, y - 3);
+                            tileCtx.stroke();
+                        } else if (kind > 0.42) {
+                            tileCtx.fillStyle = "#4b463a38";
+                            tileCtx.beginPath();
+                            tileCtx.ellipse(x, y, 2.3, 1.6, kind * 7, 0, Math.PI * 2);
+                            tileCtx.fill();
+                        } else {
+                            tileCtx.fillStyle = "#171a0f33";
+                            tileCtx.fillRect(x, y, 1 + Math.round(kind * 2), 1 + Math.round(kind));
+                        }
+                    });
+                }
+
+                return tile;
+            }
+
+            function getWorldGroundPattern(targetCtx) {
+                if (!worldGroundPattern || worldGroundPatternCtx !== targetCtx) {
+                    worldGroundPattern = targetCtx.createPattern(buildWorldGroundTile(), "repeat");
+                    worldGroundPatternCtx = targetCtx;
+                }
+                return worldGroundPattern;
+            }
+
+            // A handful of map-sized blotches break up the repeat a tiled texture would
+            // otherwise show. They are world-scale, so they cannot live in the tile -
+            // instead they are baked once into a 1/8-size layer (about 0.3 MP) that costs
+            // a single stretched drawImage per frame.
+            const GROUND_MACRO_SCALE = 8;
+            let worldMacroLayer = null;
+
+            function buildWorldMacroLayer() {
+                const layer = document.createElement("canvas");
+                layer.width = Math.max(1, Math.ceil(world.w / GROUND_MACRO_SCALE));
+                layer.height = Math.max(1, Math.ceil(world.h / GROUND_MACRO_SCALE));
+                const layerCtx = layer.getContext("2d");
+
+                // Density, not count: one blotch per patch of ground this wide, so the
+                // count follows the map size on its own.
+                const blotchSpacing = W(770);
+                const blotchCount = Math.round((world.w * world.h) / (blotchSpacing * blotchSpacing));
+                for (let i = 0; i < blotchCount; i += 1) {
+                    const x = terrainNoise(103.7, i * 3 + 1) * layer.width;
+                    const y = terrainNoise(109.3, i * 3 + 2) * layer.height;
+                    const radius = (W(360) + terrainNoise(97.1, i * 3) * W(520)) / GROUND_MACRO_SCALE;
+                    const blotch = layerCtx.createRadialGradient(x, y, 0, x, y, radius);
+                    blotch.addColorStop(0, terrainNoise(113.9, i) > 0.5 ? "#3d513047" : "#18140947");
+                    blotch.addColorStop(1, `${GROUND_BASE_COLOR}00`);
+                    layerCtx.fillStyle = blotch;
+                    layerCtx.beginPath();
+                    layerCtx.arc(x, y, radius, 0, Math.PI * 2);
+                    layerCtx.fill();
+                }
+
+                // A network of trails worn between the tower and the spawners: the ground
+                // remembers where everyone walks. Every route is deterministic, so the
+                // same paths turn up in every session, and all of it is baked in, so the
+                // whole network costs nothing to draw.
+                const toLayerX = (worldX) => (worldX - world.minX) / GROUND_MACRO_SCALE;
+                const toLayerY = (worldY) => (worldY - world.minY) / GROUND_MACRO_SCALE;
+                const towerLayerX = toLayerX(0);
+                const towerLayerY = toLayerY(0);
+                const towerPoint = { x: towerLayerX, y: towerLayerY };
+                const spawnerPoints = spawners.map((spawner) => ({ x: toLayerX(spawner.x), y: toLayerY(spawner.y) }));
+
+                // Waypoints swung off the straight line, so a trail wanders towards where
+                // it is going instead of being surveyed there.
+                const routeBetween = (from, to, seed) => {
+                    const legs = 3;
+                    const dx = to.x - from.x;
+                    const dy = to.y - from.y;
+                    const points = [from];
+                    for (let leg = 1; leg < legs; leg += 1) {
+                        const t = leg / legs;
+                        const sway = (terrainNoise(seed, leg) - 0.5) * 0.36;
+                        points.push({
+                            x: clamp(from.x + dx * t - dy * sway, 0, layer.width),
+                            y: clamp(from.y + dy * t + dx * sway, 0, layer.height)
+                        });
+                    }
+                    points.push(to);
+                    return points;
+                };
+
+                const routes = [];
+
+                // A few neighbouring fields are linked directly, so the network is not a
+                // plain wheel - but most pairs are left unconnected.
+                const ring = spawnerPoints
+                    .map((point, i) => ({ point, index: i, angle: Math.atan2(spawners[i].y, spawners[i].x) }))
+                    .sort((a, b) => a.angle - b.angle);
+                const ringLinked = new Set();
+                ring.forEach((entry, i) => {
+                    if (terrainNoise(157.7, i) < 0.9) return;
+                    const next = ring[(i + 1) % ring.length];
+                    routes.push(routeBetween(entry.point, next.point, 163.1 + i));
+                    ringLinked.add(entry.index);
+                    ringLinked.add(next.index);
+                });
+
+                // Most fields are walked to straight from the tower, but one that already
+                // hangs off a neighbour's trail is left without its own spoke.
+                spawnerPoints.forEach((point, i) => {
+                    if (ringLinked.has(i) && terrainNoise(149.7, i) > 0.72) return;
+                    routes.push(routeBetween(towerPoint, point, 141.3 + i));
+                });
+
+                // Blurred at bake time so the edges melt into the ground instead of
+                // reading as drawn lines. Ignored where the filter is unsupported.
+                layerCtx.lineCap = "round";
+                layerCtx.lineJoin = "round";
+                layerCtx.filter = "blur(2.5px)";
+                for (const route of routes) {
+                    for (const pass of [{ width: 17, color: "#2a2317", alpha: 0.26 }, { width: 7, color: "#40341f", alpha: 0.2 }]) {
+                        layerCtx.strokeStyle = pass.color;
+                        layerCtx.lineWidth = pass.width;
+                        layerCtx.globalAlpha = pass.alpha;
+                        layerCtx.beginPath();
+                        layerCtx.moveTo(route[0].x, route[0].y);
+                        for (let i = 1; i < route.length - 1; i += 1) {
+                            const next = route[i + 1];
+                            layerCtx.quadraticCurveTo(route[i].x, route[i].y, (route[i].x + next.x) * 0.5, (route[i].y + next.y) * 0.5);
+                        }
+                        const end = route[route.length - 1];
+                        layerCtx.lineTo(end.x, end.y);
+                        layerCtx.stroke();
+                    }
+                }
+                layerCtx.filter = "none";
+                layerCtx.globalAlpha = 1;
+
+                // Trodden clearing where all the trails meet.
+                const clearingRadius = W(620) / GROUND_MACRO_SCALE;
+                const clearing = layerCtx.createRadialGradient(
+                    towerLayerX, towerLayerY, clearingRadius * 0.2,
+                    towerLayerX, towerLayerY, clearingRadius
+                );
+                clearing.addColorStop(0, "#352c1c33");
+                clearing.addColorStop(1, `${GROUND_BASE_COLOR}00`);
+                layerCtx.fillStyle = clearing;
+                layerCtx.beginPath();
+                layerCtx.arc(towerLayerX, towerLayerY, clearingRadius, 0, Math.PI * 2);
+                layerCtx.fill();
+
+                return layer;
+            }
+
+            function drawGroundMacro(targetCtx) {
+                if (!worldMacroLayer) worldMacroLayer = buildWorldMacroLayer();
+                targetCtx.drawImage(worldMacroLayer, world.minX, world.minY, world.w, world.h);
+            }
+
+            function drawBackdrop(targetCtx) {
+                targetCtx.fillStyle = getWorldGroundPattern(targetCtx) || GROUND_BASE_COLOR;
+                targetCtx.fillRect(cameraState.x, cameraState.y, viewWorldW(), viewWorldH());
+                drawGroundMacro(targetCtx);
+
+                drawSpawnTerrain(targetCtx);
                 drawSpawners(targetCtx);
-                drawDepot(targetCtx);
+                drawTower(targetCtx);
             }
 
             function togglePause() {
@@ -3381,8 +4093,8 @@
                 return {
                     type,
                     sourceSpawnerIndex: -1,
-                    x: random(W(26), world.w - W(150)),
-                    y: random(W(26), world.h - W(26)),
+                    x: random(world.minX + W(26), world.maxX - W(150)),
+                    y: random(world.minY + W(26), world.maxY - W(26)),
                     size: config.size,
                     active: true
                 };
@@ -3434,51 +4146,32 @@
                 return count;
             }
 
-            function randomSpawnPointForCorner(corner) {
-                if (corner === "left-mid") {
-                    return {
-                        x: random(
-                            Math.max(W(26), SIDE_SPAWNER_X_OFFSET - SIDE_SPAWN_WIDTH * 0.5),
-                            Math.min(world.w - W(26), SIDE_SPAWNER_X_OFFSET + SIDE_SPAWN_WIDTH * 0.5)
-                        ),
-                        y: random(DEPOT_CENTER_Y - SIDE_SPAWN_HEIGHT * 0.5, DEPOT_CENTER_Y + SIDE_SPAWN_HEIGHT * 0.5)
-                    };
-                }
+            // The disc a spawner rolls its nodes inside. Both the spawn roll and the
+            // terrain patch under it read this, so the ground can never drift out of step
+            // with where resources actually appear.
+            function spawnRegionForSpawner(spawner) {
+                const edge = W(26);
+                const radius = SPAWN_RADIUS_BY_TIER[spawner.tier] || SPAWN_RADIUS_BY_TIER[1];
 
-                if (corner === "right-mid") {
-                    return {
-                        x: random(
-                            Math.max(W(26), (world.w - SIDE_SPAWNER_X_OFFSET) - SIDE_SPAWN_WIDTH * 0.5),
-                            Math.min(world.w - W(26), (world.w - SIDE_SPAWNER_X_OFFSET) + SIDE_SPAWN_WIDTH * 0.5)
-                        ),
-                        y: random(DEPOT_CENTER_Y - SIDE_SPAWN_HEIGHT * 0.5, DEPOT_CENTER_Y + SIDE_SPAWN_HEIGHT * 0.5)
-                    };
-                }
-
-                if (corner === "top-left") {
-                    return {
-                        x: random(W(26), W(26) + CORNER_SPAWN_WIDTH),
-                        y: random(W(26), W(26) + CORNER_SPAWN_HEIGHT)
-                    };
-                }
-
-                if (corner === "top-right") {
-                    return {
-                        x: random(world.w - W(26) - CORNER_SPAWN_WIDTH, world.w - W(26)),
-                        y: random(W(26), W(26) + CORNER_SPAWN_HEIGHT)
-                    };
-                }
-
-                if (corner === "bottom-left") {
-                    return {
-                        x: random(W(26), W(26) + CORNER_SPAWN_WIDTH),
-                        y: random(world.h - W(26) - CORNER_SPAWN_HEIGHT, world.h - W(26))
-                    };
-                }
-
+                // A disc centred on a spawner near the map edge would hang off it, so the
+                // centre slides inwards just far enough to fit. The spawner itself stays
+                // well inside the disc either way.
                 return {
-                    x: random(world.w - W(26) - CORNER_SPAWN_WIDTH, world.w - W(26)),
-                    y: random(world.h - W(26) - CORNER_SPAWN_HEIGHT, world.h - W(26))
+                    cx: clamp(spawner.x, world.minX + edge + radius, world.maxX - edge - radius),
+                    cy: clamp(spawner.y, world.minY + edge + radius, world.maxY - edge - radius),
+                    r: radius
+                };
+            }
+
+            function randomSpawnPointForSpawner(spawner) {
+                const region = spawnRegionForSpawner(spawner);
+                const angle = random(0, Math.PI * 2);
+                // sqrt keeps the scatter even across the disc instead of clustering it
+                // around the centre.
+                const distance = Math.sqrt(random(0, 1)) * region.r;
+                return {
+                    x: region.cx + Math.cos(angle) * distance,
+                    y: region.cy + Math.sin(angle) * distance
                 };
             }
 
@@ -3486,7 +4179,7 @@
                 const spawnerCap = activeNodeCapForSpawner(spawnerIndex);
                 if (countActiveNodesForSpawner(spawnerIndex) >= spawnerCap) return false;
 
-                const point = randomSpawnPointForCorner(spawner.corner);
+                const point = randomSpawnPointForSpawner(spawner);
                 let node = null;
 
                 for (const existingNode of game.nodes) {
@@ -3523,7 +4216,7 @@
                 const spawnerCap = activeNodeCapForSpawner(spawnerIndex);
                 if (countActiveNodesForSpawner(spawnerIndex) >= spawnerCap) return activeNodes;
 
-                const point = randomSpawnPointForCorner(spawner.corner);
+                const point = randomSpawnPointForSpawner(spawner);
                 let node = null;
 
                 for (const existingNode of game.nodes) {
@@ -3589,12 +4282,12 @@
                 }
             }
 
-            function minionDepotPoint(index) {
+            function minionTowerPoint(index) {
                 const col = index % 5;
                 const row = Math.floor(index / 5);
                 return {
-                    x: depot.x + 16 + col * 16,
-                    y: depot.y + 38 + row * 16
+                    x: tower.x + 16 + col * 16,
+                    y: tower.y + 38 + row * 16
                 };
             }
 
@@ -3687,26 +4380,26 @@
                 game.nextEnemyId = Math.max(maxId + 1, nextId, 1);
             }
 
-            function isInsideDepot(x, y) {
-                return x > depot.x && x < depot.x + depot.w && y > depot.y && y < depot.y + depot.h;
+            function isInsideTower(x, y) {
+                return x > tower.x && x < tower.x + tower.w && y > tower.y && y < tower.y + tower.h;
             }
 
             function randomDefenderPatrolPoint() {
-                const centerX = depot.x + depot.w * 0.5;
-                const centerY = depot.y + depot.h * 0.5;
+                const centerX = tower.x + tower.w * 0.5;
+                const centerY = tower.y + tower.h * 0.5;
                 for (let attempt = 0; attempt < 16; attempt += 1) {
                     const angle = random(0, Math.PI * 2);
                     const radius = random(DEFENDER_PATROL_MIN_RADIUS, DEFENDER_PATROL_MAX_RADIUS);
-                    const x = Math.max(16, Math.min(world.w - 16, centerX + Math.cos(angle) * radius));
-                    const y = Math.max(16, Math.min(world.h - 16, centerY + Math.sin(angle) * radius));
-                    if (!isInsideDepot(x, y)) {
+                    const x = clamp(centerX + Math.cos(angle) * radius, world.minX + 16, world.maxX - 16);
+                    const y = clamp(centerY + Math.sin(angle) * radius, world.minY + 16, world.maxY - 16);
+                    if (!isInsideTower(x, y)) {
                         return { x, y };
                     }
                 }
 
                 return {
-                    x: Math.max(16, Math.min(world.w - 16, depot.x - 18)),
-                    y: Math.max(16, Math.min(world.h - 16, depot.y + depot.h * 0.5))
+                    x: clamp(tower.x - 18, world.minX + 16, world.maxX - 16),
+                    y: clamp(tower.y + tower.h * 0.5, world.minY + 16, world.maxY - 16)
                 };
             }
 
@@ -3740,7 +4433,7 @@
 
             function createMinionUnit(role = "worker", slotIndex = null) {
                 const resolvedSlot = Number.isFinite(slotIndex) ? Math.max(0, Math.floor(slotIndex)) : game.nextMinionSlot;
-                const home = minionDepotPoint(resolvedSlot);
+                const home = minionTowerPoint(resolvedSlot);
                 const maxHp = minionMaxHpFor(role);
                 const patrolPoint = role === "defender" ? randomDefenderPatrolPoint() : null;
                 const savedPriority = role === "worker" && save.gathererFocusBySlot
@@ -3762,11 +4455,11 @@
                     patrolTargetX: patrolPoint ? patrolPoint.x : 0,
                     patrolTargetY: patrolPoint ? patrolPoint.y : 0,
                     patrolIdleTicks: 0,
-                    isRegeneratingAtDepot: false,
+                    isRegeneratingAtTower: false,
                     targetEnemyId: null,
                     carryType: null,
                     carryLoad: 0,
-                    carry: { wood: 0, stone: 0, crystal: 0, amber: 0 },
+                    carry: { wood: 0, stone: 0, crystal: 0, amber: 0, aether: 0 },
                     gathererPriority: role === "worker" ? normalizedGathererPriority(savedPriority) : "auto",
                     speed: minionMoveSpeed(resolvedSlot) + (role === "defender" ? DEFENDER_BASE_SPEED_BONUS : 0)
                 };
@@ -3790,8 +4483,8 @@
             }
 
             function canPlaceTurretAt(x, y) {
-                const inDepot = x > depot.x && x < depot.x + depot.w && y > depot.y && y < depot.y + depot.h;
-                if (inDepot) return false;
+                const inTower = x > tower.x && x < tower.x + tower.w && y > tower.y && y < tower.y + tower.h;
+                if (inTower) return false;
 
                 for (const turret of game.turrets) {
                     const dx = turret.x - x;
@@ -4082,7 +4775,7 @@
                 for (let i = 0; i < game.minionUnits.length; i += 1) {
                     const minion = game.minionUnits[i];
                     const slotIndex = Number.isFinite(minion.slotIndex) ? minion.slotIndex : i;
-                    const home = minionDepotPoint(slotIndex);
+                    const home = minionTowerPoint(slotIndex);
 
                     minion.speed = minionMoveSpeed(slotIndex) + (minion.role === "defender" ? DEFENDER_BASE_SPEED_BONUS : 0);
                     if (resetPositions) {
@@ -4093,7 +4786,7 @@
                         minion.attackCooldown = 0;
                         minion.attackFlash = 0;
                         minion.hitFlash = 0;
-                        minion.isRegeneratingAtDepot = false;
+                        minion.isRegeneratingAtTower = false;
                         minion.targetEnemyId = null;
                         minion.hp = minion.maxHp;
                         if (minion.role === "defender") {
@@ -4108,14 +4801,15 @@
                         minion.carry.stone = 0;
                         minion.carry.crystal = 0;
                         minion.carry.amber = 0;
+                        minion.carry.aether = 0;
                     }
                 }
             }
 
             function resetSession() {
                 clearRuntimeSnapshot();
-                game.player.x = world.w / 2;
-                game.player.y = world.h / 2;
+                game.player.x = 0;
+                game.player.y = 0;
                 centerCameraOn(game.player.x, game.player.y);
                 game.player.speed = BASE_PLAYER_SPEED + save.speedLevel * PLAYER_SPEED_LEVEL_STEP;
                 game.player.stamina = PLAYER_STAMINA_MAX;
@@ -4123,17 +4817,18 @@
                 game.inventory.stone = 0;
                 game.inventory.crystal = 0;
                 game.inventory.amber = 0;
+                game.inventory.aether = 0;
                 game.dayTick = 0;
                 game.depositPulse = 0;
                 game.minionPulse = 0;
-                game.depotPulse = 0;
+                game.towerPulse = 0;
                 game.waveNumber = INITIAL_WAVE_NUMBER;
                 game.waveRemainingSpawns = 0;
                 game.waveSpawnTimer = 0;
                 game.waveBreakTimer = WAVE_START_DELAY;
                 game.waveInProgress = false;
                 game.waveIntroPendingType = null;
-                game.depotHp = DEPOT_MAX_HP;
+                game.towerHp = TOWER_MAX_HP;
                 game.enemies = [];
                 game.turrets = [];
                 game.pendingBasicTurretPlacements = 0;
@@ -4180,8 +4875,8 @@
                     game.player.y += (vy * invMag) * game.player.speed;
                 }
 
-                game.player.x = Math.max(game.player.r, Math.min(world.w - game.player.r, game.player.x));
-                game.player.y = Math.max(game.player.r, Math.min(world.h - game.player.r, game.player.y));
+                game.player.x = clamp(game.player.x, world.minX + game.player.r, world.maxX - game.player.r);
+                game.player.y = clamp(game.player.y, world.minY + game.player.r, world.maxY - game.player.r);
             }
 
             function drawDiamond(x, y, size, color) {
@@ -4205,26 +4900,73 @@
                 ctx.fill();
             }
 
-            function drawNode(node) {
-                const config = materialConfig[node.type];
-                ctx.fillStyle = config.color;
-
-                if (config.shape === "square") {
-                    ctx.fillRect(node.x - node.size / 2, node.y - node.size / 2, node.size, node.size);
-                } else if (config.shape === "circle") {
-                    ctx.beginPath();
-                    ctx.arc(node.x, node.y, node.size * 0.5, 0, Math.PI * 2);
-                    ctx.fill();
-                } else if (config.shape === "triangle") {
-                    drawTriangle(node.x, node.y, node.size * 0.7, config.color);
+            function traceNodeShape(node, shape, scale) {
+                const half = node.size * 0.5 * scale;
+                ctx.beginPath();
+                if (shape === "square") {
+                    ctx.rect(node.x - half, node.y - half, half * 2, half * 2);
+                } else if (shape === "circle") {
+                    ctx.arc(node.x, node.y, half, 0, Math.PI * 2);
+                } else if (shape === "triangle") {
+                    const size = node.size * 0.7 * scale;
+                    ctx.moveTo(node.x, node.y - size);
+                    ctx.lineTo(node.x + size * 0.9, node.y + size * 0.8);
+                    ctx.lineTo(node.x - size * 0.9, node.y + size * 0.8);
+                    ctx.closePath();
+                } else if (shape === "star") {
+                    const size = node.size * 0.72 * scale;
+                    for (let i = 0; i < 8; i += 1) {
+                        const angle = (i / 8) * Math.PI * 2 - Math.PI * 0.5;
+                        const reach = i % 2 === 0 ? size : size * 0.44;
+                        const px = node.x + Math.cos(angle) * reach;
+                        const py = node.y + Math.sin(angle) * reach;
+                        if (i === 0) ctx.moveTo(px, py);
+                        else ctx.lineTo(px, py);
+                    }
+                    ctx.closePath();
                 } else {
-                    drawDiamond(node.x, node.y, node.size * 0.7, config.color);
+                    const size = node.size * 0.7 * scale;
+                    ctx.moveTo(node.x, node.y - size);
+                    ctx.lineTo(node.x + size * 0.75, node.y);
+                    ctx.lineTo(node.x, node.y + size);
+                    ctx.lineTo(node.x - size * 0.75, node.y);
+                    ctx.closePath();
                 }
             }
 
+            // Each node sits on ground tinted to its own resource, so hue alone cannot
+            // carry it. The silhouette does the work: a dark drop shadow lifts it off the
+            // terrain, a dark outline separates it, and a rim highlight keeps it reading
+            // as a solid object rather than a stain on the ground.
+            function drawNode(node) {
+                const config = materialConfig[node.type];
+
+                ctx.save();
+                ctx.shadowColor = "rgba(4, 10, 18, 0.9)";
+                ctx.shadowBlur = node.size * 0.75;
+                ctx.shadowOffsetY = node.size * 0.14;
+                ctx.fillStyle = config.color;
+                traceNodeShape(node, config.shape, 1);
+                ctx.fill();
+                ctx.restore();
+
+                ctx.save();
+                ctx.strokeStyle = "#07111c";
+                ctx.lineWidth = Math.max(1.5, node.size * 0.14);
+                ctx.lineJoin = "round";
+                traceNodeShape(node, config.shape, 1);
+                ctx.stroke();
+
+                ctx.strokeStyle = "#ffffff5e";
+                ctx.lineWidth = Math.max(1, node.size * 0.07);
+                traceNodeShape(node, config.shape, 0.62);
+                ctx.stroke();
+                ctx.restore();
+            }
+
             function canDeposit() {
-                return game.player.x > depot.x && game.player.x < depot.x + depot.w
-                    && game.player.y > depot.y && game.player.y < depot.y + depot.h;
+                return game.player.x > tower.x && game.player.x < tower.x + tower.w
+                    && game.player.y > tower.y && game.player.y < tower.y + tower.h;
             }
 
             function depositInventory() {
@@ -4236,23 +4978,27 @@
                 const gainedStone = Math.max(game.inventory.stone, Math.round(game.inventory.stone * mult));
                 const gainedCrystal = Math.max(game.inventory.crystal, Math.round(game.inventory.crystal * mult));
                 const gainedAmber = Math.max(game.inventory.amber, Math.round(game.inventory.amber * mult));
+                const gainedAether = Math.max(game.inventory.aether, Math.round(game.inventory.aether * mult));
 
                 const gained = gainedWood * materialConfig.wood.value
                     + gainedStone * materialConfig.stone.value
                     + gainedCrystal * materialConfig.crystal.value
-                    + gainedAmber * materialConfig.amber.value;
+                    + gainedAmber * materialConfig.amber.value
+                    + gainedAether * materialConfig.aether.value;
                 save.stored += gained;
                 if (save.stored > save.bestStored) save.bestStored = save.stored;
                 save.bankWood += gainedWood;
                 save.bankStone += gainedStone;
                 save.bankCrystal += gainedCrystal;
                 save.bankAmber += gainedAmber;
+                save.bankAether += gainedAether;
                 game.depositPulse = gained;
 
                 game.inventory.wood = 0;
                 game.inventory.stone = 0;
                 game.inventory.crystal = 0;
                 game.inventory.amber = 0;
+                game.inventory.aether = 0;
 
                 saveGame();
             }
@@ -4280,17 +5026,17 @@
                 let y = 0;
 
                 if (side === 0) {
-                    x = random(margin, world.w - margin);
-                    y = margin;
+                    x = random(world.minX + margin, world.maxX - margin);
+                    y = world.minY + margin;
                 } else if (side === 1) {
-                    x = world.w - margin;
-                    y = random(margin, world.h - margin);
+                    x = world.maxX - margin;
+                    y = random(world.minY + margin, world.maxY - margin);
                 } else if (side === 2) {
-                    x = random(margin, world.w - margin);
-                    y = world.h - margin;
+                    x = random(world.minX + margin, world.maxX - margin);
+                    y = world.maxY - margin;
                 } else {
-                    x = margin;
-                    y = random(margin, world.h - margin);
+                    x = world.minX + margin;
+                    y = random(world.minY + margin, world.maxY - margin);
                 }
 
                 const ageTier = Math.floor(save.worldAge / 1800);
@@ -4350,17 +5096,17 @@
                 let y = 0;
 
                 if (side === 0) {
-                    x = random(margin, world.w - margin);
-                    y = margin;
+                    x = random(world.minX + margin, world.maxX - margin);
+                    y = world.minY + margin;
                 } else if (side === 1) {
-                    x = world.w - margin;
-                    y = random(margin, world.h - margin);
+                    x = world.maxX - margin;
+                    y = random(world.minY + margin, world.maxY - margin);
                 } else if (side === 2) {
-                    x = random(margin, world.w - margin);
-                    y = world.h - margin;
+                    x = random(world.minX + margin, world.maxX - margin);
+                    y = world.maxY - margin;
                 } else {
-                    x = margin;
-                    y = random(margin, world.h - margin);
+                    x = world.minX + margin;
+                    y = random(world.minY + margin, world.maxY - margin);
                 }
 
                 const ageTier = Math.floor(save.worldAge / 1800);
@@ -4396,17 +5142,17 @@
                 let y = 0;
 
                 if (side === 0) {
-                    x = random(margin, world.w - margin);
-                    y = margin;
+                    x = random(world.minX + margin, world.maxX - margin);
+                    y = world.minY + margin;
                 } else if (side === 1) {
-                    x = world.w - margin;
-                    y = random(margin, world.h - margin);
+                    x = world.maxX - margin;
+                    y = random(world.minY + margin, world.maxY - margin);
                 } else if (side === 2) {
-                    x = random(margin, world.w - margin);
-                    y = world.h - margin;
+                    x = random(world.minX + margin, world.maxX - margin);
+                    y = world.maxY - margin;
                 } else {
-                    x = margin;
-                    y = random(margin, world.h - margin);
+                    x = world.minX + margin;
+                    y = random(world.minY + margin, world.maxY - margin);
                 }
 
                 const tier = Math.max(1, milestone);
@@ -4504,12 +5250,12 @@
                 game.enemies.splice(index, 1);
             }
 
-            function handleDepotBreach() {
+            function handleTowerBreach() {
                 const storedBefore = save.stored;
 
                 game.running = false;
                 keys.clear();
-                game.depotHp = DEPOT_MAX_HP;
+                game.towerHp = TOWER_MAX_HP;
                 game.enemies = [];
                 game.waveBreakTimer = Math.round(WAVE_START_DELAY * 0.7);
                 game.waveInProgress = false;
@@ -4519,7 +5265,7 @@
                 startBtn.textContent = "Restart Day";
                 save.stored = Math.max(0, Math.floor(save.stored * 0.85));
 
-                // The run pauses, the depot is repaired and 15% of progress is gone.
+                // The run pauses, the tower is repaired and 15% of progress is gone.
                 // Record it so the overlay can say so instead of reading as a plain pause.
                 game.breach = {
                     wave: game.waveNumber,
@@ -4581,8 +5327,8 @@
                     }
                 }
 
-                const depotCenterX = depot.x + depot.w * 0.5;
-                const depotCenterY = depot.y + depot.h * 0.5;
+                const towerCenterX = tower.x + tower.w * 0.5;
+                const towerCenterY = tower.y + tower.h * 0.5;
 
                 for (let i = game.enemies.length - 1; i >= 0; i -= 1) {
                     const enemy = game.enemies[i];
@@ -4590,8 +5336,8 @@
                         enemy.ticksSinceMinionKill = (enemy.ticksSinceMinionKill || 0) + 1;
                     }
 
-                    let moveTargetX = depotCenterX;
-                    let moveTargetY = depotCenterY;
+                    let moveTargetX = towerCenterX;
+                    let moveTargetY = towerCenterY;
                     if (enemy.minionFocus && game.minionUnits.length > 0) {
                         const minionIndex = findClosestMinionIndexFrom(enemy.x, enemy.y, world.w + world.h);
                         if (minionIndex !== -1) {
@@ -4660,16 +5406,16 @@
                         }
                     }
 
-                    const hitDepot = enemy.x > depot.x && enemy.x < depot.x + depot.w
-                        && enemy.y > depot.y && enemy.y < depot.y + depot.h;
-                    if (hitDepot) {
-                        game.depotHp = Math.max(0, game.depotHp - enemy.damage);
-                        game.depotPulse = Math.max(-999, game.depotPulse - enemy.damage);
+                    const hitTower = enemy.x > tower.x && enemy.x < tower.x + tower.w
+                        && enemy.y > tower.y && enemy.y < tower.y + tower.h;
+                    if (hitTower) {
+                        game.towerHp = Math.max(0, game.towerHp - enemy.damage);
+                        game.towerPulse = Math.max(-999, game.towerPulse - enemy.damage);
                         game.enemies.splice(i, 1);
-                        playDepotHitSfx(enemy.damage);
+                        playTowerHitSfx(enemy.damage);
 
-                        if (game.depotHp <= 0) {
-                            handleDepotBreach();
+                        if (game.towerHp <= 0) {
+                            handleTowerBreach();
                             break;
                         }
                     }
@@ -4800,7 +5546,7 @@
                 for (let i = 0; i < game.minionUnits.length; i += 1) {
                     const minion = game.minionUnits[i];
                     const slotIndex = Number.isFinite(minion.slotIndex) ? minion.slotIndex : i;
-                    const home = minionDepotPoint(slotIndex);
+                    const home = minionTowerPoint(slotIndex);
 
                     if (minion.attackFlash > 0) {
                         minion.attackFlash -= 1;
@@ -4819,7 +5565,7 @@
                             minion.targetEnemyId = null;
                             let enemyIndex = findClosestEnemyIndexFrom(minion.x, minion.y, DEFENDER_AGGRO_RADIUS);
                             if (enemyIndex === -1) {
-                                enemyIndex = findClosestEnemyIndexFrom(home.x, home.y, DEFENDER_DEPOT_ALERT_RADIUS);
+                                enemyIndex = findClosestEnemyIndexFrom(home.x, home.y, DEFENDER_TOWER_ALERT_RADIUS);
                             }
                             if (enemyIndex !== -1) {
                                 enemy = game.enemies[enemyIndex];
@@ -4829,18 +5575,18 @@
 
                         const currentTarget = enemy;
                         const defendingAgainstHunter = currentTarget && currentTarget.type === "hunter";
-                        const shouldKeepRegenerating = minion.isRegeneratingAtDepot && minion.hp < minion.maxHp;
+                        const shouldKeepRegenerating = minion.isRegeneratingAtTower && minion.hp < minion.maxHp;
                         const shouldStartRegenerating = minion.hp <= minion.maxHp * 0.5 && !defendingAgainstHunter;
 
                         if (shouldKeepRegenerating || shouldStartRegenerating) {
-                            minion.isRegeneratingAtDepot = true;
+                            minion.isRegeneratingAtTower = true;
                             minion.targetEnemyId = null;
-                            const reachedDepot = moveEntityTowards(minion, home.x, home.y, minion.speed);
-                            if (reachedDepot) {
+                            const reachedTower = moveEntityTowards(minion, home.x, home.y, minion.speed);
+                            if (reachedTower) {
                                 minion.hp = Math.min(minion.maxHp, minion.hp + DEFENDER_REGEN_PER_TICK);
                                 if (minion.hp >= minion.maxHp) {
                                     minion.hp = minion.maxHp;
-                                    minion.isRegeneratingAtDepot = false;
+                                    minion.isRegeneratingAtTower = false;
                                     minion.patrolIdleTicks = Math.floor(random(DEFENDER_PATROL_IDLE_MIN_TICKS, DEFENDER_PATROL_IDLE_MAX_TICKS + 1));
                                     const patrolPoint = randomDefenderPatrolPoint();
                                     minion.patrolTargetX = patrolPoint.x;
@@ -4918,7 +5664,7 @@
                         }
                         if (nodeIndex === -1) {
                             if (minion.carryLoad > 0) {
-                                minion.state = "toDepot";
+                                minion.state = "toTower";
                             } else {
                                 moveEntityTowards(minion, home.x, home.y, minion.speed);
                             }
@@ -4952,34 +5698,38 @@
                             targetNode.active = false;
                             minion.targetNodeIndex = -1;
                             if (minion.carryLoad >= minionCarryCapacity()) {
-                                minion.state = "toDepot";
+                                minion.state = "toTower";
                             } else {
                                 minion.state = "idle";
                             }
                         }
                     }
 
-                    if (minion.state === "toDepot") {
+                    if (minion.state === "toTower") {
                         const reached = moveEntityTowards(minion, home.x, home.y, minion.speed);
                         if (reached && minion.carryLoad > 0) {
                             const gainedWood = minion.carry.wood;
                             const gainedStone = minion.carry.stone;
                             const gainedCrystal = minion.carry.crystal;
                             const gainedAmber = minion.carry.amber;
+                            const gainedAether = minion.carry.aether;
                             const mult = resourceMultiplier();
                             const bankWoodGain = Math.max(gainedWood, Math.round(gainedWood * mult));
                             const bankStoneGain = Math.max(gainedStone, Math.round(gainedStone * mult));
                             const bankCrystalGain = Math.max(gainedCrystal, Math.round(gainedCrystal * mult));
                             const bankAmberGain = Math.max(gainedAmber, Math.round(gainedAmber * mult));
+                            const bankAetherGain = Math.max(gainedAether, Math.round(gainedAether * mult));
                             save.bankWood += bankWoodGain;
                             save.bankStone += bankStoneGain;
                             save.bankCrystal += bankCrystalGain;
                             save.bankAmber += bankAmberGain;
+                            save.bankAether += bankAetherGain;
 
                             const gainedValue = bankWoodGain * materialConfig.wood.value
                                 + bankStoneGain * materialConfig.stone.value
                                 + bankCrystalGain * materialConfig.crystal.value
-                                + bankAmberGain * materialConfig.amber.value;
+                                + bankAmberGain * materialConfig.amber.value
+                                + bankAetherGain * materialConfig.aether.value;
                             save.stored += gainedValue;
                             if (save.stored > save.bestStored) save.bestStored = save.stored;
                             game.minionPulse = Math.min(999, game.minionPulse + gainedValue);
@@ -4990,6 +5740,7 @@
                             minion.carry.stone = 0;
                             minion.carry.crystal = 0;
                             minion.carry.amber = 0;
+                            minion.carry.aether = 0;
                             minion.state = "idle";
                         }
                     }
@@ -5035,7 +5786,7 @@
                     const minionDecay = Math.max(0.06, game.minionPulse * 0.012);
                     game.minionPulse = Math.max(0, game.minionPulse - minionDecay);
                 }
-                if (game.depotPulse < 0) game.depotPulse = Math.min(0, game.depotPulse + 0.12);
+                if (game.towerPulse < 0) game.towerPulse = Math.min(0, game.towerPulse + 0.12);
 
                 if (game.sellPulse && game.sellPulse.ticks > 0) {
                     game.sellPulse.ticks -= 1;
@@ -5052,9 +5803,10 @@
                 clampCameraPosition();
                 ctx.clearRect(0, 0, viewport.w, viewport.h);
                 ctx.save();
+                ctx.scale(cameraState.zoom, cameraState.zoom);
                 ctx.translate(-cameraState.x, -cameraState.y);
                 drawBackdrop(ctx);
-                drawDepotHealthBorder(ctx);
+                drawTowerHealthBorder(ctx);
                 drawSpawnerNodeCounts(ctx);
 
                 for (let i = 0; i < game.minionUnits.length; i += 1) {
@@ -5229,29 +5981,29 @@
                 ctx.restore();
 
                 const carryNow = inventoryCount();
-                const inDepot = canDeposit();
-                if (inDepot && carryNow > 0) {
+                const inTower = canDeposit();
+                if (inTower && carryNow > 0) {
                     ctx.fillStyle = "#1f7a56";
                     ctx.font = "700 16px Space Grotesk, sans-serif";
-                    ctx.fillText("Depositing...", depot.x - 12, depot.y - 10);
+                    ctx.fillText("Depositing...", tower.x - 12, tower.y - 10);
                 }
 
                 if (game.depositPulse > 0) {
                     ctx.fillStyle = "#1f7a56";
                     ctx.font = "700 18px Space Grotesk, sans-serif";
-                    ctx.fillText(`+${Math.ceil(game.depositPulse)} stored`, depot.x - 8, depot.y - 34);
+                    ctx.fillText(`+${Math.ceil(game.depositPulse)} stored`, tower.x - 8, tower.y - 34);
                 }
 
                 if (game.minionPulse > 0) {
                     ctx.fillStyle = "#1f7a56";
                     ctx.font = "700 14px Space Grotesk, sans-serif";
-                    ctx.fillText(`Minions +${Math.ceil(game.minionPulse)} bank`, depot.x - 8, depot.y - 52);
+                    ctx.fillText(`Minions +${Math.ceil(game.minionPulse)} bank`, tower.x - 8, tower.y - 52);
                 }
 
-                if (game.depotPulse < 0) {
+                if (game.towerPulse < 0) {
                     ctx.fillStyle = "#ff7f7f";
                     ctx.font = "700 16px Space Grotesk, sans-serif";
-                    ctx.fillText(`${Math.floor(game.depotPulse)} depot`, depot.x - 8, depot.y - 70);
+                    ctx.fillText(`${Math.floor(game.towerPulse)} tower`, tower.x - 8, tower.y - 70);
                 }
 
                 drawTurretSellHint(ctx);
@@ -5293,7 +6045,7 @@
 
                     ctx.fillStyle = "#ff8f8f";
                     ctx.font = "700 48px Space Grotesk, sans-serif";
-                    ctx.fillText("DEPOT BREACHED", cx, cy - 46);
+                    ctx.fillText("TOWER BREACHED", cx, cy - 46);
 
                     ctx.fillStyle = "#ffdede";
                     ctx.font = "500 21px Space Grotesk, sans-serif";
@@ -5304,7 +6056,7 @@
                     ctx.fillText(`-${breach.lost} progress lost`, cx, cy + 30);
                     ctx.fillStyle = "#ffcaca";
                     ctx.font = "500 18px Space Grotesk, sans-serif";
-                    ctx.fillText(`${breach.stored} progress remaining - depot repaired to full`, cx, cy + 58);
+                    ctx.fillText(`${breach.stored} progress remaining - tower repaired to full`, cx, cy + 58);
 
                     ctx.fillStyle = "#f3e2e2";
                     ctx.font = "500 17px Space Grotesk, sans-serif";
@@ -5332,10 +6084,11 @@
                     ctx.fillStyle = "#e9f4fb";
                     ctx.font = "500 17px Space Grotesk, sans-serif";
                     ctx.fillText("Move: Arrow Keys / WASD (or touch drag)", viewport.w / 2, viewport.h / 2 + 56);
-                    ctx.fillText("Walk into DEPOT to bank materials", viewport.w / 2, viewport.h / 2 + 84);
-                    ctx.fillText("Use the FIELD SHOP for Speed, Bag, and Minion crafting", viewport.w / 2, viewport.h / 2 + 112);
-                    ctx.fillText("Wood: green square | Stone: gray circle | Crystal: blue diamond | Amber: orange triangle", viewport.w / 2, viewport.h / 2 + 140);
-                    ctx.fillText("Bump red enemies and place sentries where you want to defend DEPOT.", viewport.w / 2, viewport.h / 2 + 168);
+                    ctx.fillText("Zoom the map: mouse wheel, [ and ], 0 to reset", viewport.w / 2, viewport.h / 2 + 84);
+                    ctx.fillText("Walk into TOWER to bank materials", viewport.w / 2, viewport.h / 2 + 112);
+                    ctx.fillText("Use the FIELD SHOP for Speed, Bag, and Minion crafting", viewport.w / 2, viewport.h / 2 + 140);
+                    ctx.fillText("Wood: green square | Stone: gray circle | Crystal: blue diamond | Amber: orange triangle | Aether: violet star", viewport.w / 2, viewport.h / 2 + 168);
+                    ctx.fillText("Bump red enemies and place sentries where you want to defend TOWER.", viewport.w / 2, viewport.h / 2 + 196);
                 }
             }
 
@@ -5375,7 +6128,7 @@
 
             const MUSIC_TONE_BRIGHT = 6800;
             const MUSIC_TONE_DARK = 2100;
-            const DEPOT_HIT_MIN_GAP_SECONDS = 0.07;
+            const TOWER_HIT_MIN_GAP_SECONDS = 0.07;
 
             // [step within the 8-bar loop, midi note, length in steps]
             const MUSIC_LEAD = [
@@ -5399,7 +6152,7 @@
                 dark: false,
                 // -Infinity, not 0: currentTime also starts at 0, so a zero here would
                 // swallow the first hit of the session.
-                lastDepotHitTime: -Infinity,
+                lastTowerHitTime: -Infinity,
                 pulseWave: null,
                 thinPulseWave: null,
                 noiseBuffer: null,
@@ -5672,17 +6425,17 @@
                 setMusicDark(bossPresent);
             }
 
-            // Impact on the depot: a pitch-dropping thud plus a filtered noise crack,
-            // both scaled by how hard the hit was and how close the depot is to falling.
-            function playDepotHitSfx(damage) {
+            // Impact on the tower: a pitch-dropping thud plus a filtered noise crack,
+            // both scaled by how hard the hit was and how close the tower is to falling.
+            function playTowerHitSfx(damage) {
                 if (!musicState.ctx || !musicState.sfxBus || save.sfxMuted) return;
                 const ctx = musicState.ctx;
                 const now = ctx.currentTime;
-                if (now - musicState.lastDepotHitTime < DEPOT_HIT_MIN_GAP_SECONDS) return;
-                musicState.lastDepotHitTime = now;
+                if (now - musicState.lastTowerHitTime < TOWER_HIT_MIN_GAP_SECONDS) return;
+                musicState.lastTowerHitTime = now;
 
                 const heft = clamp(damage / 16, 0.35, 1);
-                const urgency = 1 - clamp(game.depotHp / DEPOT_MAX_HP, 0, 1);
+                const urgency = 1 - clamp(game.towerHp / TOWER_MAX_HP, 0, 1);
                 const time = now + 0.005;
 
                 const thud = ctx.createOscillator();
@@ -5813,6 +6566,22 @@
                     toggleMusicMuted();
                     return;
                 }
+                // +/- already nudge the volume, so zoom sits on the bracket keys.
+                if (key === "[") {
+                    e.preventDefault();
+                    setMapZoom(cameraState.zoom / MAP_ZOOM_STEP);
+                    return;
+                }
+                if (key === "]") {
+                    e.preventDefault();
+                    setMapZoom(cameraState.zoom * MAP_ZOOM_STEP);
+                    return;
+                }
+                if (key === "0") {
+                    e.preventDefault();
+                    setMapZoom(1);
+                    return;
+                }
                 if (key === "+" || key === "=") {
                     e.preventDefault();
                     nudgeMusicVolume(0.1);
@@ -5842,11 +6611,11 @@
 
             function worldPointFromClient(clientX, clientY) {
                 const rect = canvas.getBoundingClientRect();
-                const worldX = cameraState.x + ((clientX - rect.left) / rect.width) * viewport.w;
-                const worldY = cameraState.y + ((clientY - rect.top) / rect.height) * viewport.h;
+                const worldX = cameraState.x + ((clientX - rect.left) / rect.width) * viewWorldW();
+                const worldY = cameraState.y + ((clientY - rect.top) / rect.height) * viewWorldH();
                 return {
-                    x: clamp(worldX, 0, world.w),
-                    y: clamp(worldY, 0, world.h)
+                    x: clamp(worldX, world.minX, world.maxX),
+                    y: clamp(worldY, world.minY, world.maxY)
                 };
             }
 
@@ -5915,8 +6684,8 @@
                 const rect = canvas.getBoundingClientRect();
                 if (rect.width <= 0 || rect.height <= 0) return;
 
-                const worldPerPixelX = viewport.w / rect.width;
-                const worldPerPixelY = viewport.h / rect.height;
+                const worldPerPixelX = viewWorldW() / rect.width;
+                const worldPerPixelY = viewWorldH() / rect.height;
                 const dx = (e.clientX - cameraState.startClientX) * worldPerPixelX;
                 const dy = (e.clientY - cameraState.startClientY) * worldPerPixelY;
                 if (Math.abs(dx) + Math.abs(dy) > 3) {
@@ -5937,6 +6706,11 @@
                 }
                 canvas.style.cursor = "";
             };
+
+            canvas.addEventListener("wheel", (e) => {
+                e.preventDefault();
+                setMapZoom(cameraState.zoom * (e.deltaY > 0 ? 1 / MAP_ZOOM_STEP : MAP_ZOOM_STEP), e.clientX, e.clientY);
+            }, { passive: false });
 
             canvas.addEventListener("pointerup", stopCanvasPan);
             canvas.addEventListener("pointercancel", stopCanvasPan);
@@ -6256,7 +7030,7 @@
                         `Progress ${save.stored} (best ${save.bestStored})`,
                         `${unlockedSkillCount()} of ${SKILL_TREE_ORDER.length} skills unlocked`,
                         `${turrets} turret${turrets === 1 ? "" : "s"}, ${minions} minion${minions === 1 ? "" : "s"}`,
-                        `Bank ${save.bankWood}W / ${save.bankStone}S / ${save.bankCrystal}C / ${save.bankAmber}A`,
+                        `Bank ${save.bankWood}W / ${save.bankStone}S / ${save.bankCrystal}C / ${save.bankAmber}A / ${save.bankAether}Ae`,
                         `${save.essence} essence`
                     ]) {
                         const li = document.createElement("li");
@@ -6369,6 +7143,8 @@
             });
 
             initSkillTreeUi();
+
+            cameraState.zoom = Number.isFinite(save.mapZoom) ? clamp(save.mapZoom, MIN_MAP_ZOOM, MAX_MAP_ZOOM) : 1;
 
             if (!restoreRuntimeSnapshot()) {
                 resetSession();
