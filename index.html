@@ -1233,6 +1233,7 @@
                                 <button id="defenderBtn" class="secondary shop-btn">Craft Defender</button>
                                 <button id="minionSpeedBtn" class="secondary shop-btn">Minion Speed</button>
                                 <button id="minionCapBtn" class="secondary shop-btn">Minion Capacity</button>
+                                <button id="minionHasteBtn" class="secondary shop-btn">Haste Spell</button>
                             </div>
                         </details>
 
@@ -1356,6 +1357,7 @@
             const gathererFocusListEl = document.getElementById("gathererFocusList");
             const defenderBtn = document.getElementById("defenderBtn");
             const minionSpeedBtn = document.getElementById("minionSpeedBtn");
+            const minionHasteBtn = document.getElementById("minionHasteBtn");
             const minionCapBtn = document.getElementById("minionCapBtn");
             const resetBtn = document.getElementById("resetBtn");
             const resetPopoverEl = document.getElementById("resetPopover");
@@ -1410,6 +1412,7 @@
                 "minionSpeed",
                 "minionCapacity",
                 "gathererFocus",
+                "minionHaste",
                 "minionArmor",
                 "minionArmor2",
                 "turret",
@@ -1435,6 +1438,7 @@
                 sniperTurret: { label: "Unlock Snipers", cost: { wood: 24, stone: 26 }, requires: ["turret"] },
                 slowTurret: { label: "Unlock Slow Field", cost: { crystal: 14, amber: 9, essence: 2 }, requires: ["sniperTurret"] },
                 turretCap: { label: "Unlock Turret Capacity", cost: { crystal: 18, amber: 10, essence: 3 }, requires: ["slowTurret"] },
+                minionHaste: { label: "Unlock Haste Spell", desc: "Cast to double every minion's pace for a minute", cost: { crystal: 40, amber: 24, aether: 4 }, requires: ["gathererFocus"] },
                 minionArmor2: { label: "Unlock Minion Plating", desc: "Doubles minion health again, 4x in total", cost: { stone: 180, crystal: 90, amber: 60, essence: 80 }, requires: ["minionArmor"] },
                 minionArmor: { label: "Unlock Minion Armor", desc: "Doubles the health of every gatherer and defender", cost: { stone: 90, crystal: 48, amber: 48 }, requires: ["defender"] },
                 turretHaste: { label: "Unlock Rapid Fire", desc: "All sentries and snipers fire 30% faster", cost: { crystal: 240, amber: 140, essence: 50 }, requires: ["slowTurret"] },
@@ -1449,6 +1453,7 @@
                 bag: 2,
                 gatherer: 3,
                 gathererFocus: 5,
+                minionHaste: 6,
                 minionArmor: 5,
                 minionArmor2: 6,
                 defender: 4,
@@ -1470,6 +1475,7 @@
                 bag: "player",
                 gatherer: "minionCore",
                 gathererFocus: "minionCore",
+                minionHaste: "minionCore",
                 defender: "defender",
                 minionArmor: "minionArmor",
                 minionArmor2: "minionArmor",
@@ -1510,6 +1516,7 @@
                 globalMultiplier: "globalMultiplier",
                 gatherer: "gatherer",
                 gathererFocus: "gathererFocus",
+                minionHaste: "minionHaste",
                 defender: "defender",
                 minionSpeed: "minionSpeed",
                 minionCapacity: "minionCapacity"
@@ -1579,7 +1586,7 @@
 
             const tower = { x: -W(108) / 2, y: -W(88) / 2, w: W(108), h: W(88) };
             const TOWER_MAX_HP = 100;
-            const START_BUDGET = { wood: 40, stone: 30, crystal: 0, amber: 0, aether: 0, essence: 0 };
+            const START_BUDGET = { wood: 4000, stone: 3000, crystal: 100, amber: 100, aether: 100, essence: 100 };
             const START_WAVE_COUNT = 1;
             const WAVE_START_DELAY = 3600;
             const WAVE_BREAK_TICKS = 320;
@@ -1612,6 +1619,10 @@
             const DEFENDER_PATROL_IDLE_MAX_TICKS = 210;
             const DEFENDER_AGGRO_RADIUS = W(320);
             const DEFENDER_TOWER_ALERT_RADIUS = W(460);
+            // Haste spell: burns aether to double every minion's pace for a minute.
+            const MINION_HASTE_DURATION_TICKS = 3600;   // 60 ticks a second
+            const MINION_HASTE_MULTIPLIER = 2;
+            const MINION_HASTE_COST = { aether: 6 };
             const DEFENDER_BASE_SPEED_BONUS = 0.45;
             const DEFENDER_CHASE_SPEED_BONUS = 0.75;
             const DEFENDER_REGEN_PER_TICK = 0.05;
@@ -1676,6 +1687,7 @@
                 waveInProgress: false,
                 waveIntroPendingType: null,
                 towerHp: TOWER_MAX_HP,
+                minionHasteTicks: 0,
                 player: {
                     x: 0,
                     y: 0,
@@ -2298,6 +2310,7 @@
                     waveInProgress: game.waveInProgress,
                     waveIntroPendingType: game.waveIntroPendingType,
                     towerHp: game.towerHp,
+                    minionHasteTicks: game.minionHasteTicks,
                     player: {
                         x: game.player.x,
                         y: game.player.y,
@@ -2352,6 +2365,9 @@
                 game.waveInProgress = Boolean(snapshot.waveInProgress);
                 game.waveIntroPendingType = typeof snapshot.waveIntroPendingType === "string" ? snapshot.waveIntroPendingType : null;
                 game.towerHp = Number.isFinite(snapshot.towerHp) ? clamp(snapshot.towerHp, 0, TOWER_MAX_HP) : TOWER_MAX_HP;
+                game.minionHasteTicks = Number.isFinite(snapshot.minionHasteTicks)
+                    ? clamp(Math.floor(snapshot.minionHasteTicks), 0, MINION_HASTE_DURATION_TICKS)
+                    : 0;
 
                 const player = snapshot.player && typeof snapshot.player === "object" ? snapshot.player : {};
                 game.player.speed = BASE_PLAYER_SPEED + save.speedLevel * PLAYER_SPEED_LEVEL_STEP;
@@ -2674,6 +2690,28 @@
                 return 1.3 + (index % 3) * 0.12 + save.minionSpeedLevel * 0.2;
             }
 
+            function minionHasteActive() {
+                return game.minionHasteTicks > 0;
+            }
+
+            // minion.speed stays the minion's own pace; the spell is applied here, at the
+            // moment of moving, so it lifts every minion at once and drops away cleanly
+            // when the spell lapses.
+            function minionTravelSpeed(minion, factor = 1, bonus = 0) {
+                const speed = minion.speed * factor + bonus;
+                return minionHasteActive() ? speed * MINION_HASTE_MULTIPLIER : speed;
+            }
+
+            function castMinionHaste() {
+                if (!canUseUpgrade("minionHaste") || minionHasteActive()) return;
+                if (!hasBankForCost(MINION_HASTE_COST)) return;
+
+                spendBankForCost(MINION_HASTE_COST);
+                game.minionHasteTicks = MINION_HASTE_DURATION_TICKS;
+                saveGame();
+                refreshHud();
+            }
+
             function totalMinionCount() {
                 return save.minions + save.defenderMinions;
             }
@@ -2848,6 +2886,7 @@
                 const defenderUnlocked = canUseUpgrade("defender");
                 const minionSpeedUnlocked = canUseUpgrade("minionSpeed");
                 const minionCapacityUnlocked = canUseUpgrade("minionCapacity");
+                const minionHasteUnlocked = canUseUpgrade("minionHaste");
 
                 const speedCost = speedRecipe();
                 const bagCost = bagRecipe();
@@ -2906,6 +2945,14 @@
                 setShopButtonContent(minionSpeedBtn, "Minion Speed", `Lv ${save.minionSpeedLevel}`, minionSpeedCost);
                 const minionCapCost = minionCapacityRecipe();
                 setShopButtonContent(minionCapBtn, "Minion Capacity", `Lv ${save.minionCapacityLevel}`, minionCapCost);
+                // While it runs the button counts the spell down in place of its pitch.
+                const hasteRunning = minionHasteActive();
+                setShopButtonContent(
+                    minionHasteBtn,
+                    "Haste Spell",
+                    hasteRunning ? `Active ${formatWaveCountdown(game.minionHasteTicks)}` : `x${MINION_HASTE_MULTIPLIER} for 1:00`,
+                    MINION_HASTE_COST
+                );
 
                 setButtonVisible(speedBtn, speedUnlocked);
                 setButtonVisible(bagBtn, bagUnlocked);
@@ -2923,6 +2970,7 @@
                 setButtonVisible(defenderBtn, defenderUnlocked);
                 setButtonVisible(minionSpeedBtn, minionSpeedUnlocked);
                 setButtonVisible(minionCapBtn, minionCapacityUnlocked);
+                setButtonVisible(minionHasteBtn, minionHasteUnlocked);
 
                 setButtonDisabled(speedBtn, !speedUnlocked);
                 setButtonDisabled(bagBtn, !bagUnlocked);
@@ -2945,6 +2993,7 @@
                 setButtonDisabled(defenderBtn, !defenderUnlocked);
                 setButtonDisabled(minionSpeedBtn, !minionSpeedUnlocked);
                 setButtonDisabled(minionCapBtn, !minionCapacityUnlocked);
+                setButtonDisabled(minionHasteBtn, !minionHasteUnlocked || hasteRunning || !hasBankForCost(MINION_HASTE_COST));
 
                 refreshShopGroupVisibility();
 
@@ -4829,6 +4878,7 @@
                 game.waveInProgress = false;
                 game.waveIntroPendingType = null;
                 game.towerHp = TOWER_MAX_HP;
+                game.minionHasteTicks = 0;
                 game.enemies = [];
                 game.turrets = [];
                 game.pendingBasicTurretPlacements = 0;
@@ -5581,7 +5631,7 @@
                         if (shouldKeepRegenerating || shouldStartRegenerating) {
                             minion.isRegeneratingAtTower = true;
                             minion.targetEnemyId = null;
-                            const reachedTower = moveEntityTowards(minion, home.x, home.y, minion.speed);
+                            const reachedTower = moveEntityTowards(minion, home.x, home.y, minionTravelSpeed(minion));
                             if (reachedTower) {
                                 minion.hp = Math.min(minion.maxHp, minion.hp + DEFENDER_REGEN_PER_TICK);
                                 if (minion.hp >= minion.maxHp) {
@@ -5609,7 +5659,7 @@
                                 minion.patrolTargetY = patrolPoint.y;
                             }
 
-                            const reachedPatrol = moveEntityTowards(minion, minion.patrolTargetX, minion.patrolTargetY, minion.speed * 0.9);
+                            const reachedPatrol = moveEntityTowards(minion, minion.patrolTargetX, minion.patrolTargetY, minionTravelSpeed(minion, 0.9));
                             if (reachedPatrol) {
                                 minion.patrolIdleTicks = Math.floor(random(DEFENDER_PATROL_IDLE_MIN_TICKS, DEFENDER_PATROL_IDLE_MAX_TICKS + 1));
                                 const patrolPoint = randomDefenderPatrolPoint();
@@ -5619,7 +5669,7 @@
                             continue;
                         }
 
-                        moveEntityTowards(minion, enemy.x, enemy.y, minion.speed + DEFENDER_CHASE_SPEED_BONUS);
+                        moveEntityTowards(minion, enemy.x, enemy.y, minionTravelSpeed(minion, 1, DEFENDER_CHASE_SPEED_BONUS));
                         const strikeRange = W(12) + enemy.r;
                         if (distanceSq(minion, enemy) <= strikeRange * strikeRange && minion.attackCooldown <= 0) {
                             enemy.hp -= 1;
@@ -5666,7 +5716,7 @@
                             if (minion.carryLoad > 0) {
                                 minion.state = "toTower";
                             } else {
-                                moveEntityTowards(minion, home.x, home.y, minion.speed);
+                                moveEntityTowards(minion, home.x, home.y, minionTravelSpeed(minion));
                             }
                             continue;
                         }
@@ -5688,7 +5738,7 @@
                             continue;
                         }
 
-                        const reached = moveEntityTowards(minion, targetNode.x, targetNode.y, minion.speed);
+                        const reached = moveEntityTowards(minion, targetNode.x, targetNode.y, minionTravelSpeed(minion));
                         if (reached) {
                             if (!minion.carryType) {
                                 minion.carryType = targetNode.type;
@@ -5706,7 +5756,7 @@
                     }
 
                     if (minion.state === "toTower") {
-                        const reached = moveEntityTowards(minion, home.x, home.y, minion.speed);
+                        const reached = moveEntityTowards(minion, home.x, home.y, minionTravelSpeed(minion));
                         if (reached && minion.carryLoad > 0) {
                             const gainedWood = minion.carry.wood;
                             const gainedStone = minion.carry.stone;
@@ -5787,6 +5837,11 @@
                     game.minionPulse = Math.max(0, game.minionPulse - minionDecay);
                 }
                 if (game.towerPulse < 0) game.towerPulse = Math.min(0, game.towerPulse + 0.12);
+
+                if (game.minionHasteTicks > 0) {
+                    game.minionHasteTicks -= 1;
+                    if (game.minionHasteTicks === 0) refreshHud();   // the spell just lapsed
+                }
 
                 if (game.sellPulse && game.sellPulse.ticks > 0) {
                     game.sellPulse.ticks -= 1;
@@ -6996,6 +7051,10 @@
                 syncMinionUnits(false);
                 saveGame();
                 refreshHud();
+            });
+
+            minionHasteBtn.addEventListener("click", () => {
+                castMinionHaste();
             });
 
             minionCapBtn.addEventListener("click", () => {
