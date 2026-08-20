@@ -1,0 +1,13 @@
+[default]
+address = "0.0.0.0"
+# 8080 is taken on this machine (Adminer), 8081 by VS Code.
+port = 8090
+# The game posts small JSON blobs; keep the accepted body tiny so a stray payload
+# cannot tie the server up.
+limits = { json = "8 KiB" }
+
+[debug]
+log_level = "normal"
+
+[release]
+log_level = "critical"

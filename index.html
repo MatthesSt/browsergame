@@ -451,6 +451,104 @@
             display: none;
         }
 
+        .popover-card.leaderboard-card {
+            width: min(94vw, 760px);
+            height: min(88vh, 760px);
+            max-height: min(88vh, 760px);
+        }
+
+        .leaderboard-identity {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-size: 0.78rem;
+            color: #b8d4eb;
+        }
+
+        .leaderboard-identity input {
+            width: 168px;
+            padding: 6px 9px;
+            border-radius: 8px;
+            border: 1px solid #34506e;
+            background: #13263d;
+            color: #eaf4ff;
+            font: inherit;
+            font-size: 0.82rem;
+        }
+
+        .leaderboard-status {
+            padding: 3px 8px;
+            border-radius: 999px;
+            border: 1px solid #34506e;
+            font-size: 0.7rem;
+            font-weight: 700;
+            letter-spacing: 0.03em;
+            text-transform: uppercase;
+            color: #9fb6cc;
+        }
+
+        .leaderboard-status.live {
+            border-color: #2f7d63;
+            color: #7fe0bb;
+        }
+
+        .leaderboard-status.offline {
+            border-color: #7d3a3a;
+            color: #ff9f9f;
+        }
+
+        .leaderboard-body {
+            overflow: auto;
+            padding-right: 4px;
+        }
+
+        .leaderboard-table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 0.86rem;
+        }
+
+        .leaderboard-table th {
+            position: sticky;
+            top: 0;
+            background: #13273d;
+            text-align: left;
+            font-size: 0.72rem;
+            letter-spacing: 0.06em;
+            text-transform: uppercase;
+            color: #8fa8c0;
+            padding: 6px 8px;
+            border-bottom: 1px solid #2c4763;
+        }
+
+        .leaderboard-table td {
+            padding: 7px 8px;
+            border-bottom: 1px solid #1d3450;
+        }
+
+        .leaderboard-table .rank,
+        .leaderboard-table .score,
+        .leaderboard-table .wave {
+            text-align: right;
+            font-variant-numeric: tabular-nums;
+        }
+
+        .leaderboard-table .name {
+            width: 100%;
+        }
+
+        /* Your own row, so you can find yourself without reading every line. */
+        .leaderboard-table tr.self td {
+            background: #1b3a56;
+            color: #ffe7a8;
+        }
+
+        .leaderboard-empty {
+            margin: 14px 4px;
+            color: #9fb6cc;
+            font-size: 0.86rem;
+        }
+
         /* Qualified with .popover-card so it wins over the full-screen sizing that
            rule declares further down the sheet. */
         .popover-card.confirm-card {
@@ -1181,6 +1279,7 @@
             </div>
             <div class="controls">
                 <button id="openSkillTreeBtn" class="secondary icon-title-btn" title="Open Skill Tree"><span class="ico skill" aria-hidden="true"></span><span>Skill Tree</span></button>
+                <button id="openLeaderboardBtn" class="secondary icon-title-btn" title="Open Leaderboard"><span class="ico best" aria-hidden="true"></span><span>Leaderboard</span></button>
                 <button id="resetBtn" class="secondary">Reset Save</button>
             </div>
         </section>
@@ -1285,6 +1384,32 @@
         <button id="dismissUndoBtn" class="secondary subtle">Dismiss</button>
     </div>
 
+    <div id="leaderboardPopover" class="popover-backdrop" aria-hidden="true">
+        <div class="popover-card leaderboard-card" role="dialog" aria-modal="true" aria-label="Leaderboard">
+            <div class="popover-head">
+                <h3>LEADERBOARD</h3>
+                <div class="leaderboard-identity">
+                    <label for="leaderboardName">Name</label>
+                    <input id="leaderboardName" type="text" maxlength="24" autocomplete="off" spellcheck="false" placeholder="Wanderer">
+                    <span id="leaderboardStatus" class="leaderboard-status offline">offline</span>
+                </div>
+                <div class="popover-head-actions">
+                    <button id="closeLeaderboardBtn" class="secondary">Close</button>
+                </div>
+            </div>
+            <div class="leaderboard-body">
+                <table class="leaderboard-table">
+                    <thead>
+                        <tr><th class="rank">#</th><th class="name">Name</th><th class="score">Best</th><th class="wave">Wave</th></tr>
+                    </thead>
+                    <tbody id="leaderboardRows"></tbody>
+                </table>
+                <p id="leaderboardEmpty" class="leaderboard-empty">Nothing banked yet - deposit some progress and the board is yours.</p>
+            </div>
+        </div>
+    </div>
+
+    <script src="leaderboard-client.js"></script>
     <script>
         (function () {
             const WORLD_SCALE = 1.5;
@@ -1376,6 +1501,13 @@
             const musicVolumeValueEl = document.getElementById("musicVolumeValue");
             const openSkillTreeBtn = document.getElementById("openSkillTreeBtn");
             const closeSkillTreeBtn = document.getElementById("closeSkillTreeBtn");
+            const openLeaderboardBtn = document.getElementById("openLeaderboardBtn");
+            const closeLeaderboardBtn = document.getElementById("closeLeaderboardBtn");
+            const leaderboardPopoverEl = document.getElementById("leaderboardPopover");
+            const leaderboardRowsEl = document.getElementById("leaderboardRows");
+            const leaderboardEmptyEl = document.getElementById("leaderboardEmpty");
+            const leaderboardNameEl = document.getElementById("leaderboardName");
+            const leaderboardStatusEl = document.getElementById("leaderboardStatus");
             const skillTreeZoomOutBtn = document.getElementById("skillTreeZoomOutBtn");
             const skillTreeZoomInBtn = document.getElementById("skillTreeZoomInBtn");
             const skillTreeZoomReadout = document.getElementById("skillTreeZoomReadout");
@@ -4109,6 +4241,126 @@
                 refreshHud();
             }
 
+            // ---- Leaderboard -------------------------------------------------------
+            //
+            // The server keeps one best-progress entry per player and pushes the board
+            // to every open tab. Everything here is optional: with no server reachable
+            // the game plays exactly as before, the panel just says "offline".
+
+            const leaderboard = typeof Leaderboard === "function" ? new Leaderboard() : null;
+            const LEADERBOARD_MIN_REPORT_GAP_MS = 5000;
+            let lastReportedScore = -1;
+            let lastReportAt = 0;
+            let resumeAfterLeaderboardClose = false;
+
+            // Only ever sends a new personal best, and never more than once every few
+            // seconds - the server keeps the best anyway, so there is nothing to gain
+            // from chattier reporting.
+            function reportScore(force = false) {
+                if (!leaderboard) return;
+                const score = Math.max(0, Math.floor(save.bestStored));
+                if (score <= 0) return;
+
+                const now = Date.now();
+                if (!force && (score <= lastReportedScore || now - lastReportAt < LEADERBOARD_MIN_REPORT_GAP_MS)) {
+                    return;
+                }
+                lastReportedScore = score;
+                lastReportAt = now;
+                leaderboard.submit(score, Math.max(0, game.waveNumber));
+            }
+
+            function renderLeaderboard(entries) {
+                if (!leaderboardRowsEl) return;
+
+                leaderboardRowsEl.textContent = "";
+                leaderboardEmptyEl.hidden = entries.length > 0;
+
+                for (const entry of entries) {
+                    const row = document.createElement("tr");
+                    if (leaderboard && entry.player_id === leaderboard.playerId) {
+                        row.className = "self";
+                    }
+
+                    const cells = [
+                        { className: "rank", text: String(entry.rank) },
+                        // textContent, never innerHTML: names come from other players.
+                        { className: "name", text: entry.name },
+                        { className: "score", text: convertNotation(entry.score) },
+                        { className: "wave", text: String(entry.wave || 0) }
+                    ];
+                    for (const cell of cells) {
+                        const td = document.createElement("td");
+                        td.className = cell.className;
+                        td.textContent = cell.text;
+                        row.appendChild(td);
+                    }
+                    leaderboardRowsEl.appendChild(row);
+                }
+            }
+
+            function setLeaderboardStatus(status) {
+                if (!leaderboardStatusEl) return;
+                leaderboardStatusEl.textContent = status;
+                leaderboardStatusEl.classList.toggle("live", status === "live");
+                leaderboardStatusEl.classList.toggle("offline", status === "offline");
+            }
+
+            function isLeaderboardPopoverOpen() {
+                return leaderboardPopoverEl && leaderboardPopoverEl.classList.contains("open");
+            }
+
+            function openLeaderboardPopover() {
+                if (!leaderboardPopoverEl || isLeaderboardPopoverOpen()) return;
+
+                if (game.running) {
+                    togglePause();
+                    resumeAfterLeaderboardClose = true;
+                } else {
+                    resumeAfterLeaderboardClose = false;
+                }
+
+                leaderboardPopoverEl.classList.add("open");
+                leaderboardPopoverEl.setAttribute("aria-hidden", "false");
+                // Opening is the moment the player cares about their standing.
+                reportScore(true);
+            }
+
+            function closeLeaderboardPopover() {
+                if (!leaderboardPopoverEl || !isLeaderboardPopoverOpen()) return;
+
+                leaderboardPopoverEl.classList.remove("open");
+                leaderboardPopoverEl.setAttribute("aria-hidden", "true");
+
+                if (resumeAfterLeaderboardClose && game.started && !game.running) {
+                    togglePause();
+                }
+                resumeAfterLeaderboardClose = false;
+            }
+
+            if (leaderboard) {
+                leaderboardNameEl.value = leaderboard.name;
+                leaderboard.onBoard((entries) => renderLeaderboard(entries));
+                leaderboard.onStatus(setLeaderboardStatus);
+                leaderboard.connect();
+
+                leaderboardNameEl.addEventListener("change", () => {
+                    leaderboard.setName(leaderboardNameEl.value);
+                    leaderboardNameEl.value = leaderboard.name;
+                    // Push the new name out straight away rather than waiting for the
+                    // next personal best.
+                    reportScore(true);
+                });
+            } else {
+                setLeaderboardStatus("unavailable");
+            }
+
+            openLeaderboardBtn.addEventListener("click", openLeaderboardPopover);
+            closeLeaderboardBtn.addEventListener("click", closeLeaderboardPopover);
+            leaderboardPopoverEl.addEventListener("click", (e) => {
+                if (e.target === leaderboardPopoverEl) closeLeaderboardPopover();
+            });
+
             function isSkillTreePopoverOpen() {
                 return skillTreePopoverEl && skillTreePopoverEl.classList.contains("open");
             }
@@ -5313,6 +5565,8 @@
             }
 
             function handleTowerBreach() {
+                // A run ending is the natural moment to record what it was worth.
+                reportScore(true);
                 const storedBefore = save.stored;
 
                 game.running = false;
@@ -5859,7 +6113,10 @@
                     game.sellPulse.ticks -= 1;
                 }
                 if (game.dayTick % 15 === 0) syncMusicMood();
-                if (game.dayTick % 120 === 0) captureRuntimeSnapshot();
+                if (game.dayTick % 120 === 0) {
+                    captureRuntimeSnapshot();
+                    reportScore();
+                }
                 // The full HUD pass walks every shop button and skill node. Nothing in it
                 // needs 60 Hz, so honour HUD_REFRESH_INTERVAL_TICKS here. Direct callers
                 // (purchases, unlocks, pause) still refresh immediately.
@@ -6611,6 +6868,11 @@
                 if (key === "escape" && isSkillTreePopoverOpen()) {
                     e.preventDefault();
                     closeSkillTreePopover();
+                    return;
+                }
+                if (key === "escape" && isLeaderboardPopoverOpen()) {
+                    e.preventDefault();
+                    closeLeaderboardPopover();
                     return;
                 }
                 if (key === "escape" && isResetPopoverOpen()) {
