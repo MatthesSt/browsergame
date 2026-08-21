@@ -234,6 +234,15 @@
         .ico.essence { background: #d7b7ff; border-radius: 50%; box-shadow: 0 0 6px #b288ff; }
         .ico.wave { background: #9be7ff; border-radius: 50%; }
         .ico.timer { background: #ffd166; border-radius: 50%; }
+        .ico.field { background: #7fe0bb; border-radius: 3px; }
+        .ico.field.claimed { background: #ff4d4d; }
+
+        /* A choked field is the kind of loss that is easy to miss on a map this big. */
+        .chip.alert {
+            border-color: #a13c3c;
+            background: #3a1b1bcc;
+            color: #ffd3d3;
+        }
         .ico.skill { background: #9fc0de; clip-path: polygon(50% 0, 80% 20%, 100% 50%, 80% 80%, 50% 100%, 20% 80%, 0 50%, 20% 20%); }
 
         .shop {
@@ -1320,6 +1329,7 @@
                     <div class="hud-section hud-section-wave">
                         <div class="chip" title="Current enemy wave"><span class="ico wave"></span><span>Wave</span><strong id="waveHud">0</strong></div>
                         <div class="chip" title="Time until next wave"><span class="ico timer"></span><span>Next</span><strong id="nextWaveHud">--:--</strong></div>
+                        <div class="chip" id="fieldsChip" title="Resource fields still producing - blights claim them until killed"><span class="ico field" id="fieldsIco"></span><span>Fields</span><strong id="fieldsHud">8/8</strong></div>
                     </div>
                     <div class="hud-spacer" aria-hidden="true"></div>
                     <div class="hud-section hud-section-score">
@@ -1525,6 +1535,9 @@
             const waveHudEl = document.getElementById("waveHud");
             const nextWaveHudEl = document.getElementById("nextWaveHud");
             const startBtn = document.getElementById("startBtn");
+            const fieldsChipEl = document.getElementById("fieldsChip");
+            const fieldsIcoEl = document.getElementById("fieldsIco");
+            const fieldsHudEl = document.getElementById("fieldsHud");
             const runRestartPopoverEl = document.getElementById("runRestartPopover");
             const runRestartSummaryEl = document.getElementById("runRestartSummary");
             const runRestartCancelBtn = document.getElementById("runRestartCancelBtn");
@@ -1781,8 +1794,29 @@
                 scout: { key: "scout", color: "#ff8c69", stroke: "#502018", r: E(9), hp: 1, speed: W(1.9) * ENEMY_SPEED_MULTIPLIER, damage: 5, shape: "circle", minionFocus: false, minionShotRange: W(46), minionShotCooldown: 28, laserColor: "#ff7f7f" },
                 brute: { key: "brute", color: "#c44536", stroke: "#3f1610", r: E(13), hp: 4, speed: W(0.95) * ENEMY_SPEED_MULTIPLIER, damage: 14, shape: "square", minionFocus: false, minionShotRange: W(46), minionShotCooldown: 28, laserColor: "#ff7f7f" },
                 wisp: { key: "wisp", color: "#f28482", stroke: "#4f1f2a", r: E(10), hp: 2, speed: W(1.35) * ENEMY_SPEED_MULTIPLIER, damage: 9, shape: "diamond", minionFocus: false, minionShotRange: W(46), minionShotCooldown: 28, laserColor: "#ff7f7f" },
-                hunter: { key: "hunter", color: "#8de969", stroke: "#2f5b22", r: E(9), hp: 2, speed: W(2.0) * ENEMY_SPEED_MULTIPLIER, damage: 3, shape: "circle", minionFocus: true, minionShotRange: W(72), minionShotCooldown: 16, laserColor: "#b8ff7f" }
+                hunter: { key: "hunter", color: "#8de969", stroke: "#2f5b22", r: E(9), hp: 2, speed: W(2.0) * ENEMY_SPEED_MULTIPLIER, damage: 3, shape: "circle", minionFocus: true, minionShotRange: W(72), minionShotCooldown: 16, laserColor: "#b8ff7f" },
+                // Walks past the tower without a glance: it wants a field, and once it
+                // has one that field stops producing until the blight is killed.
+                blight: { key: "blight", color: "#a06bd8", stroke: "#331a4d", r: E(12), hp: 4, speed: W(1.45) * ENEMY_SPEED_MULTIPLIER, damage: 0, shape: "diamond", minionFocus: false, minionShotRange: 0, minionShotCooldown: 0, laserColor: "#c9a2ff", claimsSpawner: true }
             };
+
+            // Blights arrive on their own schedule rather than as part of a wave's
+            // count, so choking the economy stays a separate pressure from the push
+            // on the tower.
+            const CLAIM_FIRST_WAVE = 5;
+            const CLAIM_WAVE_INTERVAL = 3;
+            const CLAIM_MAX_ACTIVE = 3;
+            const CLAIM_EXTRA_EVERY_WAVES = 12;
+            const CLAIM_RADIUS = W(30);
+            // A blight rises near the meadow it wants rather than walking in from the
+            // map edge, which on a map this size took minutes and made the schedule
+            // meaningless. Close enough to be a threat, far enough to be seen coming.
+            const CLAIM_APPROACH_DISTANCE = W(900);
+            const CLAIM_ESSENCE = 3;
+            // Red is reserved for a field that is actually lost: violet marks a blight
+            // still on its way, so the two states never read as the same thing.
+            const CLAIM_ALERT_COLOR = "#ff4d4d";
+            const CLAIM_PING_TICKS = 110;
 
             const tower = { x: -W(108) / 2, y: -W(88) / 2, w: W(108), h: W(88) };
             const TOWER_MAX_HP = 100;
@@ -1866,7 +1900,9 @@
                     tier: entry.tier,
                     x: Math.cos(bearing) * distance,
                     y: Math.sin(bearing) * distance,
-                    timer: 0
+                    timer: 0,
+                    // Id of the blight sitting on this field, or null while it is free.
+                    claimedBy: null
                 };
             });
             const BASE_ACTIVE_NODES_PER_SPAWNER = Math.max(1, Math.floor(MAX_ACTIVE_NODES / spawners.length));
@@ -2560,7 +2596,8 @@
                     pendingBasicTurretPlacements: game.pendingBasicTurretPlacements,
                     pendingSniperTurretPlacements: game.pendingSniperTurretPlacements,
                     pendingSlowTurretPlacements: game.pendingSlowTurretPlacements,
-                    spawnerTimers: spawners.map((spawner) => spawner.timer)
+                    spawnerTimers: spawners.map((spawner) => spawner.timer),
+                    spawnerClaims: spawners.map((spawner) => spawner.claimedBy)
                 };
 
                 save.runtimeState = snapshot;
@@ -2637,6 +2674,18 @@
                     for (let i = 0; i < spawners.length; i += 1) {
                         const timer = snapshot.spawnerTimers[i];
                         spawners[i].timer = Number.isFinite(timer) ? Math.max(0, Math.floor(timer)) : 0;
+                    }
+                }
+
+                clearSpawnerClaims();
+                if (Array.isArray(snapshot.spawnerClaims)) {
+                    for (let i = 0; i < spawners.length; i += 1) {
+                        const claim = snapshot.spawnerClaims[i];
+                        // Only honour a claim whose blight came back with the snapshot;
+                        // otherwise the field would be choked by nothing.
+                        if (Number.isFinite(claim) && game.enemies.some((enemy) => enemy.id === claim)) {
+                            spawners[i].claimedBy = claim;
+                        }
                     }
                 }
 
@@ -3104,6 +3153,12 @@
                 setHudNumber("bankAmber", bankAmberHudEl, save.bankAmber);
                 setHudNumber("bankAether", bankAetherHudEl, save.bankAether);
                 refreshSkillTreeBank();
+                const claimedFields = countClaimedSpawners();
+                const freeFields = spawners.length - claimedFields;
+                fieldsHudEl.textContent = `${freeFields}/${spawners.length}`;
+                fieldsChipEl.classList.toggle("alert", claimedFields > 0);
+                fieldsIcoEl.classList.toggle("claimed", claimedFields > 0);
+
                 setHudNumber("stored", storedEl, save.stored);
                 setHudNumber("bestRunScore", bestRunScoreEl, save.bestRunScore);
                 setCapacityHud(currentInventoryCount, currentBagCapacity);
@@ -3996,31 +4051,94 @@
                 }
             }
 
+            // A claimed field has to be obvious from across the map, where the 28-unit
+            // spawner marker is a couple of pixels. The meadow itself washes red and
+            // pings outward for as long as a blight is sitting on it.
+            function drawClaimedFields(targetCtx) {
+                const patches = getSpawnTerrainPatches();
+
+                for (let i = 0; i < spawners.length; i += 1) {
+                    const spawner = spawners[i];
+                    if (spawner.claimedBy === null) continue;
+
+                    const patch = patches[i];
+                    const region = spawnRegionForSpawner(spawner);
+                    const breathe = 0.5 + 0.5 * Math.sin(game.dayTick * 0.07);
+                    // Line widths are world units under a scaled context, so pulled all
+                    // the way out they would thin to a hair - exactly when this warning
+                    // matters most. Keep them a constant width on screen instead.
+                    const zoomComp = 1 / Math.max(MIN_MAP_ZOOM, cameraState.zoom);
+
+                    targetCtx.save();
+
+                    // Clipped to the patch outline so the wash stops where the meadow does.
+                    if (patch && patch.path) {
+                        targetCtx.globalAlpha = 0.16 + breathe * 0.14;
+                        targetCtx.fillStyle = CLAIM_ALERT_COLOR;
+                        targetCtx.fill(patch.path);
+                    }
+
+                    // Two pings half a cycle apart, running out to the field edge.
+                    targetCtx.strokeStyle = CLAIM_ALERT_COLOR;
+                    for (let ping = 0; ping < 2; ping += 1) {
+                        const phase = ((game.dayTick / CLAIM_PING_TICKS) + ping * 0.5) % 1;
+                        targetCtx.globalAlpha = (1 - phase) * 0.5;
+                        targetCtx.lineWidth = (3 + (1 - phase) * 4) * zoomComp;
+                        targetCtx.beginPath();
+                        targetCtx.arc(region.cx, region.cy, region.r * (0.25 + phase * 0.85), 0, Math.PI * 2);
+                        targetCtx.stroke();
+                    }
+
+                    // A steady rim, so the field still reads as claimed between pings.
+                    targetCtx.globalAlpha = 0.3 + breathe * 0.3;
+                    targetCtx.lineWidth = 5 * zoomComp;
+                    targetCtx.setLineDash([20 * zoomComp, 16 * zoomComp]);
+                    targetCtx.beginPath();
+                    targetCtx.arc(region.cx, region.cy, region.r, 0, Math.PI * 2);
+                    targetCtx.stroke();
+
+                    targetCtx.restore();
+                }
+            }
+
             function drawSpawners(targetCtx) {
                 targetCtx.save();
                 targetCtx.lineWidth = 2;
 
                 for (const spawner of spawners) {
                     const config = materialConfig[spawner.type];
+                    const claimed = spawner.claimedBy !== null;
+                    // A claimed field trades its own colour for the blight's, and
+                    // breathes, so it reads as choked from across the map.
+                    const ringColor = claimed ? CLAIM_ALERT_COLOR : config.color;
+                    const pulse = claimed ? 0.72 + 0.28 * Math.sin(game.dayTick * 0.08) : 1;
 
-                    targetCtx.shadowColor = `${config.color}66`;
-                    targetCtx.shadowBlur = 10;
-                    targetCtx.fillStyle = `${config.color}2f`;
+                    targetCtx.globalAlpha = pulse;
+                    targetCtx.shadowColor = `${ringColor}66`;
+                    targetCtx.shadowBlur = claimed ? 16 : 10;
+                    targetCtx.fillStyle = `${ringColor}2f`;
                     targetCtx.beginPath();
                     targetCtx.arc(spawner.x, spawner.y, 28, 0, Math.PI * 2);
                     targetCtx.fill();
 
                     targetCtx.shadowBlur = 0;
-                    targetCtx.strokeStyle = config.color;
+                    targetCtx.strokeStyle = ringColor;
+                    targetCtx.setLineDash(claimed ? [6, 5] : []);
                     targetCtx.beginPath();
                     targetCtx.arc(spawner.x, spawner.y, 28, 0, Math.PI * 2);
                     targetCtx.stroke();
+                    targetCtx.setLineDash([]);
+                    targetCtx.globalAlpha = 1;
 
-                    targetCtx.fillStyle = "#f4f8ffcc";
+                    targetCtx.fillStyle = claimed ? "#ffd3d3" : "#f4f8ffcc";
                     targetCtx.font = "700 9px Space Grotesk, sans-serif";
                     targetCtx.textAlign = "center";
                     targetCtx.textBaseline = "alphabetic";
                     targetCtx.fillText(spawner.type.toUpperCase(), spawner.x, spawner.y + 42);
+                    if (claimed) {
+                        targetCtx.fillStyle = CLAIM_ALERT_COLOR;
+                        targetCtx.fillText("CLAIMED", spawner.x, spawner.y + 53);
+                    }
                 }
 
                 targetCtx.restore();
@@ -4315,6 +4433,7 @@
                 drawGroundMacro(targetCtx);
 
                 drawSpawnTerrain(targetCtx);
+                drawClaimedFields(targetCtx);
                 drawSpawners(targetCtx);
                 drawTower(targetCtx);
             }
@@ -4686,10 +4805,63 @@
                 return Math.max(14, scaled);
             }
 
+            function countClaimedSpawners() {
+                let claimed = 0;
+                for (const spawner of spawners) {
+                    if (spawner.claimedBy !== null) claimed += 1;
+                }
+                return claimed;
+            }
+
+            // Free-and-unspoken-for: a field nothing has claimed and nothing is already
+            // walking towards, so two blights never race for the same one.
+            function spawnerIsAvailable(index) {
+                if (spawners[index].claimedBy !== null) return false;
+                for (const enemy of game.enemies) {
+                    if (enemy.claimTargetIndex === index) return false;
+                }
+                return true;
+            }
+
+            function nearestAvailableSpawnerIndex(x, y) {
+                let bestIndex = -1;
+                let bestDistSq = Infinity;
+                for (let i = 0; i < spawners.length; i += 1) {
+                    if (!spawnerIsAvailable(i)) continue;
+                    const dx = spawners[i].x - x;
+                    const dy = spawners[i].y - y;
+                    const distSq = dx * dx + dy * dy;
+                    if (distSq < bestDistSq) {
+                        bestDistSq = distSq;
+                        bestIndex = i;
+                    }
+                }
+                return bestIndex;
+            }
+
+            // Killing the blight is what frees the field, wherever the kill came from.
+            function releaseSpawnerClaims(enemyId) {
+                for (const spawner of spawners) {
+                    if (spawner.claimedBy === enemyId) {
+                        spawner.claimedBy = null;
+                        // Give the field a moment to come back rather than popping a
+                        // node the instant the blight dies.
+                        spawner.timer = Math.max(spawner.timer, 60);
+                    }
+                }
+            }
+
+            function clearSpawnerClaims() {
+                for (const spawner of spawners) spawner.claimedBy = null;
+            }
+
             function updateSpawners() {
                 let activeNodes = countActiveNodes();
                 for (let i = 0; i < spawners.length; i += 1) {
                     const spawner = spawners[i];
+                    // A claimed field keeps whatever is already lying in it, but grows
+                    // nothing new until the blight on it is dealt with.
+                    if (spawner.claimedBy !== null) continue;
                     spawner.timer -= 1;
                     if (spawner.timer > 0) continue;
                     activeNodes = spawnFromSpawnerWithActiveCount(spawner, i, activeNodes);
@@ -5235,6 +5407,7 @@
 
             function resetSession() {
                 clearRuntimeSnapshot();
+                clearSpawnerClaims();
                 game.runOver = false;
                 game.runSummary = null;
                 game.runEssenceStart = save.essence;
@@ -5572,8 +5745,71 @@
                     ticksSinceMinionKill: 0,
                     shotFlash: 0,
                     shotTargetX: x,
-                    shotTargetY: y
+                    shotTargetY: y,
+                    claimsSpawner: enemyType.claimsSpawner === true,
+                    claimTargetIndex: null
                 };
+            }
+
+            function countActiveClaimers() {
+                let claimers = 0;
+                for (const enemy of game.enemies) {
+                    if (enemy.claimsSpawner) claimers += 1;
+                }
+                return claimers;
+            }
+
+            // The field a blight is walking to. If something else took it first, it
+            // turns for the nearest one still going spare rather than standing about.
+            function claimTargetFor(enemy) {
+                if (!enemy.claimsSpawner) return null;
+                const index = enemy.claimTargetIndex;
+                if (!Number.isInteger(index) || index < 0 || index >= spawners.length) return null;
+
+                const spawner = spawners[index];
+                if (spawner.claimedBy !== null && spawner.claimedBy !== enemy.id) {
+                    const next = nearestAvailableSpawnerIndex(enemy.x, enemy.y);
+                    if (next !== -1) {
+                        enemy.claimTargetIndex = next;
+                        return spawners[next];
+                    }
+                }
+                return spawner;
+            }
+
+            function claimersForWave(waveNumber) {
+                if (waveNumber < CLAIM_FIRST_WAVE) return 0;
+                if ((waveNumber - CLAIM_FIRST_WAVE) % CLAIM_WAVE_INTERVAL !== 0) return 0;
+                return 1 + Math.floor((waveNumber - CLAIM_FIRST_WAVE) / CLAIM_EXTRA_EVERY_WAVES);
+            }
+
+            function randomAvailableSpawnerIndex() {
+                const available = [];
+                for (let i = 0; i < spawners.length; i += 1) {
+                    if (spawnerIsAvailable(i)) available.push(i);
+                }
+                if (available.length === 0) return -1;
+                return available[Math.floor(Math.random() * available.length)];
+            }
+
+            function spawnClaimers(count) {
+                for (let n = 0; n < count; n += 1) {
+                    if (countActiveClaimers() >= CLAIM_MAX_ACTIVE) return;
+
+                    const targetIndex = randomAvailableSpawnerIndex();
+                    if (targetIndex === -1) return;   // every field is already spoken for
+
+                    const target = spawners[targetIndex];
+                    const bearing = Math.random() * Math.PI * 2;
+                    const margin = W(16);
+                    const enemy = spawnEnemyOfType("blight");
+                    enemy.x = clamp(target.x + Math.cos(bearing) * CLAIM_APPROACH_DISTANCE, world.minX + margin, world.maxX - margin);
+                    enemy.y = clamp(target.y + Math.sin(bearing) * CLAIM_APPROACH_DISTANCE, world.minY + margin, world.maxY - margin);
+                    enemy.shotTargetX = enemy.x;
+                    enemy.shotTargetY = enemy.y;
+                    enemy.claimTargetIndex = targetIndex;
+                    game.enemies.push(enemy);
+                }
             }
 
             function spawnBossEnemy(milestone) {
@@ -5672,6 +5908,7 @@
             function startNextWave() {
                 game.waveNumber += 1;
                 if (game.waveNumber > save.bestRunWave) save.bestRunWave = game.waveNumber;
+                spawnClaimers(claimersForWave(game.waveNumber));
                 game.waveRemainingSpawns = waveSizeFor(game.waveNumber);
                 game.waveSpawnTimer = 0;
                 game.waveInProgress = true;
@@ -5681,6 +5918,7 @@
             function essenceFromEnemy(enemy) {
                 if (!enemy) return 0;
                 if (enemy.type === "boss") return 8;
+                if (enemy.claimsSpawner) return CLAIM_ESSENCE;
                 if (enemy.type === "hunter") return 2;
                 return 1;
             }
@@ -5689,6 +5927,7 @@
                 const enemy = game.enemies[index];
                 if (!enemy) return;
                 save.essence += essenceFromEnemy(enemy);
+                releaseSpawnerClaims(enemy.id);
                 game.enemies.splice(index, 1);
             }
 
@@ -5796,7 +6035,11 @@
 
                     let moveTargetX = towerCenterX;
                     let moveTargetY = towerCenterY;
-                    if (enemy.minionFocus && game.minionUnits.length > 0) {
+                    const claimTarget = claimTargetFor(enemy);
+                    if (claimTarget) {
+                        moveTargetX = claimTarget.x;
+                        moveTargetY = claimTarget.y;
+                    } else if (enemy.minionFocus && game.minionUnits.length > 0) {
                         const minionIndex = findClosestMinionIndexFrom(enemy.x, enemy.y, world.w + world.h);
                         if (minionIndex !== -1) {
                             const minion = game.minionUnits[minionIndex];
@@ -5809,6 +6052,14 @@
                         * slowMultiplierAtEnemy(enemy);
                     moveEntityTowards(enemy, moveTargetX, moveTargetY, enemyMoveSpeed);
                     if (enemy.shotFlash > 0) enemy.shotFlash -= 1;
+
+                    // Arriving is the whole attack: the field stops producing and stays
+                    // that way until this blight is killed.
+                    if (claimTarget && claimTarget.claimedBy === null
+                        && distanceSq(enemy, claimTarget) <= CLAIM_RADIUS * CLAIM_RADIUS) {
+                        claimTarget.claimedBy = enemy.id;
+                        playTowerHitSfx(4);
+                    }
 
                     const playerHitRadius = game.player.r + enemy.r;
                     const hitRadiusSq = playerHitRadius * playerHitRadius;
@@ -5864,7 +6115,8 @@
                         }
                     }
 
-                    const hitTower = enemy.x > tower.x && enemy.x < tower.x + tower.w
+                    const hitTower = !enemy.claimsSpawner
+                        && enemy.x > tower.x && enemy.x < tower.x + tower.w
                         && enemy.y > tower.y && enemy.y < tower.y + tower.h;
                     if (hitTower) {
                         game.towerHp = Math.max(0, game.towerHp - enemy.damage);
@@ -6337,6 +6589,21 @@
                 }
 
                 for (const enemy of game.enemies) {
+                    if (enemy.claimsSpawner) {
+                        const target = spawners[enemy.claimTargetIndex];
+                        if (target && target.claimedBy !== enemy.id) {
+                            ctx.save();
+                            ctx.strokeStyle = "#a06bd899";
+                            ctx.lineWidth = 1.5;
+                            ctx.setLineDash([7, 7]);
+                            ctx.beginPath();
+                            ctx.moveTo(enemy.x, enemy.y);
+                            ctx.lineTo(target.x, target.y);
+                            ctx.stroke();
+                            ctx.restore();
+                        }
+                    }
+
                     if (enemy.shotFlash > 0) {
                         ctx.save();
                         ctx.strokeStyle = enemy.laserColor || "#ff7f7f";
