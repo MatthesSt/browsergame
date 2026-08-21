@@ -1446,9 +1446,10 @@
                             <details class="shop-group defense" open>
                                 <summary class="shop-group-title">Turrets <span id="turretGroupCount">0/15</span></summary>
                                 <div class="shop-controls">
-                                    <button id="turretBtn" class="secondary shop-btn">Build Sentry</button>
-                                    <button id="sniperTurretBtn" class="secondary shop-btn">Build Sniper</button>
-                                    <button id="slowTurretBtn" class="secondary shop-btn">Build Slow Field</button>
+                                    <details id="turretStockPanel" class="gatherer-focus-panel">
+                                        <summary id="turretStockSummary" class="secondary shop-btn gatherer-focus-summary">Turret Store</summary>
+                                        <div id="turretStockList" class="gatherer-focus-list"></div>
+                                    </details>
                                     <button id="turretCapBtn" class="secondary shop-btn">Turret Capacity</button>
                                 </div>
                             </details>
@@ -1467,6 +1468,10 @@
                                         <div id="traderRouteList" class="gatherer-focus-list"></div>
                                     </details>
                                     <button id="defenderBtn" class="secondary shop-btn">Craft Defender</button>
+                                    <details id="defenderPostPanel" class="gatherer-focus-panel">
+                                        <summary id="defenderPostSummary" class="secondary shop-btn gatherer-focus-summary">Defender Posts</summary>
+                                        <div id="defenderPostList" class="gatherer-focus-list"></div>
+                                    </details>
                                     <button id="minionSpeedBtn" class="secondary shop-btn">Minion Speed</button>
                                     <button id="minionCapBtn" class="secondary shop-btn">Minion Capacity</button>
                                     <button id="minionHasteBtn" class="secondary shop-btn">Haste Spell</button>
@@ -1622,10 +1627,10 @@
             const spawnerStoneBtn = document.getElementById("spawnerStoneBtn");
             const spawnerCrystalBtn = document.getElementById("spawnerCrystalBtn");
             const spawnerAmberBtn = document.getElementById("spawnerAmberBtn");
-            const turretBtn = document.getElementById("turretBtn");
-            const sniperTurretBtn = document.getElementById("sniperTurretBtn");
-            const slowTurretBtn = document.getElementById("slowTurretBtn");
             const turretCapBtn = document.getElementById("turretCapBtn");
+            const turretStockPanelEl = document.getElementById("turretStockPanel");
+            const turretStockSummaryEl = document.getElementById("turretStockSummary");
+            const turretStockListEl = document.getElementById("turretStockList");
             const turretGroupCountEl = document.getElementById("turretGroupCount");
             const globalMultBtn = document.getElementById("globalMultBtn");
             const craftBtn = document.getElementById("craftBtn");
@@ -1637,6 +1642,9 @@
             const traderRouteSummaryEl = document.getElementById("traderRouteSummary");
             const traderRouteListEl = document.getElementById("traderRouteList");
             const defenderBtn = document.getElementById("defenderBtn");
+            const defenderPostPanelEl = document.getElementById("defenderPostPanel");
+            const defenderPostSummaryEl = document.getElementById("defenderPostSummary");
+            const defenderPostListEl = document.getElementById("defenderPostList");
             const minionSpeedBtn = document.getElementById("minionSpeedBtn");
             const minionHasteBtn = document.getElementById("minionHasteBtn");
             const minionCapBtn = document.getElementById("minionCapBtn");
@@ -2003,26 +2011,40 @@
                 4: W(5200)
             };
 
-            // The village is deliberately not in `spawners`: it grows nothing, and a
-            // blight must never be able to claim it.
+            // Neither settlement is in `spawners`: they grow nothing, and a blight must
+            // never be able to claim one. The village trades goods; the city is the only
+            // place that will sell you a turret.
             const VILLAGE_BEARING_DEG = -35;
             const village = {
                 x: Math.cos((VILLAGE_BEARING_DEG * Math.PI) / 180) * SPAWNER_TIER_DISTANCE[4],
                 y: Math.sin((VILLAGE_BEARING_DEG * Math.PI) / 180) * SPAWNER_TIER_DISTANCE[4],
                 r: W(84)
             };
+            const CITY_BEARING_DEG = 135;
+            const city = {
+                x: Math.cos((CITY_BEARING_DEG * Math.PI) / 180) * SPAWNER_TIER_DISTANCE[4],
+                y: Math.sin((CITY_BEARING_DEG * Math.PI) / 180) * SPAWNER_TIER_DISTANCE[4],
+                r: W(126)
+            };
 
             // Curated routes rather than every pairing: each turns something you have in
             // bulk into something further from the tower. The village keeps a cut, so no
             // chain of trades can ever come out ahead of gathering.
             const TRADE_ROUTES = [
-                { key: "wood-crystal", from: "wood", to: "crystal" },
-                { key: "stone-crystal", from: "stone", to: "crystal" },
-                { key: "wood-amber", from: "wood", to: "amber" },
-                { key: "stone-amber", from: "stone", to: "amber" },
-                { key: "crystal-aether", from: "crystal", to: "aether" },
-                { key: "amber-aether", from: "amber", to: "aether" }
+                { key: "wood-crystal", dest: "village", from: "wood", to: "crystal" },
+                { key: "stone-crystal", dest: "village", from: "stone", to: "crystal" },
+                { key: "wood-amber", dest: "village", from: "wood", to: "amber" },
+                { key: "stone-amber", dest: "village", from: "stone", to: "amber" },
+                { key: "crystal-aether", dest: "village", from: "crystal", to: "aether" },
+                { key: "amber-aether", dest: "village", from: "amber", to: "aether" },
+                // One turret per caravan. The skill tree is the licence to buy a type;
+                // the run to the city is the price of each one.
+                { key: "buy-sentry", dest: "city", from: "stone", turret: "basic", skill: "turret", label: "Sentry" },
+                { key: "buy-sniper", dest: "city", from: "crystal", turret: "sniper", skill: "sniperTurret", label: "Sniper" },
+                { key: "buy-slow", dest: "city", from: "amber", turret: "slow", skill: "slowTurret", label: "Slow Field" }
             ];
+            const TURRET_TRADE_BASE = { basic: 34, sniper: 26, slow: 22 };
+            const TURRET_TRADE_STEP = { basic: 14, sniper: 12, slow: 10 };
             // A trader starts stood down. Picking up a route it was never given, and
             // spending the bank on it, is not something a fresh caravan should decide.
             const TRADE_ROUTE_NONE = "none";
@@ -2100,10 +2122,17 @@
                 placementPreview: null,
                 sellPulse: null,
                 villagePulse: 0,
+                cityPulse: 0,
                 // Row whose chooser is open, as "gatherer:3" / "trader:1". A click used
                 // to commit the next setting outright, which made every stray click a
                 // silent reassignment.
                 openMinionPicker: null,
+                // Slot of the defender waiting for its post to be clicked on the map.
+                pendingDefenderPost: null,
+                // Which kind of stored turret the next map click places. Traded turrets
+                // sit in the store until then, rather than demanding to be placed the
+                // moment the caravan gets home.
+                selectedTurretType: null,
                 ghoulTimer: GHOUL_FIRST_TICKS,
                 runOver: false,
                 runSummary: null,
@@ -2175,8 +2204,8 @@
                         // minion carrying it would sit still forever.
                         if (minion.state === "toDepot") minion.state = "toTower";
                         if (!("isRegeneratingAtDepot" in minion)) continue;
-                        if (!("isRegeneratingAtTower" in minion)) {
-                            minion.isRegeneratingAtTower = Boolean(minion.isRegeneratingAtDepot);
+                        if (!("isRegenerating" in minion)) {
+                            minion.isRegenerating = Boolean(minion.isRegeneratingAtDepot);
                         }
                         delete minion.isRegeneratingAtDepot;
                     }
@@ -2257,7 +2286,8 @@
                     bagLevel: 0,
                     gathererFocusBySlot: {},
                     gathererFocusCursor: 0,
-                    traderRouteBySlot: {}
+                    traderRouteBySlot: {},
+                    defenderPostBySlot: {}
                 };
             }
 
@@ -2289,6 +2319,9 @@
                         : {};
                     const traderRouteBySlot = data.traderRouteBySlot && typeof data.traderRouteBySlot === "object"
                         ? data.traderRouteBySlot
+                        : {};
+                    const defenderPostBySlot = data.defenderPostBySlot && typeof data.defenderPostBySlot === "object"
+                        ? data.defenderPostBySlot
                         : {};
                     const gathererFocusCursor = Number.isFinite(data.gathererFocusCursor)
                         ? Math.max(0, Math.floor(data.gathererFocusCursor))
@@ -2332,6 +2365,7 @@
                         gathererFocusBySlot,
                         gathererFocusCursor,
                         traderRouteBySlot,
+                        defenderPostBySlot,
                         unlockedSkills,
                         // Music starts off by default; only an explicit unmute in the save turns it on.
                         musicMuted: data.musicMuted !== false,
@@ -2968,30 +3002,6 @@
                 };
             }
 
-            function turretRecipe(owned = save.turrets) {
-                return {
-                    wood: 12 + owned * 10,
-                    stone: 9 + owned * 8,
-                    crystal: 4 + owned * 4
-                };
-            }
-
-            function sniperTurretRecipe(owned = save.sniperTurrets) {
-                return {
-                    stone: 16 + owned * 12,
-                    crystal: 7 + owned * 7,
-                    amber: 5 + owned * 5
-                };
-            }
-
-            function slowTurretRecipe(owned = save.slowTurrets) {
-                return {
-                    wood: 18 + owned * 12,
-                    crystal: 10 + owned * 8,
-                    amber: 8 + owned * 6
-                };
-            }
-
             function maxTurrets() {
                 return BASE_MAX_TURRETS + save.turretCapLevel * TURRET_CAP_STEP;
             }
@@ -3088,6 +3098,32 @@
                 return Math.floor((inValue * TRADE_MARKUP) / materialConfig[route.to].value);
             }
 
+            function tradeRouteDestination(route) {
+                return route && route.dest === "city" ? city : village;
+            }
+
+            // A turret route's cargo is its price, and the price climbs with how many of
+            // that kind already stand - the same curve the shop used to charge.
+            function tradeRoutePrice(route) {
+                if (!route) return 0;
+                if (!route.turret) return traderCargoSize();
+                const owned = ownedCountForTurretType(route.turret);
+                return TURRET_TRADE_BASE[route.turret] + owned * TURRET_TRADE_STEP[route.turret];
+            }
+
+            // The city will only deal in what you hold a licence for.
+            function tradeRouteAvailable(route) {
+                if (!route) return true;
+                return route.skill ? isSkillUnlocked(route.skill) : true;
+            }
+
+            function tradeRouteSummary(route) {
+                if (!route) return "No route";
+                const price = tradeRoutePrice(route);
+                if (route.turret) return `${price} ${route.from} &gt; 1 ${route.label}`;
+                return `${price} ${route.from} &gt; ${tradePayoutFor(route, price)} ${route.to}`;
+            }
+
             function traderMinionsSortedBySlot() {
                 return game.minionUnits
                     .filter((minion) => minion && minion.role === "trader")
@@ -3111,16 +3147,22 @@
                 }
 
                 const cargo = traderCargoSize();
+                // Licences and turret prices both change what the chooser should show,
+                // so they belong in the cache key or the list goes stale.
+                const offer = TRADE_ROUTES
+                    .filter(tradeRouteAvailable)
+                    .map((route) => `${route.key}:${tradeRoutePrice(route)}`)
+                    .join(",");
                 const renderKey = traders
                     .map((minion, index) => `${index}:${minion.slotIndex}:${normalizedTradeRoute(minion.tradeRoute)}:${cargo}`)
-                    .join("|") + `|open:${game.openMinionPicker}`;
+                    .join("|") + `|open:${game.openMinionPicker}|offer:${offer}`;
                 if (traderRouteListEl.dataset.renderKey === renderKey) return;
                 traderRouteListEl.dataset.renderKey = renderKey;
 
                 const options = [{ value: TRADE_ROUTE_NONE, label: "No route - stay at the tower" }]
-                    .concat(TRADE_ROUTES.map((route) => ({
+                    .concat(TRADE_ROUTES.filter(tradeRouteAvailable).map((route) => ({
                         value: route.key,
-                        label: `${cargo} ${route.from} &gt; ${tradePayoutFor(route, cargo)} ${route.to}`
+                        label: (route.turret ? "City: " : "") + tradeRouteSummary(route)
                     })));
 
                 traderRouteListEl.innerHTML = traders
@@ -3129,11 +3171,98 @@
                         const routeKey = normalizedTradeRoute(minion.tradeRoute);
                         const route = tradeRouteByKey(routeKey);
                         const open = isMinionPickerOpen("trader", slot);
-                        const summary = route
-                            ? `${cargo} ${route.from} &gt; ${tradePayoutFor(route, cargo)} ${route.to}`
-                            : "No route";
+                        const summary = tradeRouteSummary(route);
                         return `<button class="secondary shop-btn gatherer-focus-row${open ? " picker-open" : ""}${route ? "" : " route-idle"}" data-trader-slot="${slot}"><span class="shop-btn-title"><span>Trader ${index + 1}</span><span class="shop-btn-level">${summary} ${open ? "&#9652;" : "&#9662;"}</span></span></button>`
                             + minionPickerMarkup("trader", slot, options, routeKey);
+                    })
+                    .join("");
+            }
+
+            const TURRET_STOCK_TYPES = [
+                { type: "basic", label: "Sentry" },
+                { type: "sniper", label: "Sniper" },
+                { type: "slow", label: "Slow Field" }
+            ];
+
+            function turretStockSummaryText() {
+                const held = totalStoredTurrets();
+                return held > 0 ? `Turret Store (${held})` : "Turret Store";
+            }
+
+            function renderTurretStockList() {
+                if (!turretStockListEl) return;
+
+                const held = TURRET_STOCK_TYPES.filter((entry) => storedTurretCount(entry.type) > 0);
+                if (held.length === 0) {
+                    if (turretStockListEl.dataset.renderKey !== "empty") {
+                        turretStockListEl.dataset.renderKey = "empty";
+                        turretStockListEl.innerHTML = '<div class="gatherer-focus-empty">No turrets in store. Trade for them at the city.</div>';
+                    }
+                    return;
+                }
+
+                const renderKey = held.map((entry) => `${entry.type}:${storedTurretCount(entry.type)}`).join("|")
+                    + `|sel:${game.selectedTurretType}`;
+                if (turretStockListEl.dataset.renderKey === renderKey) return;
+                turretStockListEl.dataset.renderKey = renderKey;
+
+                turretStockListEl.innerHTML = held
+                    .map((entry) => {
+                        const count = storedTurretCount(entry.type);
+                        const armed = game.selectedTurretType === entry.type;
+                        const refund = turretTradeCost(entry.type, Math.max(0, ownedCountForTurretType(entry.type) - 1));
+                        return `<button class="secondary shop-btn gatherer-focus-row${armed ? " picker-open" : ""}" data-turret-stock="${entry.type}"><span class="shop-btn-title"><span>${entry.label} x${count}</span><span class="shop-btn-level">${armed ? "click the map" : "Place"}</span></span></button>`
+                            + (armed
+                                ? `<div class="focus-options"><button class="focus-option" data-turret-sell="${entry.type}">Sell back${refund ? ` +${formatCostShort(refund)}` : ""}</button></div>`
+                                : "");
+                    })
+                    .join("");
+            }
+
+            function defenderMinionsSortedBySlot() {
+                return game.minionUnits
+                    .filter((minion) => minion && minion.role === "defender")
+                    .sort((a, b) => (a.slotIndex || 0) - (b.slotIndex || 0));
+            }
+
+            function defenderPostSummaryText() {
+                const defenders = defenderMinionsSortedBySlot();
+                return defenders.length > 0 ? `Defender Posts (${defenders.length})` : "Defender Posts";
+            }
+
+            function renderDefenderPostList() {
+                if (!defenderPostListEl) return;
+                const defenders = defenderMinionsSortedBySlot();
+                if (defenders.length === 0) {
+                    if (defenderPostListEl.dataset.renderKey !== "empty") {
+                        defenderPostListEl.dataset.renderKey = "empty";
+                        defenderPostListEl.innerHTML = '<div class="gatherer-focus-empty">No defenders to station yet.</div>';
+                    }
+                    return;
+                }
+
+                const renderKey = defenders
+                    .map((minion, index) => {
+                        const slot = Number.isFinite(minion.slotIndex) ? minion.slotIndex : index;
+                        const post = defenderPostFor(minion);
+                        return `${index}:${slot}:${Math.round(post.x)},${Math.round(post.y)}`;
+                    })
+                    .join("|") + `|place:${game.pendingDefenderPost}`;
+                if (defenderPostListEl.dataset.renderKey === renderKey) return;
+                defenderPostListEl.dataset.renderKey = renderKey;
+
+                defenderPostListEl.innerHTML = defenders
+                    .map((minion, index) => {
+                        const slot = Number.isFinite(minion.slotIndex) ? minion.slotIndex : index;
+                        const custom = hasCustomDefenderPost(slot);
+                        const placing = game.pendingDefenderPost === slot;
+                        const label = placing
+                            ? "click the map"
+                            : (custom ? "Stationed" : "At tower");
+                        return `<button class="secondary shop-btn gatherer-focus-row${placing ? " picker-open" : ""}${custom ? "" : " route-idle"}" data-defender-slot="${slot}"><span class="shop-btn-title"><span>Defender ${index + 1}</span><span class="shop-btn-level">${label}</span></span></button>`
+                            + (custom && !placing
+                                ? `<div class="focus-options"><button class="focus-option" data-defender-recall="${slot}">Recall to tower</button></div>`
+                                : "");
                     })
                     .join("");
             }
@@ -3444,9 +3573,6 @@
                 const spawnerStoneUnlocked = canUseUpgrade("spawnerStone");
                 const spawnerCrystalUnlocked = canUseUpgrade("spawnerCrystal");
                 const spawnerAmberUnlocked = canUseUpgrade("spawnerAmber");
-                const turretUnlocked = canUseUpgrade("turret");
-                const sniperUnlocked = canUseUpgrade("sniperTurret");
-                const slowTurretUnlocked = canUseUpgrade("slowTurret");
                 const turretCapUnlocked = canUseUpgrade("turretCap");
                 const globalMultUnlocked = canUseUpgrade("globalMultiplier");
                 const gathererUnlocked = canUseUpgrade("gatherer");
@@ -3469,8 +3595,7 @@
                 setShopButtonContent(spawnerCrystalBtn, "Crystal Spawner", `Lv ${save.spawnerCrystalLevel}`, crystalSpawnerCost);
                 const amberSpawnerCost = spawnerRecipe("amber");
                 setShopButtonContent(spawnerAmberBtn, "Amber Spawner", `Lv ${save.spawnerAmberLevel}`, amberSpawnerCost);
-                const turretCost = turretRecipe();
-                const totalTurretsOwned = save.turrets + save.sniperTurrets + save.slowTurrets;
+                const totalTurretsOwned = placedTurretCount();
                 const turretCapacity = maxTurrets();
                 if (turretGroupCountEl) {
                     const turretGroupCountText = `${totalTurretsOwned}/${turretCapacity}`;
@@ -3478,23 +3603,13 @@
                         turretGroupCountEl.textContent = turretGroupCountText;
                     }
                 }
-                const pendingBasic = Math.max(0, game.pendingBasicTurretPlacements || 0);
-                const turretLevelText = pendingBasic > 0
-                    ? `Owned ${save.turrets} +${pendingBasic}`
-                    : `Owned ${save.turrets}`;
-                setShopButtonContent(turretBtn, "Build Sentry", turretLevelText, turretCost);
-                const sniperCost = sniperTurretRecipe();
-                const pendingSniper = Math.max(0, game.pendingSniperTurretPlacements || 0);
-                const sniperLevelText = pendingSniper > 0
-                    ? `Owned ${save.sniperTurrets} +${pendingSniper}`
-                    : `Owned ${save.sniperTurrets}`;
-                setShopButtonContent(sniperTurretBtn, "Build Sniper", sniperLevelText, sniperCost);
-                const slowCost = slowTurretRecipe();
-                const pendingSlow = Math.max(0, game.pendingSlowTurretPlacements || 0);
-                const slowLevelText = pendingSlow > 0
-                    ? `Owned ${save.slowTurrets} +${pendingSlow}`
-                    : `Owned ${save.slowTurrets}`;
-                setShopButtonContent(slowTurretBtn, "Build Slow Field", slowLevelText, slowCost);
+                if (turretStockSummaryEl) {
+                    const nextStockSummary = turretStockSummaryText();
+                    if (turretStockSummaryEl.textContent !== nextStockSummary) {
+                        turretStockSummaryEl.textContent = nextStockSummary;
+                    }
+                }
+                renderTurretStockList();
                 const turretCapCost = turretCapRecipe();
                 setShopButtonContent(turretCapBtn, "Turret Capacity", `Lv ${save.turretCapLevel} cap ${turretCapacity}`, turretCapCost);
                 const globalMultCost = globalMultiplierRecipe();
@@ -3519,6 +3634,13 @@
                 renderTraderRouteList();
                 const defenderRecipe = defenderMinionRecipe();
                 setShopButtonContent(defenderBtn, "Craft Defender", `Owned ${save.defenderMinions}`, defenderRecipe);
+                if (defenderPostSummaryEl) {
+                    const nextPostSummary = defenderPostSummaryText();
+                    if (defenderPostSummaryEl.textContent !== nextPostSummary) {
+                        defenderPostSummaryEl.textContent = nextPostSummary;
+                    }
+                }
+                renderDefenderPostList();
                 const minionSpeedCost = minionSpeedRecipe();
                 setShopButtonContent(minionSpeedBtn, "Minion Speed", `Lv ${save.minionSpeedLevel}`, minionSpeedCost);
                 const minionCapCost = minionCapacityRecipe();
@@ -3538,9 +3660,7 @@
                 setButtonVisible(spawnerStoneBtn, spawnerStoneUnlocked);
                 setButtonVisible(spawnerCrystalBtn, spawnerCrystalUnlocked);
                 setButtonVisible(spawnerAmberBtn, spawnerAmberUnlocked);
-                setButtonVisible(turretBtn, turretUnlocked);
-                setButtonVisible(sniperTurretBtn, sniperUnlocked);
-                setButtonVisible(slowTurretBtn, slowTurretUnlocked);
+                setButtonVisible(turretStockPanelEl, true);
                 setButtonVisible(turretCapBtn, turretCapUnlocked);
                 setButtonVisible(globalMultBtn, globalMultUnlocked);
                 setButtonVisible(craftBtn, gathererUnlocked);
@@ -3548,6 +3668,7 @@
                 setButtonVisible(traderBtn, traderUnlocked);
                 setButtonVisible(traderRoutePanelEl, traderUnlocked);
                 setButtonVisible(defenderBtn, defenderUnlocked);
+                setButtonVisible(defenderPostPanelEl, defenderUnlocked);
                 setButtonVisible(minionSpeedBtn, minionSpeedUnlocked);
                 setButtonVisible(minionCapBtn, minionCapacityUnlocked);
                 setButtonVisible(minionHasteBtn, minionHasteUnlocked);
@@ -3558,16 +3679,7 @@
                 setButtonDisabled(spawnerStoneBtn, !spawnerStoneUnlocked);
                 setButtonDisabled(spawnerCrystalBtn, !spawnerCrystalUnlocked);
                 setButtonDisabled(spawnerAmberBtn, !spawnerAmberUnlocked);
-                setButtonDisabled(turretBtn, !turretUnlocked);
-                setButtonDisabled(sniperTurretBtn, !sniperUnlocked);
-                setButtonDisabled(slowTurretBtn, !slowTurretUnlocked);
                 setButtonDisabled(turretCapBtn, !turretCapUnlocked);
-                const turretCapReached = totalTurretsOwned >= turretCapacity;
-                if (turretCapReached) {
-                    setButtonDisabled(turretBtn, true);
-                    setButtonDisabled(sniperTurretBtn, true);
-                    setButtonDisabled(slowTurretBtn, true);
-                }
                 setButtonDisabled(globalMultBtn, !globalMultUnlocked);
                 setButtonDisabled(craftBtn, !gathererUnlocked);
                 setButtonDisabled(traderBtn, !traderUnlocked);
@@ -4038,6 +4150,78 @@
                 targetCtx.textAlign = "center";
                 targetCtx.textBaseline = "alphabetic";
                 targetCtx.fillText(`+${pulse.text}`, pulse.x, pulse.y - 26 - (1 - life) * 22);
+                targetCtx.restore();
+            }
+
+            // Where each defender is stationed, and the ground it answers for. Without
+            // this the post is invisible and a defender looks like it is wandering off.
+            function drawDefenderPosts(targetCtx) {
+                for (const minion of game.minionUnits) {
+                    if (minion.role !== "defender") continue;
+                    const slot = Number.isFinite(minion.slotIndex) ? minion.slotIndex : -1;
+                    if (slot < 0 || !hasCustomDefenderPost(slot)) continue;
+
+                    const post = defenderPostFor(minion);
+                    const armed = game.pendingDefenderPost === slot;
+
+                    targetCtx.save();
+                    targetCtx.strokeStyle = armed ? "#ffd7c8" : "#ffb08a66";
+                    targetCtx.lineWidth = armed ? 2.5 : 1.5;
+                    targetCtx.setLineDash([10, 9]);
+                    targetCtx.beginPath();
+                    targetCtx.arc(post.x, post.y, DEFENDER_PATROL_MAX_RADIUS, 0, Math.PI * 2);
+                    targetCtx.stroke();
+                    targetCtx.setLineDash([]);
+
+                    targetCtx.fillStyle = "#ffb08a";
+                    targetCtx.beginPath();
+                    targetCtx.arc(post.x, post.y, 5, 0, Math.PI * 2);
+                    targetCtx.fill();
+                    targetCtx.strokeStyle = "#4a2520";
+                    targetCtx.lineWidth = 1.5;
+                    targetCtx.stroke();
+
+                    // A line back to its defender, so which post belongs to whom is
+                    // never a guess when several are stationed close together.
+                    targetCtx.strokeStyle = "#ffb08a33";
+                    targetCtx.lineWidth = 1;
+                    targetCtx.beginPath();
+                    targetCtx.moveTo(post.x, post.y);
+                    targetCtx.lineTo(minion.x, minion.y);
+                    targetCtx.stroke();
+                    targetCtx.restore();
+                }
+            }
+
+            function drawDefenderPostPreview(targetCtx) {
+                const preview = game.placementPreview;
+                if (!preview || game.pendingDefenderPost === null) return;
+
+                const x = clamp(preview.x, world.minX + 16, world.maxX - 16);
+                const y = clamp(preview.y, world.minY + 16, world.maxY - 16);
+
+                targetCtx.save();
+                targetCtx.fillStyle = "#ffb08a14";
+                targetCtx.beginPath();
+                targetCtx.arc(x, y, DEFENDER_TOWER_ALERT_RADIUS, 0, Math.PI * 2);
+                targetCtx.fill();
+                targetCtx.strokeStyle = "#ffb08a";
+                targetCtx.lineWidth = 2;
+                targetCtx.setLineDash([12, 10]);
+                targetCtx.beginPath();
+                targetCtx.arc(x, y, DEFENDER_PATROL_MAX_RADIUS, 0, Math.PI * 2);
+                targetCtx.stroke();
+                targetCtx.setLineDash([]);
+                targetCtx.beginPath();
+                targetCtx.arc(x, y, 6, 0, Math.PI * 2);
+                targetCtx.fillStyle = "#ffd7c8";
+                targetCtx.fill();
+                targetCtx.stroke();
+
+                targetCtx.fillStyle = "#ffd7c8";
+                targetCtx.font = "700 18px Space Grotesk, sans-serif";
+                targetCtx.textAlign = "center";
+                targetCtx.fillText("Station defender here", x, y - DEFENDER_PATROL_MAX_RADIUS - 14);
                 targetCtx.restore();
             }
 
@@ -4674,6 +4858,165 @@
                 targetCtx.restore();
             }
 
+            // Stone where the village is thatch: walls, gate towers and a keep. The
+            // only place that will sell you a turret, so it should look like somewhere
+            // that builds them.
+            let cityLayout = null;
+
+            function getCityLayout() {
+                if (cityLayout) return cityLayout;
+
+                const blocks = [];
+                for (let i = 0; i < 7; i += 1) {
+                    const wobble = terrainNoise(311, i);
+                    const spread = terrainNoise(457, i);
+                    const size = terrainNoise(613, i);
+                    const angle = (i / 7) * Math.PI * 2 + (wobble - 0.5) * 0.4;
+                    const distance = city.r * (0.42 + spread * 0.22);
+                    blocks.push({
+                        x: Math.cos(angle) * distance,
+                        y: Math.sin(angle) * distance,
+                        w: city.r * (0.2 + size * 0.1),
+                        h: city.r * (0.15 + wobble * 0.08),
+                        facing: angle
+                    });
+                }
+
+                cityLayout = {
+                    blocks,
+                    roadAngle: Math.atan2(TOWER_CENTER_Y - city.y, TOWER_CENTER_X - city.x)
+                };
+                return cityLayout;
+            }
+
+            function drawCity(targetCtx) {
+                const layout = getCityLayout();
+                const R = city.r;
+                const breathe = 0.5 + 0.5 * Math.sin(game.dayTick * 0.04);
+                const trade = game.cityPulse > 0 ? game.cityPulse / 20 : 0;
+
+                targetCtx.save();
+                targetCtx.translate(city.x, city.y);
+
+                // Paved approach from the tower.
+                targetCtx.save();
+                targetCtx.rotate(layout.roadAngle);
+                const road = targetCtx.createLinearGradient(0, 0, R * 2.4, 0);
+                road.addColorStop(0, "rgba(122, 130, 142, 0.45)");
+                road.addColorStop(1, "rgba(122, 130, 142, 0)");
+                targetCtx.fillStyle = road;
+                targetCtx.beginPath();
+                targetCtx.moveTo(0, -R * 0.24);
+                targetCtx.lineTo(R * 2.4, -R * 0.08);
+                targetCtx.lineTo(R * 2.4, R * 0.08);
+                targetCtx.lineTo(0, R * 0.24);
+                targetCtx.closePath();
+                targetCtx.fill();
+                targetCtx.restore();
+
+                targetCtx.fillStyle = "rgba(8, 16, 26, 0.4)";
+                targetCtx.beginPath();
+                targetCtx.ellipse(R * 0.06, R * 0.08, R * 1.06, R * 1.02, 0, 0, Math.PI * 2);
+                targetCtx.fill();
+
+                const ground = targetCtx.createRadialGradient(-R * 0.25, -R * 0.3, R * 0.12, 0, 0, R);
+                ground.addColorStop(0, "#5c6270");
+                ground.addColorStop(0.65, "#434955");
+                ground.addColorStop(1, "#2b303a");
+                targetCtx.fillStyle = ground;
+                targetCtx.beginPath();
+                targetCtx.arc(0, 0, R, 0, Math.PI * 2);
+                targetCtx.fill();
+
+                // Curtain wall, with a gap where the road runs in.
+                targetCtx.strokeStyle = "#8d94a3";
+                targetCtx.lineWidth = R * 0.09;
+                targetCtx.beginPath();
+                targetCtx.arc(0, 0, R * 0.94, layout.roadAngle + 0.28, layout.roadAngle - 0.28 + Math.PI * 2);
+                targetCtx.stroke();
+                targetCtx.strokeStyle = "#2b303a";
+                targetCtx.lineWidth = Math.max(1, R * 0.02);
+                targetCtx.beginPath();
+                targetCtx.arc(0, 0, R * 0.94, layout.roadAngle + 0.28, layout.roadAngle - 0.28 + Math.PI * 2);
+                targetCtx.stroke();
+
+                // Gate towers either side of the road, plus corner towers around the wall.
+                for (let i = 0; i < 8; i += 1) {
+                    const angle = layout.roadAngle + 0.28 + (i / 7) * (Math.PI * 2 - 0.56);
+                    const tx = Math.cos(angle) * R * 0.94;
+                    const ty = Math.sin(angle) * R * 0.94;
+                    targetCtx.fillStyle = "#9aa2b1";
+                    targetCtx.beginPath();
+                    targetCtx.arc(tx, ty, R * 0.09, 0, Math.PI * 2);
+                    targetCtx.fill();
+                    targetCtx.strokeStyle = "#262b34";
+                    targetCtx.lineWidth = 1.5;
+                    targetCtx.stroke();
+                }
+
+                // Slate-roofed blocks inside the walls.
+                for (const block of layout.blocks) {
+                    targetCtx.save();
+                    targetCtx.translate(block.x, block.y);
+                    targetCtx.rotate(block.facing + Math.PI / 2);
+                    targetCtx.fillStyle = "rgba(8, 16, 26, 0.42)";
+                    targetCtx.beginPath();
+                    targetCtx.roundRect(-block.w * 0.5 + 2, -block.h * 0.5 + 2, block.w, block.h, block.h * 0.22);
+                    targetCtx.fill();
+                    const slate = targetCtx.createLinearGradient(0, -block.h * 0.5, 0, block.h * 0.5);
+                    slate.addColorStop(0, "#7b8496");
+                    slate.addColorStop(1, "#454c5a");
+                    targetCtx.fillStyle = slate;
+                    targetCtx.beginPath();
+                    targetCtx.roundRect(-block.w * 0.5, -block.h * 0.5, block.w, block.h, block.h * 0.22);
+                    targetCtx.fill();
+                    targetCtx.strokeStyle = "rgba(24, 28, 36, 0.8)";
+                    targetCtx.lineWidth = 1.2;
+                    targetCtx.stroke();
+                    targetCtx.strokeStyle = "rgba(206, 218, 238, 0.35)";
+                    targetCtx.lineWidth = Math.max(1, block.h * 0.1);
+                    targetCtx.beginPath();
+                    targetCtx.moveTo(-block.w * 0.4, 0);
+                    targetCtx.lineTo(block.w * 0.4, 0);
+                    targetCtx.stroke();
+                    targetCtx.restore();
+                }
+
+                // The keep, and the forge light that flares when a turret is bought.
+                targetCtx.save();
+                targetCtx.shadowColor = "rgba(255, 170, 90, 0.9)";
+                targetCtx.shadowBlur = R * (0.12 + breathe * 0.08 + trade * 0.5);
+                targetCtx.fillStyle = "#6e7686";
+                targetCtx.beginPath();
+                targetCtx.arc(0, 0, R * 0.2, 0, Math.PI * 2);
+                targetCtx.fill();
+                targetCtx.strokeStyle = "#242932";
+                targetCtx.lineWidth = 2;
+                targetCtx.stroke();
+                targetCtx.fillStyle = `rgba(255, 186, 110, ${0.55 + breathe * 0.2 + trade * 0.25})`;
+                targetCtx.beginPath();
+                targetCtx.arc(0, 0, R * 0.09, 0, Math.PI * 2);
+                targetCtx.fill();
+                targetCtx.restore();
+
+                const plateW = R * 0.56;
+                const plateH = R * 0.17;
+                const plateY = R * 1.12;
+                targetCtx.fillStyle = "#101620ee";
+                targetCtx.beginPath();
+                targetCtx.roundRect(-plateW * 0.5, plateY, plateW, plateH, plateH * 0.42);
+                targetCtx.fill();
+                targetCtx.strokeStyle = "rgba(206, 218, 238, 0.4)";
+                targetCtx.lineWidth = 1;
+                targetCtx.stroke();
+                targetCtx.fillStyle = "#dbe6f5";
+                targetCtx.font = `700 ${Math.max(9, Math.round(R * 0.12))}px Space Grotesk, sans-serif`;
+                targetCtx.textAlign = "center";
+                targetCtx.textBaseline = "middle";
+                targetCtx.fillText("CITY", 0, plateY + plateH * 0.55);
+                targetCtx.restore();
+            }
+
             function drawSpawners(targetCtx) {
                 targetCtx.save();
                 targetCtx.lineWidth = 2;
@@ -5009,6 +5352,7 @@
                 drawClaimedFields(targetCtx);
                 drawSpawners(targetCtx);
                 drawVillage(targetCtx);
+                drawCity(targetCtx);
                 drawTower(targetCtx);
             }
 
@@ -5570,9 +5914,30 @@
                 return x > tower.x && x < tower.x + tower.w && y > tower.y && y < tower.y + tower.h;
             }
 
-            function randomDefenderPatrolPoint() {
-                const centerX = tower.x + tower.w * 0.5;
-                const centerY = tower.y + tower.h * 0.5;
+            // A defender guards its post, which is the tower until it is given one of
+            // its own. Everything about its behaviour - patrol, alert radius, where it
+            // falls back to heal - hangs off this point rather than off the tower.
+            function defenderPostFor(minion) {
+                const slot = minion && Number.isFinite(minion.slotIndex) ? String(minion.slotIndex) : null;
+                const stored = slot !== null && save.defenderPostBySlot ? save.defenderPostBySlot[slot] : null;
+                if (stored && Number.isFinite(stored.x) && Number.isFinite(stored.y)) {
+                    return {
+                        x: clamp(stored.x, world.minX + 16, world.maxX - 16),
+                        y: clamp(stored.y, world.minY + 16, world.maxY - 16),
+                        custom: true
+                    };
+                }
+                return { x: TOWER_CENTER_X, y: TOWER_CENTER_Y, custom: false };
+            }
+
+            function hasCustomDefenderPost(slot) {
+                const stored = save.defenderPostBySlot ? save.defenderPostBySlot[String(slot)] : null;
+                return Boolean(stored && Number.isFinite(stored.x) && Number.isFinite(stored.y));
+            }
+
+            function randomDefenderPatrolPoint(post = null) {
+                const centerX = post ? post.x : TOWER_CENTER_X;
+                const centerY = post ? post.y : TOWER_CENTER_Y;
                 for (let attempt = 0; attempt < 16; attempt += 1) {
                     const angle = random(0, Math.PI * 2);
                     const radius = random(DEFENDER_PATROL_MIN_RADIUS, DEFENDER_PATROL_MAX_RADIUS);
@@ -5584,8 +5949,8 @@
                 }
 
                 return {
-                    x: clamp(tower.x - 18, world.minX + 16, world.maxX - 16),
-                    y: clamp(tower.y + tower.h * 0.5, world.minY + 16, world.maxY - 16)
+                    x: clamp(centerX - 18, world.minX + 16, world.maxX - 16),
+                    y: clamp(centerY, world.minY + 16, world.maxY - 16)
                 };
             }
 
@@ -5627,7 +5992,9 @@
                 const resolvedSlot = Number.isFinite(slotIndex) ? Math.max(0, Math.floor(slotIndex)) : game.nextMinionSlot;
                 const home = minionTowerPoint(resolvedSlot);
                 const maxHp = minionMaxHpFor(role);
-                const patrolPoint = role === "defender" ? randomDefenderPatrolPoint() : null;
+                const patrolPoint = role === "defender"
+                    ? randomDefenderPatrolPoint(defenderPostFor({ slotIndex: resolvedSlot }))
+                    : null;
                 const savedPriority = role === "worker" && save.gathererFocusBySlot
                     ? save.gathererFocusBySlot[String(resolvedSlot)]
                     : "auto";
@@ -5650,7 +6017,7 @@
                     patrolTargetX: patrolPoint ? patrolPoint.x : 0,
                     patrolTargetY: patrolPoint ? patrolPoint.y : 0,
                     patrolIdleTicks: 0,
-                    isRegeneratingAtTower: false,
+                    isRegenerating: false,
                     targetEnemyId: null,
                     carryType: null,
                     carryLoad: 0,
@@ -5658,6 +6025,8 @@
                     gathererPriority: role === "worker" ? normalizedGathererPriority(savedPriority) : "auto",
                     tradeRoute: normalizedTradeRoute(savedRoute),
                     tradeDwell: 0,
+                    tradeCarryRoute: null,
+                    carryTurret: null,
                     speed: minionMoveSpeed(resolvedSlot) + minionRoleSpeedBonus(role)
                 };
 
@@ -5737,11 +6106,29 @@
                 game.pendingSlowTurretPlacements = Math.max(0, save.slowTurrets - placedSlow);
             }
 
+            function storedTurretCount(type) {
+                if (type === "sniper") return Math.max(0, game.pendingSniperTurretPlacements || 0);
+                if (type === "slow") return Math.max(0, game.pendingSlowTurretPlacements || 0);
+                return Math.max(0, game.pendingBasicTurretPlacements || 0);
+            }
+
+            function totalStoredTurrets() {
+                return storedTurretCount("basic") + storedTurretCount("sniper") + storedTurretCount("slow");
+            }
+
+            // Only what the player picked out of the store gets placed; nothing is
+            // armed by default, so a stray click on the map can never spend a turret.
             function nextPendingTurretType() {
-                if (game.pendingSniperTurretPlacements > 0) return "sniper";
-                if (game.pendingSlowTurretPlacements > 0) return "slow";
-                if (game.pendingBasicTurretPlacements > 0) return "basic";
+                const chosen = game.selectedTurretType;
+                if (chosen && storedTurretCount(chosen) > 0) return chosen;
                 return null;
+            }
+
+            function selectTurretType(type) {
+                game.selectedTurretType = game.selectedTurretType === type ? null : type;
+                if (game.selectedTurretType && storedTurretCount(game.selectedTurretType) <= 0) {
+                    game.selectedTurretType = null;
+                }
             }
 
             const TURRET_HASTE_BONUS = 0.3;
@@ -5784,6 +6171,10 @@
                     game.pendingBasicTurretPlacements -= 1;
                 }
 
+                if (storedTurretCount(turretType) <= 0 && game.selectedTurretType === turretType) {
+                    game.selectedTurretType = null;
+                }
+
                 saveGame();
                 refreshHud();
                 return true;
@@ -5802,10 +6193,8 @@
             const TURRET_SELL_RATE = 0.75;
             const TURRET_PICK_RADIUS = W(20);
 
-            function recipeForTurretType(type, owned) {
-                if (type === "sniper") return sniperTurretRecipe(owned);
-                if (type === "slow") return slowTurretRecipe(owned);
-                return turretRecipe(owned);
+            function placedTurretCount() {
+                return save.turrets + save.sniperTurrets + save.slowTurrets;
             }
 
             function ownedCountForTurretType(type) {
@@ -5840,10 +6229,19 @@
             // What selling this turret pays back. Prices scale with how many of that type
             // you own, so the refund is quoted at the tier of the unit being removed - the
             // last one bought - which is the recipe evaluated one below the current count.
+            // Turrets are bought from the city now, so both the refund and the resale
+            // are quoted in what the city charged - refunding the old shop recipe would
+            // hand back resources nobody ever spent.
+            function turretTradeCost(type, owned) {
+                const route = TRADE_ROUTES.find((entry) => entry.turret === type);
+                if (!route) return null;
+                return { [route.from]: TURRET_TRADE_BASE[type] + owned * TURRET_TRADE_STEP[type] };
+            }
+
             function turretSellValue(type) {
                 const owned = ownedCountForTurretType(type);
                 if (owned <= 0) return null;
-                return scaleCost(recipeForTurretType(type, owned - 1), TURRET_SELL_RATE);
+                return scaleCost(turretTradeCost(type, owned - 1), TURRET_SELL_RATE);
             }
 
             function findTurretIndexAt(x, y) {
@@ -5909,22 +6307,26 @@
             // Refunds the turret the preview is currently offering. Each recipe scales with its own
             // owned count, so the counter is decremented first: the recipe then reports exactly the
             // price that was paid for this unit.
-            function cancelPendingTurretPurchase() {
-                const turretType = nextPendingTurretType();
-                if (!turretType) return false;
+            function sellStoredTurret(type) {
+                if (storedTurretCount(type) <= 0) return false;
+                const turretType = type;
 
+                // Cancelling an unplaced turret returns exactly what the caravan paid
+                // for it, so a cancel loop is worth nothing either way.
+                const refund = turretTradeCost(turretType, Math.max(0, ownedCountForTurretType(turretType) - 1));
                 if (turretType === "sniper") {
                     game.pendingSniperTurretPlacements -= 1;
                     save.sniperTurrets = Math.max(0, save.sniperTurrets - 1);
-                    refundBankForCost(sniperTurretRecipe());
                 } else if (turretType === "slow") {
                     game.pendingSlowTurretPlacements -= 1;
                     save.slowTurrets = Math.max(0, save.slowTurrets - 1);
-                    refundBankForCost(slowTurretRecipe());
                 } else {
                     game.pendingBasicTurretPlacements -= 1;
                     save.turrets = Math.max(0, save.turrets - 1);
-                    refundBankForCost(turretRecipe());
+                }
+                if (refund) refundBankForCost(refund);
+                if (storedTurretCount(turretType) <= 0 && game.selectedTurretType === turretType) {
+                    game.selectedTurretType = null;
                 }
 
                 saveGame();
@@ -6006,11 +6408,11 @@
                         minion.attackCooldown = 0;
                         minion.attackFlash = 0;
                         minion.hitFlash = 0;
-                        minion.isRegeneratingAtTower = false;
+                        minion.isRegenerating = false;
                         minion.targetEnemyId = null;
                         minion.hp = minion.maxHp;
                         if (minion.role === "defender") {
-                            const patrolPoint = randomDefenderPatrolPoint();
+                            const patrolPoint = randomDefenderPatrolPoint(defenderPostFor(minion));
                             minion.patrolTargetX = patrolPoint.x;
                             minion.patrolTargetY = patrolPoint.y;
                             minion.patrolIdleTicks = 0;
@@ -6029,6 +6431,8 @@
             function resetSession() {
                 clearRuntimeSnapshot();
                 closeMinionPicker();
+                game.pendingDefenderPost = null;
+                game.selectedTurretType = null;
                 clearSpawnerClaims();
                 // Drop the old run's units before anything syncs: they carry per-slot
                 // config that would otherwise be written straight back into the fresh
@@ -7045,6 +7449,7 @@
                     }
 
                     if (minion.role === "defender") {
+                        const post = defenderPostFor(minion);
                         if (minion.attackCooldown > 0) {
                             minion.attackCooldown -= 1;
                         }
@@ -7054,7 +7459,7 @@
                             minion.targetEnemyId = null;
                             let enemyIndex = findClosestEnemyIndexFrom(minion.x, minion.y, DEFENDER_AGGRO_RADIUS);
                             if (enemyIndex === -1) {
-                                enemyIndex = findClosestEnemyIndexFrom(home.x, home.y, DEFENDER_TOWER_ALERT_RADIUS);
+                                enemyIndex = findClosestEnemyIndexFrom(post.x, post.y, DEFENDER_TOWER_ALERT_RADIUS);
                             }
                             if (enemyIndex !== -1) {
                                 enemy = game.enemies[enemyIndex];
@@ -7064,20 +7469,23 @@
 
                         const currentTarget = enemy;
                         const defendingAgainstHunter = currentTarget && currentTarget.type === "hunter";
-                        const shouldKeepRegenerating = minion.isRegeneratingAtTower && minion.hp < minion.maxHp;
+                        const shouldKeepRegenerating = minion.isRegenerating && minion.hp < minion.maxHp;
                         const shouldStartRegenerating = minion.hp <= minion.maxHp * 0.5 && !defendingAgainstHunter;
 
                         if (shouldKeepRegenerating || shouldStartRegenerating) {
-                            minion.isRegeneratingAtTower = true;
+                            // Falls back to its own post rather than all the way home:
+                            // a defender sent to guard a far field should hold that
+                            // ground, not abandon it every time it takes a hit.
+                            minion.isRegenerating = true;
                             minion.targetEnemyId = null;
-                            const reachedTower = moveEntityTowards(minion, home.x, home.y, minionTravelSpeed(minion));
-                            if (reachedTower) {
+                            const reachedPost = moveEntityTowards(minion, post.x, post.y, minionTravelSpeed(minion));
+                            if (reachedPost) {
                                 minion.hp = Math.min(minion.maxHp, minion.hp + DEFENDER_REGEN_PER_TICK);
                                 if (minion.hp >= minion.maxHp) {
                                     minion.hp = minion.maxHp;
-                                    minion.isRegeneratingAtTower = false;
+                                    minion.isRegenerating = false;
                                     minion.patrolIdleTicks = Math.floor(random(DEFENDER_PATROL_IDLE_MIN_TICKS, DEFENDER_PATROL_IDLE_MAX_TICKS + 1));
-                                    const patrolPoint = randomDefenderPatrolPoint();
+                                    const patrolPoint = randomDefenderPatrolPoint(post);
                                     minion.patrolTargetX = patrolPoint.x;
                                     minion.patrolTargetY = patrolPoint.y;
                                 }
@@ -7091,9 +7499,13 @@
                                 continue;
                             }
 
-                            const hasPatrolTarget = Number.isFinite(minion.patrolTargetX) && Number.isFinite(minion.patrolTargetY);
+                            // A patrol point out of range means the post has just moved,
+                            // so the old wander target is discarded rather than walked to.
+                            const hasPatrolTarget = Number.isFinite(minion.patrolTargetX) && Number.isFinite(minion.patrolTargetY)
+                                && distanceSq({ x: minion.patrolTargetX, y: minion.patrolTargetY }, post)
+                                    <= DEFENDER_PATROL_MAX_RADIUS * DEFENDER_PATROL_MAX_RADIUS * 1.4;
                             if (!hasPatrolTarget) {
-                                const patrolPoint = randomDefenderPatrolPoint();
+                                const patrolPoint = randomDefenderPatrolPoint(post);
                                 minion.patrolTargetX = patrolPoint.x;
                                 minion.patrolTargetY = patrolPoint.y;
                             }
@@ -7101,7 +7513,7 @@
                             const reachedPatrol = moveEntityTowards(minion, minion.patrolTargetX, minion.patrolTargetY, minionTravelSpeed(minion, 0.9));
                             if (reachedPatrol) {
                                 minion.patrolIdleTicks = Math.floor(random(DEFENDER_PATROL_IDLE_MIN_TICKS, DEFENDER_PATROL_IDLE_MAX_TICKS + 1));
-                                const patrolPoint = randomDefenderPatrolPoint();
+                                const patrolPoint = randomDefenderPatrolPoint(post);
                                 minion.patrolTargetX = patrolPoint.x;
                                 minion.patrolTargetY = patrolPoint.y;
                             }
@@ -7152,7 +7564,8 @@
                         const route = tradeRouteByKey(normalizedTradeRoute(minion.tradeRoute));
 
                         if (minion.state === "toVillage") {
-                            const reached = moveEntityTowards(minion, village.x, village.y, minionTravelSpeed(minion));
+                            const market = tradeRouteDestination(tradeRouteByKey(minion.tradeCarryRoute) || route);
+                            const reached = moveEntityTowards(minion, market.x, market.y, minionTravelSpeed(minion));
                             if (reached) {
                                 if (minion.tradeDwell > 0) {
                                     minion.tradeDwell -= 1;
@@ -7161,7 +7574,15 @@
                                     // now: a route changed mid-haul must not rewrite a
                                     // load that is already in the cart.
                                     const deal = tradeRouteByKey(minion.tradeCarryRoute);
-                                    if (deal) {
+                                    if (deal && deal.turret) {
+                                        // Goods in, turret out. It rides home in the cart
+                                        // and is only yours once the caravan is back.
+                                        minion.carry[deal.from] = 0;
+                                        minion.carryType = null;
+                                        minion.carryLoad = 0;
+                                        minion.carryTurret = deal.turret;
+                                        game.cityPulse = 20;
+                                    } else if (deal) {
                                         const payout = tradePayoutFor(deal, minion.carryLoad);
                                         minion.carry[deal.from] = 0;
                                         minion.carry[deal.to] = payout;
@@ -7178,6 +7599,15 @@
                         if (minion.state === "toTower") {
                             const reached = moveEntityTowards(minion, home.x, home.y, minionTravelSpeed(minion));
                             if (reached) {
+                                if (minion.carryTurret) {
+                                    // Arrives as a turret waiting to be placed, exactly
+                                    // as a shop purchase used to.
+                                    if (minion.carryTurret === "sniper") save.sniperTurrets += 1;
+                                    else if (minion.carryTurret === "slow") save.slowTurrets += 1;
+                                    else save.turrets += 1;
+                                    minion.carryTurret = null;
+                                    syncTurretsFromSave();
+                                }
                                 if (minion.carryLoad > 0 && minion.carryType) {
                                     refundBankForCost({ [minion.carryType]: minion.carryLoad });
                                     game.minionPulse = Math.min(999, game.minionPulse + minion.carryLoad);
@@ -7197,13 +7627,19 @@
                         // Idle: wait at the tower until the bank can cover a whole run.
                         moveEntityTowards(minion, home.x, home.y, minionTravelSpeed(minion));
                         if (!route) continue;   // stood down: nothing to carry anywhere
+                        if (!tradeRouteAvailable(route)) continue;   // licence lost with the run
 
-                        const cargo = traderCargoSize();
-                        if (bankAmount(route.from) >= cargo && tradePayoutFor(route, cargo) > 0) {
-                            spendBankForCost({ [route.from]: cargo });
-                            minion.carry[route.from] = cargo;
+                        // A turret order is refused outright when there is nowhere left
+                        // to put one, rather than being carried across the map and wasted.
+                        if (route.turret && placedTurretCount() >= maxTurrets()) continue;
+
+                        const price = tradeRoutePrice(route);
+                        const worthGoing = route.turret ? true : tradePayoutFor(route, price) > 0;
+                        if (bankAmount(route.from) >= price && worthGoing) {
+                            spendBankForCost({ [route.from]: price });
+                            minion.carry[route.from] = price;
                             minion.carryType = route.from;
-                            minion.carryLoad = cargo;
+                            minion.carryLoad = price;
                             minion.tradeCarryRoute = route.key;
                             minion.tradeDwell = TRADE_DWELL_TICKS;
                             minion.state = "toVillage";
@@ -7352,6 +7788,7 @@
                     game.sellPulse.ticks -= 1;
                 }
                 if (game.villagePulse > 0) game.villagePulse -= 1;
+                if (game.cityPulse > 0) game.cityPulse -= 1;
                 if (game.dayTick % 15 === 0) syncMusicMood();
                 if (game.dayTick % 120 === 0) {
                     captureRuntimeSnapshot();
@@ -7621,9 +8058,11 @@
                     ctx.fillText(`${Math.floor(game.towerPulse)} tower`, tower.x - 8, tower.y - 70);
                 }
 
+                drawDefenderPosts(ctx);
                 drawTurretSellHint(ctx);
                 drawSellPulse(ctx);
                 drawTurretPlacementPreview(ctx);
+                drawDefenderPostPreview(ctx);
 
                 ctx.restore();
 
@@ -8277,6 +8716,14 @@
                     cameraState.suppressClick = false;
                     return;
                 }
+                if (game.pendingDefenderPost !== null) {
+                    const postPoint = worldPointFromClient(e.clientX, e.clientY);
+                    setDefenderPost(game.pendingDefenderPost, postPoint.x, postPoint.y);
+                    game.pendingDefenderPost = null;
+                    refreshHud();
+                    updatePlacementPreview(e.clientX, e.clientY);
+                    return;
+                }
                 if (game.pendingBasicTurretPlacements + game.pendingSniperTurretPlacements + game.pendingSlowTurretPlacements <= 0) return;
                 const point = worldPointFromClient(e.clientX, e.clientY);
                 placePendingTurretAt(point.x, point.y);
@@ -8287,7 +8734,16 @@
                 e.preventDefault();
                 // A queued purchase is the more recent intent, so cancel that first;
                 // with nothing pending, right-click sells whatever turret is under it.
-                if (cancelPendingTurretPurchase()) {
+                if (game.pendingDefenderPost !== null) {
+                    game.pendingDefenderPost = null;
+                    refreshHud();
+                    updatePlacementPreview(e.clientX, e.clientY);
+                    return;
+                }
+                if (game.selectedTurretType !== null) {
+                    // Disarm only: the turret stays in the store to place later.
+                    game.selectedTurretType = null;
+                    refreshHud();
                     updatePlacementPreview(e.clientX, e.clientY);
                     return;
                 }
@@ -8556,48 +9012,6 @@
                 buySpawnerUpgrade("amber");
             });
 
-            turretBtn.addEventListener("click", () => {
-                if (!canUseUpgrade("turret")) return;
-                if (save.turrets + save.sniperTurrets + save.slowTurrets >= maxTurrets()) return;
-
-                const recipe = turretRecipe();
-                if (!hasBankForCost(recipe)) return;
-
-                spendBankForCost(recipe);
-                save.turrets += 1;
-                game.pendingBasicTurretPlacements += 1;
-                saveGame();
-                refreshHud();
-            });
-
-            sniperTurretBtn.addEventListener("click", () => {
-                if (!canUseUpgrade("sniperTurret")) return;
-                if (save.turrets + save.sniperTurrets + save.slowTurrets >= maxTurrets()) return;
-
-                const recipe = sniperTurretRecipe();
-                if (!hasBankForCost(recipe)) return;
-
-                spendBankForCost(recipe);
-                save.sniperTurrets += 1;
-                game.pendingSniperTurretPlacements += 1;
-                saveGame();
-                refreshHud();
-            });
-
-            slowTurretBtn.addEventListener("click", () => {
-                if (!canUseUpgrade("slowTurret")) return;
-                if (save.turrets + save.sniperTurrets + save.slowTurrets >= maxTurrets()) return;
-
-                const recipe = slowTurretRecipe();
-                if (!hasBankForCost(recipe)) return;
-
-                spendBankForCost(recipe);
-                save.slowTurrets += 1;
-                game.pendingSlowTurretPlacements += 1;
-                saveGame();
-                refreshHud();
-            });
-
             turretCapBtn.addEventListener("click", () => {
                 if (!canUseUpgrade("turretCap")) return;
                 const recipe = turretCapRecipe();
@@ -8705,6 +9119,68 @@
                 if (!Number.isFinite(slot)) return;
 
                 toggleMinionPicker("trader", slot);
+                refreshHud();
+            });
+
+            function setDefenderPost(slot, x, y) {
+                if (!save.defenderPostBySlot || typeof save.defenderPostBySlot !== "object") {
+                    save.defenderPostBySlot = {};
+                }
+                save.defenderPostBySlot[String(slot)] = {
+                    x: clamp(x, world.minX + 16, world.maxX - 16),
+                    y: clamp(y, world.minY + 16, world.maxY - 16)
+                };
+                // Drop the old wander target so it heads for the new ground at once.
+                const defender = defenderMinionsSortedBySlot().find((minion) => minion.slotIndex === slot);
+                if (defender) {
+                    defender.patrolTargetX = NaN;
+                    defender.patrolTargetY = NaN;
+                    defender.patrolIdleTicks = 0;
+                }
+                saveGame();
+                refreshHud();
+            }
+
+            turretStockListEl.addEventListener("click", (event) => {
+                const sellBtn = event.target.closest("button[data-turret-sell]");
+                if (sellBtn) {
+                    sellStoredTurret(sellBtn.dataset.turretSell);
+                    return;
+                }
+
+                const rowBtn = event.target.closest("button[data-turret-stock]");
+                if (!rowBtn) return;
+                selectTurretType(rowBtn.dataset.turretStock);
+                refreshHud();
+            });
+
+            defenderPostListEl.addEventListener("click", (event) => {
+                if (!canUseUpgrade("defender")) return;
+
+                const recallBtn = event.target.closest("button[data-defender-recall]");
+                if (recallBtn) {
+                    const slot = Number.parseInt(recallBtn.dataset.defenderRecall, 10);
+                    if (!Number.isFinite(slot)) return;
+                    if (save.defenderPostBySlot) delete save.defenderPostBySlot[String(slot)];
+                    game.pendingDefenderPost = null;
+                    const defender = defenderMinionsSortedBySlot().find((minion) => minion.slotIndex === slot);
+                    if (defender) {
+                        defender.patrolTargetX = NaN;
+                        defender.patrolTargetY = NaN;
+                        defender.patrolIdleTicks = 0;
+                    }
+                    saveGame();
+                    refreshHud();
+                    return;
+                }
+
+                const rowBtn = event.target.closest("button[data-defender-slot]");
+                if (!rowBtn) return;
+                const slot = Number.parseInt(rowBtn.dataset.defenderSlot, 10);
+                if (!Number.isFinite(slot)) return;
+
+                // Arm, do not act: the next click on the map is what stations it.
+                game.pendingDefenderPost = game.pendingDefenderPost === slot ? null : slot;
                 refreshHud();
             });
 
