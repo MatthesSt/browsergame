@@ -1290,7 +1290,7 @@
     <main class="shell">
         <section class="hud">
             <div class="controls">
-                <button id="startBtn">Start Day</button>
+                <button id="startBtn">Start Run</button>
                 <button id="pauseBtn" class="secondary">Pause</button>
                 <div class="audio-menu">
                     <button id="musicBtn" class="secondary" title="Audio (M mutes, +/- volume)" aria-haspopup="true" aria-expanded="false">♪</button>
@@ -1324,7 +1324,7 @@
                     <div class="hud-spacer" aria-hidden="true"></div>
                     <div class="hud-section hud-section-score">
                         <div class="chip" title="Stored progress points"><span class="ico progress"></span><span>Prog</span><strong id="stored">0</strong></div>
-                        <div class="chip" title="Best stored progress reached"><span class="ico best"></span><span>Best</span><strong id="bestStored">0</strong></div>
+                        <div class="chip" title="Best progress banked in a single run"><span class="ico best"></span><span>Best run</span><strong id="bestRunScore">0</strong></div>
                     </div>
                 </div>
             </div>
@@ -1431,6 +1431,23 @@
         </div>
     </div>
 
+    <div id="runRestartPopover" class="popover-backdrop" aria-hidden="true">
+        <div class="popover-card confirm-card" role="dialog" aria-modal="true" aria-labelledby="runRestartTitle">
+            <div class="popover-head">
+                <h3 id="runRestartTitle">RESTART RUN?</h3>
+            </div>
+            <div class="confirm-body">
+                <p>This ends the run you are playing and starts a new one at wave 1.</p>
+                <ul id="runRestartSummary" class="confirm-summary"></ul>
+                <p class="confirm-note">Your skill tree and essence carry over. Everything the run built does not.</p>
+            </div>
+            <div class="confirm-actions">
+                <button id="runRestartCancelBtn" class="secondary">Keep Playing</button>
+                <button id="runRestartConfirmBtn" class="danger">Restart Run</button>
+            </div>
+        </div>
+    </div>
+
     <div id="resetPopover" class="popover-backdrop" aria-hidden="true">
         <div class="popover-card confirm-card" role="dialog" aria-modal="true" aria-labelledby="resetTitle">
             <div class="popover-head">
@@ -1473,7 +1490,7 @@
             const RUNTIME_SNAPSHOT_VERSION = 1;
             // Total map size, base view times this. It absorbed the separate padding
             // scale, so the map is the same 4x base it has been - one number to grow.
-            const PLAYABLE_WORLD_SIZE_MULTIPLIER = 8;
+            const PLAYABLE_WORLD_SIZE_MULTIPLIER = 16;
 
             const stageEl = document.querySelector(".stage");
             const mapFrameEl = document.querySelector(".map-frame");
@@ -1502,12 +1519,16 @@
                 essence: document.getElementById("treeBankEssence")
             };
             const storedEl = document.getElementById("stored");
-            const bestStoredEl = document.getElementById("bestStored");
+            const bestRunScoreEl = document.getElementById("bestRunScore");
             const capacityEl = document.getElementById("capacity");
             const essenceEl = document.getElementById("essence");
             const waveHudEl = document.getElementById("waveHud");
             const nextWaveHudEl = document.getElementById("nextWaveHud");
             const startBtn = document.getElementById("startBtn");
+            const runRestartPopoverEl = document.getElementById("runRestartPopover");
+            const runRestartSummaryEl = document.getElementById("runRestartSummary");
+            const runRestartCancelBtn = document.getElementById("runRestartCancelBtn");
+            const runRestartConfirmBtn = document.getElementById("runRestartConfirmBtn");
             const pauseBtn = document.getElementById("pauseBtn");
             const speedBtn = document.getElementById("speedBtn");
             const bagBtn = document.getElementById("bagBtn");
@@ -1896,7 +1917,13 @@
                 touchTarget: null,
                 placementPreview: null,
                 sellPulse: null,
-                breach: null
+                runOver: false,
+                runSummary: null,
+                // Essence is meta, so a run's haul is the difference from where it began.
+                runEssenceStart: 0,
+                // Deposits raise bestRunScore as the run goes, so the only way to tell
+                // whether this run set the record is to remember what it had to beat.
+                runBestAtStart: 0
             };
 
             function legacyTurretSlotPoint(index) {
@@ -2007,12 +2034,50 @@
                 return data;
             }
 
+            // Everything a run owns. A run ends when the tower falls: these fields are
+            // wiped and built again from nothing, while essence and the skill tree carry
+            // over. One source of truth for what a new run starts with, so run-start
+            // bonuses have a single place to apply.
+            function freshRunState() {
+                return {
+                    stored: 0,
+                    worldAge: 0,
+                    bankWood: START_BUDGET.wood,
+                    bankStone: START_BUDGET.stone,
+                    bankCrystal: START_BUDGET.crystal,
+                    bankAmber: START_BUDGET.amber,
+                    bankAether: START_BUDGET.aether,
+                    minions: 0,
+                    defenderMinions: 0,
+                    minionSpeedLevel: 0,
+                    minionCapacityLevel: 0,
+                    globalMultiplierLevel: 0,
+                    turretCapLevel: 0,
+                    turrets: 0,
+                    turretPlacements: [],
+                    sniperTurrets: 0,
+                    sniperTurretPlacements: [],
+                    slowTurrets: 0,
+                    slowTurretPlacements: [],
+                    spawnerWoodLevel: 0,
+                    spawnerStoneLevel: 0,
+                    spawnerCrystalLevel: 0,
+                    spawnerAmberLevel: 0,
+                    spawnerAetherLevel: 0,
+                    speedLevel: 0,
+                    bagLevel: 0,
+                    gathererFocusBySlot: {},
+                    gathererFocusCursor: 0
+                };
+            }
+
             function loadSave() {
+                const fresh = freshRunState();
                 try {
                     const stored = JSON.parse(localStorage.getItem(STORAGE_KEY) || "{}");
                     const data = migrateLegacyCoordinates(migrateLegacyTowerKeys(stored));
                     const legacySpawnerLevel = Number.isFinite(data.spawnerLevel) ? data.spawnerLevel : 0;
-                    const turretCapLevel = Number.isFinite(data.turretCapLevel) ? Math.max(0, Math.floor(data.turretCapLevel)) : 0;
+                    const turretCapLevel = Number.isFinite(data.turretCapLevel) ? Math.max(0, Math.floor(data.turretCapLevel)) : fresh.turretCapLevel;
                     const maxTurretsForSave = BASE_MAX_TURRETS + turretCapLevel * TURRET_CAP_STEP;
                     const basicTurretCount = Number.isFinite(data.turrets) ? Math.max(0, Math.floor(data.turrets)) : 0;
                     const sniperTurretCount = Number.isFinite(data.sniperTurrets) ? Math.max(0, Math.floor(data.sniperTurrets)) : 0;
@@ -2037,20 +2102,25 @@
                         : 0;
                     const unlockedSkills = normalizeUnlockedSkills(data.unlockedSkills);
                     return {
-                        stored: Number.isFinite(data.stored) ? data.stored : 0,
-                        bestStored: Number.isFinite(data.bestStored) ? data.bestStored : 0,
+                        stored: Number.isFinite(data.stored) ? data.stored : fresh.stored,
+                        // Records are per run now. An older save's `bestStored` was a
+                        // lifetime total, which is not a run score, so it is dropped
+                        // rather than migrated into a record it cannot honestly fill.
+                        bestRunScore: Number.isFinite(data.bestRunScore) ? Math.max(0, Math.floor(data.bestRunScore)) : 0,
+                        bestRunWave: Number.isFinite(data.bestRunWave) ? Math.max(0, Math.floor(data.bestRunWave)) : 0,
+                        runsPlayed: Number.isFinite(data.runsPlayed) ? Math.max(0, Math.floor(data.runsPlayed)) : 0,
                         essence: Number.isFinite(data.essence) ? Math.max(0, Math.floor(data.essence)) : START_BUDGET.essence,
-                        globalMultiplierLevel: Number.isFinite(data.globalMultiplierLevel) ? Math.max(0, Math.floor(data.globalMultiplierLevel)) : 0,
-                        worldAge: Number.isFinite(data.worldAge) ? data.worldAge : 0,
-                        bankWood: Number.isFinite(data.bankWood) ? data.bankWood : START_BUDGET.wood,
-                        bankStone: Number.isFinite(data.bankStone) ? data.bankStone : START_BUDGET.stone,
-                        bankCrystal: Number.isFinite(data.bankCrystal) ? data.bankCrystal : START_BUDGET.crystal,
-                        bankAmber: Number.isFinite(data.bankAmber) ? data.bankAmber : START_BUDGET.amber,
-                        bankAether: Number.isFinite(data.bankAether) ? data.bankAether : START_BUDGET.aether,
-                        minions: Number.isFinite(data.minions) ? data.minions : 0,
-                        defenderMinions: Number.isFinite(data.defenderMinions) ? data.defenderMinions : 0,
-                        minionSpeedLevel: Number.isFinite(data.minionSpeedLevel) ? data.minionSpeedLevel : 0,
-                        minionCapacityLevel: Number.isFinite(data.minionCapacityLevel) ? data.minionCapacityLevel : 0,
+                        globalMultiplierLevel: Number.isFinite(data.globalMultiplierLevel) ? Math.max(0, Math.floor(data.globalMultiplierLevel)) : fresh.globalMultiplierLevel,
+                        worldAge: Number.isFinite(data.worldAge) ? data.worldAge : fresh.worldAge,
+                        bankWood: Number.isFinite(data.bankWood) ? data.bankWood : fresh.bankWood,
+                        bankStone: Number.isFinite(data.bankStone) ? data.bankStone : fresh.bankStone,
+                        bankCrystal: Number.isFinite(data.bankCrystal) ? data.bankCrystal : fresh.bankCrystal,
+                        bankAmber: Number.isFinite(data.bankAmber) ? data.bankAmber : fresh.bankAmber,
+                        bankAether: Number.isFinite(data.bankAether) ? data.bankAether : fresh.bankAether,
+                        minions: Number.isFinite(data.minions) ? data.minions : fresh.minions,
+                        defenderMinions: Number.isFinite(data.defenderMinions) ? data.defenderMinions : fresh.defenderMinions,
+                        minionSpeedLevel: Number.isFinite(data.minionSpeedLevel) ? data.minionSpeedLevel : fresh.minionSpeedLevel,
+                        minionCapacityLevel: Number.isFinite(data.minionCapacityLevel) ? data.minionCapacityLevel : fresh.minionCapacityLevel,
                         turretCapLevel,
                         turrets: Math.max(appliedBasicTurrets, Math.min(appliedBasicTurrets, turretPlacements.length)),
                         turretPlacements,
@@ -2062,9 +2132,9 @@
                         spawnerStoneLevel: Number.isFinite(data.spawnerStoneLevel) ? data.spawnerStoneLevel : legacySpawnerLevel,
                         spawnerCrystalLevel: Number.isFinite(data.spawnerCrystalLevel) ? data.spawnerCrystalLevel : legacySpawnerLevel,
                         spawnerAmberLevel: Number.isFinite(data.spawnerAmberLevel) ? data.spawnerAmberLevel : legacySpawnerLevel,
-                        spawnerAetherLevel: Number.isFinite(data.spawnerAetherLevel) ? data.spawnerAetherLevel : 0,
-                        speedLevel: Number.isFinite(data.speedLevel) ? data.speedLevel : 0,
-                        bagLevel: Number.isFinite(data.bagLevel) ? data.bagLevel : 0,
+                        spawnerAetherLevel: Number.isFinite(data.spawnerAetherLevel) ? data.spawnerAetherLevel : fresh.spawnerAetherLevel,
+                        speedLevel: Number.isFinite(data.speedLevel) ? data.speedLevel : fresh.speedLevel,
+                        bagLevel: Number.isFinite(data.bagLevel) ? data.bagLevel : fresh.bagLevel,
                         gathererFocusBySlot,
                         gathererFocusCursor,
                         unlockedSkills,
@@ -2078,36 +2148,11 @@
                     };
                 } catch {
                     return {
-                        stored: 0,
-                        bestStored: 0,
+                        ...fresh,
+                        bestRunScore: 0,
+                        bestRunWave: 0,
+                        runsPlayed: 0,
                         essence: 0,
-                        globalMultiplierLevel: 0,
-                        worldAge: 0,
-                        bankWood: START_BUDGET.wood,
-                        bankStone: START_BUDGET.stone,
-                        bankCrystal: START_BUDGET.crystal,
-                        bankAmber: START_BUDGET.amber,
-                        bankAether: START_BUDGET.aether,
-                        minions: 0,
-                        defenderMinions: 0,
-                        minionSpeedLevel: 0,
-                        minionCapacityLevel: 0,
-                        turretCapLevel: 0,
-                        turrets: 0,
-                        turretPlacements: [],
-                        sniperTurrets: 0,
-                        sniperTurretPlacements: [],
-                        slowTurrets: 0,
-                        slowTurretPlacements: [],
-                        spawnerWoodLevel: 0,
-                        spawnerStoneLevel: 0,
-                        spawnerCrystalLevel: 0,
-                        spawnerAmberLevel: 0,
-                        spawnerAetherLevel: 0,
-                        speedLevel: 0,
-                        bagLevel: 0,
-                        gathererFocusBySlot: {},
-                        gathererFocusCursor: 0,
                         unlockedSkills: normalizeUnlockedSkills(null),
                         musicMuted: true,
                         musicVolume: 1,
@@ -2491,6 +2536,8 @@
                     waveIntroPendingType: game.waveIntroPendingType,
                     towerHp: game.towerHp,
                     minionHasteTicks: game.minionHasteTicks,
+                    runEssenceStart: game.runEssenceStart,
+                    runBestAtStart: game.runBestAtStart,
                     player: {
                         x: game.player.x,
                         y: game.player.y,
@@ -2548,6 +2595,11 @@
                 game.minionHasteTicks = Number.isFinite(snapshot.minionHasteTicks)
                     ? Math.max(0, Math.floor(snapshot.minionHasteTicks))
                     : 0;
+                // A snapshot is always a run in progress - a finished one is cleared.
+                game.runEssenceStart = Number.isFinite(snapshot.runEssenceStart) ? Math.max(0, snapshot.runEssenceStart) : save.essence;
+                game.runBestAtStart = Number.isFinite(snapshot.runBestAtStart) ? Math.max(0, snapshot.runBestAtStart) : save.bestRunScore;
+                game.runOver = false;
+                game.runSummary = null;
 
                 const player = snapshot.player && typeof snapshot.player === "object" ? snapshot.player : {};
                 game.player.speed = BASE_PLAYER_SPEED + save.speedLevel * PLAYER_SPEED_LEVEL_STEP;
@@ -2591,7 +2643,7 @@
                 ensureMinionIdentityAndCounters();
                 ensureEnemyIdentityAndCounter();
 
-                startBtn.textContent = "Restart Day";
+                startBtn.textContent = "Restart Run";
                 refreshHud();
                 return true;
             }
@@ -3053,7 +3105,7 @@
                 setHudNumber("bankAether", bankAetherHudEl, save.bankAether);
                 refreshSkillTreeBank();
                 setHudNumber("stored", storedEl, save.stored);
-                setHudNumber("bestStored", bestStoredEl, save.bestStored);
+                setHudNumber("bestRunScore", bestRunScoreEl, save.bestRunScore);
                 setCapacityHud(currentInventoryCount, currentBagCapacity);
                 setHudNumber("essence", essenceEl, save.essence, (value) => String(value));
                 setHudNumber("wave", waveHudEl, Math.max(0, game.waveNumber), (value) => String(value));
@@ -4269,6 +4321,8 @@
 
             function togglePause() {
                 if (!game.started) return;
+                // A finished run has nothing to resume - only New Run leaves this state.
+                if (game.runOver) return;
                 game.running = !game.running;
                 if (!game.running) {
                     keys.clear();
@@ -4279,7 +4333,6 @@
                     }
                     render();
                 } else {
-                    game.breach = null;
                     if (rafId === null) {
                         rafId = requestAnimationFrame(loop);
                     }
@@ -4307,7 +4360,7 @@
                 // Offline the board shows this run, so it has to follow the run.
                 if (!leaderboardOnline && isLeaderboardTabActive()) renderOfflineLeaderboard();
                 if (!leaderboard) return;
-                const score = Math.max(0, Math.floor(save.bestStored));
+                const score = Math.max(0, Math.floor(save.bestRunScore));
                 if (score <= 0) return;
 
                 const now = Date.now();
@@ -4316,7 +4369,7 @@
                 }
                 lastReportedScore = score;
                 lastReportAt = now;
-                leaderboard.submit(score, Math.max(0, game.waveNumber));
+                leaderboard.submit(score, Math.max(0, save.bestRunWave));
             }
 
             function leaderboardRow(entry, isSelf) {
@@ -4364,8 +4417,8 @@
                 leaderboardRowsEl.appendChild(leaderboardRow({
                     rank: 0,
                     name: (leaderboard && leaderboard.name) || "You",
-                    score: Math.max(0, Math.floor(save.bestStored)),
-                    wave: Math.max(0, game.waveNumber)
+                    score: Math.max(0, Math.floor(save.bestRunScore)),
+                    wave: Math.max(0, save.bestRunWave)
                 }, true));
             }
 
@@ -5182,6 +5235,10 @@
 
             function resetSession() {
                 clearRuntimeSnapshot();
+                game.runOver = false;
+                game.runSummary = null;
+                game.runEssenceStart = save.essence;
+                game.runBestAtStart = save.bestRunScore;
                 game.player.x = 0;
                 game.player.y = 0;
                 centerCameraOn(game.player.x, game.player.y);
@@ -5216,6 +5273,15 @@
                 syncMinionUnits(true);
                 syncTurretsFromSave();
                 refreshHud();
+            }
+
+            // Every run begins from nothing but the skill tree and the essence bank.
+            // resetSession() alone must not do this: it also runs on boot, where the
+            // saved run is meant to be picked up rather than thrown away.
+            function startRun() {
+                Object.assign(save, freshRunState());
+                resetSession();
+                saveGame();
             }
 
             function distanceSq(a, b) {
@@ -5361,7 +5427,7 @@
                     + gainedAmber * materialConfig.amber.value
                     + gainedAether * materialConfig.aether.value;
                 save.stored += gained;
-                if (save.stored > save.bestStored) save.bestStored = save.stored;
+                if (save.stored > save.bestRunScore) save.bestRunScore = save.stored;
                 save.bankWood += gainedWood;
                 save.bankStone += gainedStone;
                 save.bankCrystal += gainedCrystal;
@@ -5605,6 +5671,7 @@
 
             function startNextWave() {
                 game.waveNumber += 1;
+                if (game.waveNumber > save.bestRunWave) save.bestRunWave = game.waveNumber;
                 game.waveRemainingSpawns = waveSizeFor(game.waveNumber);
                 game.waveSpawnTimer = 0;
                 game.waveInProgress = true;
@@ -5625,30 +5692,44 @@
                 game.enemies.splice(index, 1);
             }
 
-            function handleTowerBreach() {
-                // A run ending is the natural moment to record what it was worth.
-                reportScore(true);
-                const storedBefore = save.stored;
+            // The tower falling ends the run. Skills and essence are meta and carry
+            // over; everything the run built is gone. The run's own state is cleared
+            // here rather than at the start of the next one, so a reload during the
+            // summary cannot resurrect a bank that has already been lost.
+            function endRun() {
+                if (game.runOver) return;
+
+                if (game.waveNumber > save.bestRunWave) save.bestRunWave = game.waveNumber;
+                // Deposits keep this level with the run as it goes; this catches the
+                // case of a run that ends without ever having banked a new record.
+                if (save.stored > save.bestRunScore) save.bestRunScore = save.stored;
+                save.runsPlayed += 1;
+
+                game.runSummary = {
+                    wave: game.waveNumber,
+                    score: save.stored,
+                    essence: Math.max(0, save.essence - game.runEssenceStart),
+                    turrets: save.turrets + save.sniperTurrets + save.slowTurrets,
+                    minions: save.minions + save.defenderMinions,
+                    record: save.stored > 0 && save.stored > game.runBestAtStart,
+                    runsPlayed: save.runsPlayed
+                };
 
                 game.running = false;
+                game.runOver = true;
                 keys.clear();
-                game.towerHp = TOWER_MAX_HP;
                 game.enemies = [];
-                game.waveBreakTimer = Math.round(WAVE_START_DELAY * 0.7);
                 game.waveInProgress = false;
                 game.waveRemainingSpawns = 0;
                 game.waveSpawnTimer = 0;
                 game.waveIntroPendingType = null;
-                startBtn.textContent = "Restart Day";
-                save.stored = Math.max(0, Math.floor(save.stored * 0.85));
+                startBtn.textContent = "New Run";
 
-                // The run pauses, the tower is repaired and 15% of progress is gone.
-                // Record it so the overlay can say so instead of reading as a plain pause.
-                game.breach = {
-                    wave: game.waveNumber,
-                    lost: storedBefore - save.stored,
-                    stored: save.stored
-                };
+                Object.assign(save, freshRunState());
+                // Nothing left to resume: the next visit starts a run instead.
+                clearRuntimeSnapshot();
+
+                reportScore(true);
                 setMusicDark(false);   // the wave is wiped; drop the boss colour too
                 playDefeatSting();
                 applyMusicVolume();
@@ -5792,7 +5873,7 @@
                         playTowerHitSfx(enemy.damage);
 
                         if (game.towerHp <= 0) {
-                            handleTowerBreach();
+                            endRun();
                             break;
                         }
                     }
@@ -6108,7 +6189,7 @@
                                 + bankAmberGain * materialConfig.amber.value
                                 + bankAetherGain * materialConfig.aether.value;
                             save.stored += gainedValue;
-                            if (save.stored > save.bestStored) save.bestStored = save.stored;
+                            if (save.stored > save.bestRunScore) save.bestRunScore = save.stored;
                             game.minionPulse = Math.min(999, game.minionPulse + gainedValue);
 
                             minion.carryType = null;
@@ -6419,8 +6500,8 @@
                     ctx.restore();
                 }
 
-                if (!game.running && game.breach) {
-                    const breach = game.breach;
+                if (!game.running && game.runSummary) {
+                    const summary = game.runSummary;
                     const cx = viewport.w / 2;
                     const cy = viewport.h / 2;
 
@@ -6430,26 +6511,35 @@
 
                     ctx.fillStyle = "#ff8f8f";
                     ctx.font = "700 48px Space Grotesk, sans-serif";
-                    ctx.fillText("TOWER BREACHED", cx, cy - 46);
+                    ctx.fillText("RUN OVER", cx, cy - 96);
 
                     ctx.fillStyle = "#ffdede";
                     ctx.font = "500 21px Space Grotesk, sans-serif";
-                    ctx.fillText(`Enemies broke through on wave ${breach.wave}.`, cx, cy - 8);
+                    ctx.fillText(`The tower fell on wave ${summary.wave}.`, cx, cy - 58);
 
-                    ctx.fillStyle = "#ff9f9f";
-                    ctx.font = "700 26px Space Grotesk, sans-serif";
-                    ctx.fillText(`-${breach.lost} progress lost`, cx, cy + 30);
-                    ctx.fillStyle = "#ffcaca";
-                    ctx.font = "500 18px Space Grotesk, sans-serif";
-                    ctx.fillText(`${breach.stored} progress remaining - tower repaired to full`, cx, cy + 58);
+                    ctx.fillStyle = summary.record ? "#ffe08a" : "#ff9f9f";
+                    ctx.font = "700 30px Space Grotesk, sans-serif";
+                    ctx.fillText(
+                        summary.record
+                            ? `${summary.score} progress - new best run`
+                            : `${summary.score} progress banked`,
+                        cx,
+                        cy - 12
+                    );
 
-                    ctx.fillStyle = "#f3e2e2";
-                    ctx.font = "500 17px Space Grotesk, sans-serif";
-                    ctx.fillText(`Resume (P) to hold wave ${breach.wave} again after a short breather,`, cx, cy + 98);
-                    ctx.fillText("or Restart Day to begin again from wave 1.", cx, cy + 124);
+                    ctx.fillStyle = "#cfe9d8";
+                    ctx.font = "500 19px Space Grotesk, sans-serif";
+                    ctx.fillText(`+${summary.essence} essence kept - best run so far ${save.bestRunScore}, deepest wave ${save.bestRunWave}`, cx, cy + 22);
+
                     ctx.fillStyle = "#e0b9b9";
-                    ctx.font = "500 15px Space Grotesk, sans-serif";
-                    ctx.fillText("Your bank, skills and placed sentries are kept either way.", cx, cy + 156);
+                    ctx.font = "500 17px Space Grotesk, sans-serif";
+                    ctx.fillText(`Lost with the run: ${summary.turrets} turret${summary.turrets === 1 ? "" : "s"}, ${summary.minions} minion${summary.minions === 1 ? "" : "s"}, and the bank.`, cx, cy + 60);
+                    ctx.fillStyle = "#f3e2e2";
+                    ctx.fillText("Your skill tree and essence carry over - spend them before going again.", cx, cy + 88);
+
+                    ctx.fillStyle = "#cde6f2";
+                    ctx.font = "500 18px Space Grotesk, sans-serif";
+                    ctx.fillText(`New Run to start run ${summary.runsPlayed + 1}.`, cx, cy + 128);
                 } else if (!game.running) {
                     ctx.fillStyle = "#112233cc";
                     ctx.fillRect(0, 0, viewport.w, viewport.h);
@@ -6931,6 +7021,11 @@
                     closeSkillTreePopover();
                     return;
                 }
+                if (key === "escape" && runRestartPopoverEl.classList.contains("open")) {
+                    e.preventDefault();
+                    setRunRestartPopoverOpen(false);
+                    return;
+                }
                 if (key === "escape" && isResetPopoverOpen()) {
                     e.preventDefault();
                     setResetPopoverOpen(false);
@@ -6987,6 +7082,10 @@
             window.addEventListener("resize", () => {
                 fitCanvasToStage();
                 syncSkillTreeViewport();
+                // Refitting resets the canvas bitmap. With the loop stopped nothing
+                // would paint it again, leaving a blank field behind the pause or
+                // run-over overlay until the next run starts.
+                if (!game.running) render();
             });
 
             window.addEventListener("beforeunload", () => {
@@ -7127,22 +7226,68 @@
                 game.touchTarget = null;
             });
 
-            startBtn.addEventListener("click", () => {
-                if (!game.started) {
-                    game.started = true;
-                } else {
-                    resetSession();
-                }
-
+            function beginRun() {
                 game.running = true;
-                game.breach = null;
-                startBtn.textContent = "Restart Day";
+                startBtn.textContent = "Restart Run";
                 startMusic();
                 applyMusicVolume();
                 refreshHud();
                 if (rafId === null) {
                     rafId = requestAnimationFrame(loop);
                 }
+            }
+
+            function setRunRestartPopoverOpen(open) {
+                runRestartPopoverEl.classList.toggle("open", open);
+                runRestartPopoverEl.setAttribute("aria-hidden", String(!open));
+                if (!open) return;
+
+                // Name what the run is worth before offering to throw it away.
+                const turrets = save.turrets + save.sniperTurrets + save.slowTurrets;
+                const minions = save.minions + save.defenderMinions;
+                runRestartSummaryEl.innerHTML = "";
+                for (const line of [
+                    `Wave ${game.waveNumber}, ${save.stored} progress banked`,
+                    `${turrets} turret${turrets === 1 ? "" : "s"}, ${minions} minion${minions === 1 ? "" : "s"}`,
+                    `Bank ${save.bankWood}W / ${save.bankStone}S / ${save.bankCrystal}C / ${save.bankAmber}A / ${save.bankAether}Ae`
+                ]) {
+                    const li = document.createElement("li");
+                    li.textContent = line;
+                    runRestartSummaryEl.appendChild(li);
+                }
+                runRestartCancelBtn.focus();
+            }
+
+            startBtn.addEventListener("click", () => {
+                if (!game.started) {
+                    game.started = true;
+                } else if (game.runOver) {
+                    // The run already ended and was cleared; just set the next one up.
+                    startRun();
+                } else {
+                    // Abandoning a live run costs the same as losing it, so ask first.
+                    setRunRestartPopoverOpen(true);
+                    return;
+                }
+
+                beginRun();
+            });
+
+            runRestartCancelBtn.addEventListener("click", () => {
+                setRunRestartPopoverOpen(false);
+            });
+
+            runRestartConfirmBtn.addEventListener("click", () => {
+                setRunRestartPopoverOpen(false);
+                // Route through the normal ending so an abandoned run still counts and
+                // still records whatever it reached.
+                endRun();
+                startRun();
+                beginRun();
+            });
+
+            runRestartPopoverEl.addEventListener("click", (e) => {
+                if (e.target === runRestartPopoverEl) setRunRestartPopoverOpen(false);
             });
 
             function isAudioPanelOpen() {
@@ -7416,7 +7561,7 @@
                     const minions = save.minions + save.defenderMinions;
                     resetSummaryEl.innerHTML = "";
                     for (const line of [
-                        `Progress ${save.stored} (best ${save.bestStored})`,
+                        `Run progress ${save.stored} (best run ${save.bestRunScore})`,
                         `${unlockedSkillCount()} of ${SKILL_TREE_ORDER.length} skills unlocked`,
                         `${turrets} turret${turrets === 1 ? "" : "s"}, ${minions} minion${minions === 1 ? "" : "s"}`,
                         `Bank ${save.bankWood}W / ${save.bankStone}S / ${save.bankCrystal}C / ${save.bankAmber}A / ${save.bankAether}Ae`,
@@ -7477,7 +7622,7 @@
                 game.pendingBasicTurretPlacements = 0;
                 game.pendingSniperTurretPlacements = 0;
                 game.pendingSlowTurretPlacements = 0;
-                startBtn.textContent = "Start Day";
+                startBtn.textContent = "Start Run";
                 pauseBtn.textContent = "Pause";
                 resetSession();
                 saveGame();
@@ -7554,7 +7699,7 @@
             // A reset survives a page reload, so the offer to undo it has to as well -
             // but only while the fresh save is still untouched, otherwise restoring
             // would silently discard whatever has been played since.
-            if (hasResetBackup() && save.stored === 0 && save.bestStored === 0 && unlockedSkillCount() === 0) {
+            if (hasResetBackup() && save.stored === 0 && save.bestRunScore === 0 && unlockedSkillCount() === 0) {
                 showUndoToast("Previous save available from your last reset.");
             }
         }());
