@@ -468,6 +468,58 @@
             text-align: left;
         }
 
+        /* A trader with no route reads as parked, not as misconfigured. */
+        .gatherer-focus-row.route-idle .shop-btn-level {
+            color: #8fa8c0;
+            font-style: italic;
+        }
+
+        .gatherer-focus-row.picker-open {
+            border-color: #6f9ac4;
+            background: #1e3b58;
+        }
+
+        /* The chooser: opening it is free, only picking an option commits. */
+        .focus-options {
+            display: grid;
+            gap: 4px;
+            margin: 4px 0 2px 10px;
+            padding: 6px;
+            border-left: 2px solid #4a7099;
+            border-radius: 0 8px 8px 0;
+            background: #0e1e30cc;
+        }
+
+        .focus-options .focus-option {
+            width: 100%;
+            text-align: left;
+            padding: 6px 9px;
+            border-radius: 7px;
+            border: 1px solid #2c4763;
+            background: #16304a;
+            color: #cfe2f5;
+            font-size: 0.74rem;
+            font-weight: 600;
+        }
+
+        .focus-options .focus-option:hover {
+            transform: none;
+            border-color: #6f9ac4;
+            background: #1f4266;
+            color: #f4f8ff;
+        }
+
+        .focus-options .focus-option.active {
+            border-color: #7fe0bb;
+            color: #b6f2dc;
+        }
+
+        .focus-options .focus-option.active::after {
+            content: " (current)";
+            color: #7fa8c4;
+            font-weight: 500;
+        }
+
         .gatherer-focus-empty {
             font-size: 0.74rem;
             color: #b8cbe0;
@@ -1838,7 +1890,7 @@
             // on the tower.
             const CLAIM_FIRST_WAVE = 5;
             const CLAIM_WAVE_INTERVAL = 3;
-            const CLAIM_MAX_ACTIVE = 3;
+            const CLAIM_MAX_ACTIVE = 5;
             const CLAIM_EXTRA_EVERY_WAVES = 12;
             const CLAIM_RADIUS = W(30);
             // A blight rises near the meadow it wants rather than walking in from the
@@ -1971,6 +2023,9 @@
                 { key: "crystal-aether", from: "crystal", to: "aether" },
                 { key: "amber-aether", from: "amber", to: "aether" }
             ];
+            // A trader starts stood down. Picking up a route it was never given, and
+            // spending the bank on it, is not something a fresh caravan should decide.
+            const TRADE_ROUTE_NONE = "none";
             const TRADE_MARKUP = 0.7;
             const TRADE_DWELL_TICKS = 90;
             const SPAWNER_LAYOUT = [
@@ -2045,6 +2100,10 @@
                 placementPreview: null,
                 sellPulse: null,
                 villagePulse: 0,
+                // Row whose chooser is open, as "gatherer:3" / "trader:1". A click used
+                // to commit the next setting outright, which made every stray click a
+                // silent reassignment.
+                openMinionPicker: null,
                 ghoulTimer: GHOUL_FIRST_TICKS,
                 runOver: false,
                 runSummary: null,
@@ -3014,23 +3073,12 @@
                 for (const route of TRADE_ROUTES) {
                     if (route.key === key) return route;
                 }
-                return TRADE_ROUTES[0];
+                return null;   // stood down, or a route this build no longer has
             }
 
             function normalizedTradeRoute(key) {
-                return tradeRouteByKey(key).key;
-            }
-
-            function nextTradeRoute(key) {
-                const current = TRADE_ROUTES.findIndex((route) => route.key === key);
-                const safeIndex = current >= 0 ? current : 0;
-                return TRADE_ROUTES[(safeIndex + 1) % TRADE_ROUTES.length].key;
-            }
-
-            function tradeRouteLabel(key) {
                 const route = tradeRouteByKey(key);
-                const name = (type) => type.charAt(0).toUpperCase() + type.slice(1);
-                return `${name(route.from)} > ${name(route.to)}`;
+                return route ? route.key : TRADE_ROUTE_NONE;
             }
 
             // What a full load fetches. Value in, the village's cut off the top, value
@@ -3065,16 +3113,27 @@
                 const cargo = traderCargoSize();
                 const renderKey = traders
                     .map((minion, index) => `${index}:${minion.slotIndex}:${normalizedTradeRoute(minion.tradeRoute)}:${cargo}`)
-                    .join("|");
+                    .join("|") + `|open:${game.openMinionPicker}`;
                 if (traderRouteListEl.dataset.renderKey === renderKey) return;
                 traderRouteListEl.dataset.renderKey = renderKey;
+
+                const options = [{ value: TRADE_ROUTE_NONE, label: "No route - stay at the tower" }]
+                    .concat(TRADE_ROUTES.map((route) => ({
+                        value: route.key,
+                        label: `${cargo} ${route.from} &gt; ${tradePayoutFor(route, cargo)} ${route.to}`
+                    })));
 
                 traderRouteListEl.innerHTML = traders
                     .map((minion, index) => {
                         const slot = Number.isFinite(minion.slotIndex) ? minion.slotIndex : index;
-                        const route = tradeRouteByKey(normalizedTradeRoute(minion.tradeRoute));
-                        const payout = tradePayoutFor(route, cargo);
-                        return `<button class="secondary shop-btn gatherer-focus-row" data-trader-slot="${slot}"><span class="shop-btn-title"><span>Trader ${index + 1}</span><span class="shop-btn-level">${cargo} ${route.from} &gt; ${payout} ${route.to}</span></span></button>`;
+                        const routeKey = normalizedTradeRoute(minion.tradeRoute);
+                        const route = tradeRouteByKey(routeKey);
+                        const open = isMinionPickerOpen("trader", slot);
+                        const summary = route
+                            ? `${cargo} ${route.from} &gt; ${tradePayoutFor(route, cargo)} ${route.to}`
+                            : "No route";
+                        return `<button class="secondary shop-btn gatherer-focus-row${open ? " picker-open" : ""}${route ? "" : " route-idle"}" data-trader-slot="${slot}"><span class="shop-btn-title"><span>Trader ${index + 1}</span><span class="shop-btn-level">${summary} ${open ? "&#9652;" : "&#9662;"}</span></span></button>`
+                            + minionPickerMarkup("trader", slot, options, routeKey);
                     })
                     .join("");
             }
@@ -3086,13 +3145,6 @@
                 if (priority === "amber") return "Amber";
                 if (priority === "aether") return "Aether";
                 return "Auto";
-            }
-
-            function nextGathererPriority(priority) {
-                const currentIndex = GATHERER_PRIORITY_MODES.indexOf(priority);
-                const safeIndex = currentIndex >= 0 ? currentIndex : 0;
-                const nextIndex = (safeIndex + 1) % GATHERER_PRIORITY_MODES.length;
-                return GATHERER_PRIORITY_MODES[nextIndex];
             }
 
             function normalizedGathererPriority(priority) {
@@ -3118,6 +3170,35 @@
                 return workers.length > 0 ? `Gatherer Focus (${workers.length})` : "Gatherer Focus";
             }
 
+            function minionPickerKey(kind, slot) {
+                return `${kind}:${slot}`;
+            }
+
+            function isMinionPickerOpen(kind, slot) {
+                return game.openMinionPicker === minionPickerKey(kind, slot);
+            }
+
+            function toggleMinionPicker(kind, slot) {
+                const key = minionPickerKey(kind, slot);
+                game.openMinionPicker = game.openMinionPicker === key ? null : key;
+            }
+
+            function closeMinionPicker() {
+                game.openMinionPicker = null;
+            }
+
+            // The options for one row, shown only once that row has been opened. Picking
+            // one is the deliberate act; opening the list costs nothing.
+            function minionPickerMarkup(kind, slot, options, currentValue) {
+                if (!isMinionPickerOpen(kind, slot)) return "";
+                return `<div class="focus-options">${options
+                    .map((option) => {
+                        const active = option.value === currentValue ? " active" : "";
+                        return `<button class="focus-option${active}" data-picker-kind="${kind}" data-picker-slot="${slot}" data-picker-value="${option.value}">${option.label}</button>`;
+                    })
+                    .join("")}</div>`;
+            }
+
             function renderGathererFocusList() {
                 if (!gathererFocusListEl) return;
                 const workers = workerMinionsSortedBySlot();
@@ -3131,15 +3212,19 @@
 
                 const renderKey = workers
                     .map((minion, index) => `${index}:${minion.slotIndex}:${normalizedGathererPriority(minion.gathererPriority)}`)
-                    .join("|");
+                    .join("|") + `|open:${game.openMinionPicker}`;
                 if (gathererFocusListEl.dataset.renderKey === renderKey) return;
                 gathererFocusListEl.dataset.renderKey = renderKey;
+
+                const options = GATHERER_PRIORITY_MODES.map((mode) => ({ value: mode, label: gathererPriorityLabel(mode) }));
 
                 gathererFocusListEl.innerHTML = workers
                     .map((minion, index) => {
                         const slot = Number.isFinite(minion.slotIndex) ? minion.slotIndex : index;
-                        const modeLabel = gathererPriorityLabel(normalizedGathererPriority(minion.gathererPriority));
-                        return `<button class="secondary shop-btn gatherer-focus-row" data-gatherer-slot="${slot}"><span class="shop-btn-title"><span>Gatherer ${index + 1}</span><span class="shop-btn-level">${modeLabel}</span></span></button>`;
+                        const mode = normalizedGathererPriority(minion.gathererPriority);
+                        const open = isMinionPickerOpen("gatherer", slot);
+                        return `<button class="secondary shop-btn gatherer-focus-row${open ? " picker-open" : ""}" data-gatherer-slot="${slot}"><span class="shop-btn-title"><span>Gatherer ${index + 1}</span><span class="shop-btn-level">${gathererPriorityLabel(mode)} ${open ? "&#9652;" : "&#9662;"}</span></span></button>`
+                            + minionPickerMarkup("gatherer", slot, options, mode);
                     })
                     .join("");
             }
@@ -5943,6 +6028,7 @@
 
             function resetSession() {
                 clearRuntimeSnapshot();
+                closeMinionPicker();
                 clearSpawnerClaims();
                 // Drop the old run's units before anything syncs: they carry per-slot
                 // config that would otherwise be written straight back into the fresh
@@ -7071,14 +7157,19 @@
                                 if (minion.tradeDwell > 0) {
                                     minion.tradeDwell -= 1;
                                 } else {
-                                    const deal = tradeRouteByKey(minion.tradeCarryRoute || route.key);
-                                    const payout = tradePayoutFor(deal, minion.carryLoad);
-                                    minion.carry[deal.from] = 0;
-                                    minion.carry[deal.to] = payout;
-                                    minion.carryType = deal.to;
-                                    minion.carryLoad = payout;
+                                    // The deal it left with, not whatever it is set to
+                                    // now: a route changed mid-haul must not rewrite a
+                                    // load that is already in the cart.
+                                    const deal = tradeRouteByKey(minion.tradeCarryRoute);
+                                    if (deal) {
+                                        const payout = tradePayoutFor(deal, minion.carryLoad);
+                                        minion.carry[deal.from] = 0;
+                                        minion.carry[deal.to] = payout;
+                                        minion.carryType = deal.to;
+                                        minion.carryLoad = payout;
+                                        game.villagePulse = 20;
+                                    }
                                     minion.state = "toTower";
-                                    game.villagePulse = 20;
                                 }
                             }
                             continue;
@@ -7105,6 +7196,8 @@
 
                         // Idle: wait at the tower until the bank can cover a whole run.
                         moveEntityTowards(minion, home.x, home.y, minionTravelSpeed(minion));
+                        if (!route) continue;   // stood down: nothing to carry anywhere
+
                         const cargo = traderCargoSize();
                         if (bankAmount(route.from) >= cargo && tradePayoutFor(route, cargo) > 0) {
                             spendBankForCost({ [route.from]: cargo });
@@ -8070,7 +8163,16 @@
                 }
             }
 
+            // A field with focus owns the keyboard. Without this, naming yourself on
+            // the leaderboard pauses the game on every "p" and walks you off with WASD.
+            function isTypingTarget(target) {
+                if (!target || !target.tagName) return false;
+                const tag = target.tagName.toLowerCase();
+                return tag === "input" || tag === "textarea" || tag === "select" || target.isContentEditable;
+            }
+
             window.addEventListener("keydown", (e) => {
+                if (isTypingTarget(e.target)) return;
                 const key = e.key.toLowerCase();
                 if (key === "escape" && isSkillTreePopoverOpen()) {
                     e.preventDefault();
@@ -8133,6 +8235,11 @@
 
             window.addEventListener("keyup", (e) => {
                 keys.delete(e.key.toLowerCase());
+            });
+
+            // Losing focus mid-key would otherwise leave the player walking forever.
+            window.addEventListener("blur", () => {
+                keys.clear();
             });
 
             window.addEventListener("resize", () => {
@@ -8527,36 +8634,35 @@
 
             gathererFocusListEl.addEventListener("click", (event) => {
                 if (!canUseUpgrade("gathererFocus")) return;
+
+                // Only a pick commits. A click on the row itself just opens or closes
+                // the list, so a stray click can no longer reassign anyone.
+                const optionBtn = event.target.closest("button[data-picker-value]");
+                if (optionBtn) {
+                    const slot = Number.parseInt(optionBtn.dataset.pickerSlot, 10);
+                    const mode = normalizedGathererPriority(optionBtn.dataset.pickerValue);
+                    const workers = workerMinionsSortedBySlot();
+                    const selectedIndex = workers.findIndex((minion) => minion.slotIndex === slot);
+                    if (selectedIndex === -1) return;
+
+                    workers[selectedIndex].gathererPriority = mode;
+                    if (!save.gathererFocusBySlot || typeof save.gathererFocusBySlot !== "object") {
+                        save.gathererFocusBySlot = {};
+                    }
+                    save.gathererFocusBySlot[String(slot)] = mode;
+                    save.gathererFocusCursor = selectedIndex;
+                    closeMinionPicker();
+                    saveGame();
+                    refreshHud();
+                    return;
+                }
+
                 const rowBtn = event.target.closest("button[data-gatherer-slot]");
                 if (!rowBtn) return;
-
                 const slot = Number.parseInt(rowBtn.dataset.gathererSlot, 10);
                 if (!Number.isFinite(slot)) return;
 
-                const workers = workerMinionsSortedBySlot();
-                if (workers.length === 0) return;
-
-                let selected = null;
-                let selectedIndex = -1;
-                for (let i = 0; i < workers.length; i += 1) {
-                    if (workers[i].slotIndex === slot) {
-                        selected = workers[i];
-                        selectedIndex = i;
-                        break;
-                    }
-                }
-                if (!selected) return;
-
-                const nextMode = nextGathererPriority(selected.gathererPriority);
-                selected.gathererPriority = nextMode;
-                if (!save.gathererFocusBySlot || typeof save.gathererFocusBySlot !== "object") {
-                    save.gathererFocusBySlot = {};
-                }
-                save.gathererFocusBySlot[String(slot)] = nextMode;
-                if (selectedIndex >= 0) {
-                    save.gathererFocusCursor = selectedIndex;
-                }
-                saveGame();
+                toggleMinionPicker("gatherer", slot);
                 refreshHud();
             });
 
@@ -8574,22 +8680,31 @@
 
             traderRouteListEl.addEventListener("click", (event) => {
                 if (!canUseUpgrade("trader")) return;
+
+                const optionBtn = event.target.closest("button[data-picker-value]");
+                if (optionBtn) {
+                    const slot = Number.parseInt(optionBtn.dataset.pickerSlot, 10);
+                    const selected = traderMinionsSortedBySlot().find((minion) => minion.slotIndex === slot);
+                    if (!selected) return;
+
+                    const route = normalizedTradeRoute(optionBtn.dataset.pickerValue);
+                    selected.tradeRoute = route;
+                    if (!save.traderRouteBySlot || typeof save.traderRouteBySlot !== "object") {
+                        save.traderRouteBySlot = {};
+                    }
+                    save.traderRouteBySlot[String(slot)] = route;
+                    closeMinionPicker();
+                    saveGame();
+                    refreshHud();
+                    return;
+                }
+
                 const rowBtn = event.target.closest("button[data-trader-slot]");
                 if (!rowBtn) return;
-
                 const slot = Number.parseInt(rowBtn.dataset.traderSlot, 10);
                 if (!Number.isFinite(slot)) return;
 
-                const selected = traderMinionsSortedBySlot().find((minion) => minion.slotIndex === slot);
-                if (!selected) return;
-
-                const nextRoute = nextTradeRoute(normalizedTradeRoute(selected.tradeRoute));
-                selected.tradeRoute = nextRoute;
-                if (!save.traderRouteBySlot || typeof save.traderRouteBySlot !== "object") {
-                    save.traderRouteBySlot = {};
-                }
-                save.traderRouteBySlot[String(slot)] = nextRoute;
-                saveGame();
+                toggleMinionPicker("trader", slot);
                 refreshHud();
             });
 
