@@ -1926,7 +1926,7 @@
             // Kept low on purpose: ghouls camp the meadows, and gatherers have to stand
             // still in a meadow to work. A standing infestation reads as an economy that
             // simply stops, so a horde should be an event to answer, not weather.
-            const GHOUL_MAX_ALIVE = 6;
+            const GHOUL_MAX_ALIVE = 10;
             const GHOUL_SPAWN_DISTANCE = W(420);
             const GHOUL_SPAWN_SCATTER = W(90);
             const GHOUL_AGGRO_RADIUS = W(160);
@@ -1942,7 +1942,7 @@
 
             const tower = { x: -W(108) / 2, y: -W(88) / 2, w: W(108), h: W(88) };
             const TOWER_MAX_HP = 100;
-            const START_BUDGET = { wood: 4000, stone: 3000, crystal: 1000, amber: 1000, aether: 1000, essence: 1000 };
+            const START_BUDGET = { wood: 40, stone: 30, crystal: 0, amber: 0, aether: 0, essence: 0 };
             const START_WAVE_COUNT = 1;
             const WAVE_START_DELAY = 3600;
             const WAVE_BREAK_TICKS = 320;
