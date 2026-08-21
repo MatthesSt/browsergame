@@ -1053,6 +1053,22 @@
             min-width: 314px;
         }
 
+        /* The bag rides on the map rather than in the header: it is the one readout
+           that changes with every step, and the header had no room left for it. */
+        .chip.bag-overlay {
+            position: absolute;
+            top: 10px;
+            left: 10px;
+            z-index: 2;
+            background: #08141fcc;
+            border-color: #35527299;
+            backdrop-filter: blur(3px);
+            box-shadow: 0 4px 14px #02060d66;
+            /* Placing a turret and dragging the camera both begin with a press on
+               the map, so this must never be the thing that receives it. */
+            pointer-events: none;
+        }
+
         .bag-cap-inline {
             display: inline-flex;
             align-items: center;
@@ -1322,7 +1338,6 @@
             <div class="hud-bar overlay" aria-hidden="true">
                 <div class="hud-row">
                     <div class="hud-section hud-section-resources">
-                        <div class="chip resource-bundle bag-bundle" title="Bag materials: Wood / Stone / Crystal / Amber / Aether"><span class="ico bag"></span><span>Bag</span><span class="bag-cap-inline" title="Bag capacity used / maximum"><span>Cap</span><strong id="capacity">10</strong></span><span class="shop-btn-costs hud-bank-costs"><span class="cost-chip"><span class="res-icon wood"></span><strong id="bagWoodHud">0</strong></span><span class="cost-chip"><span class="res-icon stone"></span><strong id="bagStoneHud">0</strong></span><span class="cost-chip"><span class="res-icon crystal"></span><strong id="bagCrystalHud">0</strong></span><span class="cost-chip"><span class="res-icon amber"></span><strong id="bagAmberHud">0</strong></span><span class="cost-chip"><span class="res-icon aether"></span><strong id="bagAetherHud">0</strong></span></span></div>
                         <div class="chip resource-bundle bank-bundle" title="Banked materials: Wood / Stone / Crystal / Amber / Aether / Essence"><span class="ico bank"></span><span>Bank</span><span class="shop-btn-costs hud-bank-costs"><span class="cost-chip"><span class="res-icon wood"></span><strong id="bankWoodHud">0</strong></span><span class="cost-chip"><span class="res-icon stone"></span><strong id="bankStoneHud">0</strong></span><span class="cost-chip"><span class="res-icon crystal"></span><strong id="bankCrystalHud">0</strong></span><span class="cost-chip"><span class="res-icon amber"></span><strong id="bankAmberHud">0</strong></span><span class="cost-chip"><span class="res-icon aether"></span><strong id="bankAetherHud">0</strong></span><span class="cost-chip"><span class="res-icon essence"></span><strong id="essence">0</strong></span></span></div>
                     </div>
                     <div class="hud-spacer" aria-hidden="true"></div>
@@ -1347,6 +1362,7 @@
         <section class="stage">
             <div class="map-frame">
                 <canvas id="game" width="1920" height="1080" aria-label="Meadow Gatherer game area"></canvas>
+                <div class="chip resource-bundle bag-bundle bag-overlay" aria-hidden="true" title="Bag materials: Wood / Stone / Crystal / Amber / Aether"><span class="ico bag"></span><span>Bag</span><span class="bag-cap-inline" title="Bag capacity used / maximum"><span>Cap</span><strong id="capacity">10</strong></span><span class="shop-btn-costs hud-bank-costs"><span class="cost-chip"><span class="res-icon wood"></span><strong id="bagWoodHud">0</strong></span><span class="cost-chip"><span class="res-icon stone"></span><strong id="bagStoneHud">0</strong></span><span class="cost-chip"><span class="res-icon crystal"></span><strong id="bagCrystalHud">0</strong></span><span class="cost-chip"><span class="res-icon amber"></span><strong id="bagAmberHud">0</strong></span><span class="cost-chip"><span class="res-icon aether"></span><strong id="bagAetherHud">0</strong></span></span></div>
             </div>
             <div class="shop-dock">
                 <aside class="shop" aria-label="Shop panel">
@@ -1817,6 +1833,10 @@
             // still on its way, so the two states never read as the same thing.
             const CLAIM_ALERT_COLOR = "#ff4d4d";
             const CLAIM_PING_TICKS = 110;
+            // How long a settled blight takes to eat one node out of its field. Slow
+            // enough that a claim is a warning rather than an instant loss, fast enough
+            // that ignoring one empties the meadow.
+            const CLAIM_CONSUME_TICKS = 300;
 
             const tower = { x: -W(108) / 2, y: -W(88) / 2, w: W(108), h: W(88) };
             const TOWER_MAX_HP = 100;
@@ -4859,8 +4879,8 @@
                 let activeNodes = countActiveNodes();
                 for (let i = 0; i < spawners.length; i += 1) {
                     const spawner = spawners[i];
-                    // A claimed field keeps whatever is already lying in it, but grows
-                    // nothing new until the blight on it is dealt with.
+                    // A claimed field grows nothing new, and the blight sitting on it
+                    // eats through what is already there - see consumeClaimedNode.
                     if (spawner.claimedBy !== null) continue;
                     spawner.timer -= 1;
                     if (spawner.timer > 0) continue;
@@ -5747,7 +5767,8 @@
                     shotTargetX: x,
                     shotTargetY: y,
                     claimsSpawner: enemyType.claimsSpawner === true,
-                    claimTargetIndex: null
+                    claimTargetIndex: null,
+                    consumeCooldown: 0
                 };
             }
 
@@ -5775,6 +5796,35 @@
                     }
                 }
                 return spawner;
+            }
+
+            // A settled blight does not merely stop the field growing: it works through
+            // what is already standing in it, nearest first, so the meadow empties from
+            // the blight outwards.
+            function consumeClaimedNode(enemy, spawnerIndex) {
+                let bestNode = null;
+                let bestDistSq = Infinity;
+
+                for (const node of game.nodes) {
+                    if (!node.active || node.sourceSpawnerIndex !== spawnerIndex) continue;
+                    const dx = node.x - enemy.x;
+                    const dy = node.y - enemy.y;
+                    const distSq = dx * dx + dy * dy;
+                    if (distSq < bestDistSq) {
+                        bestDistSq = distSq;
+                        bestNode = node;
+                    }
+                }
+
+                if (!bestNode) return false;
+
+                bestNode.active = false;
+                // Reuse the shot beam the renderer already draws, so the drain is seen
+                // rather than the node just vanishing.
+                enemy.shotTargetX = bestNode.x;
+                enemy.shotTargetY = bestNode.y;
+                enemy.shotFlash = 8;
+                return true;
             }
 
             function claimersForWave(waveNumber) {
@@ -6058,7 +6108,18 @@
                     if (claimTarget && claimTarget.claimedBy === null
                         && distanceSq(enemy, claimTarget) <= CLAIM_RADIUS * CLAIM_RADIUS) {
                         claimTarget.claimedBy = enemy.id;
+                        // A full interval before the first node goes, so arriving and
+                        // stripping the field are not the same moment.
+                        enemy.consumeCooldown = CLAIM_CONSUME_TICKS;
                         playTowerHitSfx(4);
+                    }
+
+                    if (claimTarget && claimTarget.claimedBy === enemy.id) {
+                        enemy.consumeCooldown -= 1;
+                        if (enemy.consumeCooldown <= 0) {
+                            enemy.consumeCooldown = CLAIM_CONSUME_TICKS;
+                            consumeClaimedNode(enemy, enemy.claimTargetIndex);
+                        }
                     }
 
                     const playerHitRadius = game.player.r + enemy.r;
