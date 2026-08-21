@@ -1409,6 +1409,11 @@
                                         <summary id="gathererFocusSummary" class="secondary shop-btn gatherer-focus-summary">Gatherer Focus</summary>
                                         <div id="gathererFocusList" class="gatherer-focus-list"></div>
                                     </details>
+                                    <button id="traderBtn" class="secondary shop-btn">Craft Trader</button>
+                                    <details id="traderRoutePanel" class="gatherer-focus-panel">
+                                        <summary id="traderRouteSummary" class="secondary shop-btn gatherer-focus-summary">Trade Routes</summary>
+                                        <div id="traderRouteList" class="gatherer-focus-list"></div>
+                                    </details>
                                     <button id="defenderBtn" class="secondary shop-btn">Craft Defender</button>
                                     <button id="minionSpeedBtn" class="secondary shop-btn">Minion Speed</button>
                                     <button id="minionCapBtn" class="secondary shop-btn">Minion Capacity</button>
@@ -1575,6 +1580,10 @@
             const gathererFocusPanelEl = document.getElementById("gathererFocusPanel");
             const gathererFocusSummaryEl = document.getElementById("gathererFocusSummary");
             const gathererFocusListEl = document.getElementById("gathererFocusList");
+            const traderBtn = document.getElementById("traderBtn");
+            const traderRoutePanelEl = document.getElementById("traderRoutePanel");
+            const traderRouteSummaryEl = document.getElementById("traderRouteSummary");
+            const traderRouteListEl = document.getElementById("traderRouteList");
             const defenderBtn = document.getElementById("defenderBtn");
             const minionSpeedBtn = document.getElementById("minionSpeedBtn");
             const minionHasteBtn = document.getElementById("minionHasteBtn");
@@ -1642,6 +1651,7 @@
                 "minionCapacity",
                 "gathererFocus",
                 "minionHaste",
+                "trader",
                 "minionArmor",
                 "minionArmor2",
                 "turret",
@@ -1667,6 +1677,7 @@
                 sniperTurret: { label: "Unlock Snipers", cost: { wood: 24, stone: 26 }, requires: ["turret"] },
                 slowTurret: { label: "Unlock Slow Field", cost: { crystal: 14, amber: 9, essence: 2 }, requires: ["sniperTurret"] },
                 turretCap: { label: "Unlock Turret Capacity", cost: { crystal: 18, amber: 10, essence: 3 }, requires: ["slowTurret"] },
+                trader: { label: "Unlock Traders", desc: "Caravans that carry bank goods to the village and trade them", cost: { wood: 60, stone: 60, crystal: 20, amber: 12 }, requires: ["gathererFocus"] },
                 minionHaste: { label: "Unlock Haste Spell", desc: "Cast to double every minion's pace for a minute", cost: { crystal: 40, amber: 24, aether: 4 }, requires: ["gathererFocus"] },
                 minionArmor2: { label: "Unlock Minion Plating", desc: "Doubles minion health again, 4x in total", cost: { stone: 180, crystal: 90, amber: 60, essence: 80 }, requires: ["minionArmor"] },
                 minionArmor: { label: "Unlock Minion Armor", desc: "Doubles the health of every gatherer and defender", cost: { stone: 90, crystal: 48, amber: 48 }, requires: ["defender"] },
@@ -1682,6 +1693,7 @@
                 bag: 2,
                 gatherer: 3,
                 gathererFocus: 5,
+                trader: 6,
                 minionHaste: 6,
                 minionArmor: 5,
                 minionArmor2: 6,
@@ -1705,6 +1717,7 @@
                 gatherer: "minionCore",
                 gathererFocus: "minionCore",
                 minionHaste: "minionCore",
+                trader: "trade",
                 defender: "defender",
                 minionArmor: "minionArmor",
                 minionArmor2: "minionArmor",
@@ -1724,6 +1737,7 @@
             const SKILL_TREE_STRAND_ANGLE_DEG = {
                 player: 270,
                 minionCore: 246,
+                trade: 300,
                 defender: 224,
                 minionArmor: 205,
                 minionCapacity: 272,
@@ -1746,6 +1760,8 @@
                 gatherer: "gatherer",
                 gathererFocus: "gathererFocus",
                 minionHaste: "minionHaste",
+                trader: "trader",
+                traderRoute: "trader",
                 defender: "defender",
                 minionSpeed: "minionSpeed",
                 minionCapacity: "minionCapacity"
@@ -1813,6 +1829,7 @@
                 hunter: { key: "hunter", color: "#8de969", stroke: "#2f5b22", r: E(9), hp: 2, speed: W(2.0) * ENEMY_SPEED_MULTIPLIER, damage: 3, shape: "circle", minionFocus: true, minionShotRange: W(72), minionShotCooldown: 16, laserColor: "#b8ff7f" },
                 // Walks past the tower without a glance: it wants a field, and once it
                 // has one that field stops producing until the blight is killed.
+                ghoul: { key: "ghoul", color: "#75855f", stroke: "#1e2616", r: E(11), hp: 3, speed: W(0.42) * ENEMY_SPEED_MULTIPLIER, damage: 0, shape: "circle", minionFocus: false, minionShotRange: 0, minionShotCooldown: 0, laserColor: "#c6e6a2", roams: true, melee: true },
                 blight: { key: "blight", color: "#a06bd8", stroke: "#331a4d", r: E(12), hp: 4, speed: W(1.45) * ENEMY_SPEED_MULTIPLIER, damage: 0, shape: "diamond", minionFocus: false, minionShotRange: 0, minionShotCooldown: 0, laserColor: "#c9a2ff", claimsSpawner: true }
             };
 
@@ -1838,9 +1855,34 @@
             // that ignoring one empties the meadow.
             const CLAIM_CONSUME_TICKS = 300;
 
+            // Ghouls answer to nothing but their own clock: a small horde crawls out
+            // every so often, drifts between the meadows, and mauls whatever minion it
+            // blunders into. They never go near the tower, so they are pressure on the
+            // economy rather than another push on the run.
+            const GHOUL_FIRST_TICKS = 1800;
+            const GHOUL_INTERVAL_TICKS = 3600;
+            const GHOUL_HORDE_MIN = 3;
+            const GHOUL_HORDE_MAX = 5;
+            // Kept low on purpose: ghouls camp the meadows, and gatherers have to stand
+            // still in a meadow to work. A standing infestation reads as an economy that
+            // simply stops, so a horde should be an event to answer, not weather.
+            const GHOUL_MAX_ALIVE = 6;
+            const GHOUL_SPAWN_DISTANCE = W(420);
+            const GHOUL_SPAWN_SCATTER = W(90);
+            const GHOUL_AGGRO_RADIUS = W(160);
+            const GHOUL_STRIKE_RANGE = W(18);
+            // A gatherer has 1 HP until Minion Armor, so every swing that lands kills
+            // one. The slow swing is what gives a minion time to wander back out of
+            // reach - a ghoul moves at a third of a minion's pace and cannot chase.
+            const GHOUL_ATTACK_COOLDOWN = 72;
+            const GHOUL_ROAM_JITTER = W(240);
+            const GHOUL_ROAM_DWELL_MIN = 60;
+            const GHOUL_ROAM_DWELL_MAX = 220;
+            const GHOUL_ESSENCE = 1;
+
             const tower = { x: -W(108) / 2, y: -W(88) / 2, w: W(108), h: W(88) };
             const TOWER_MAX_HP = 100;
-            const START_BUDGET = { wood: 40, stone: 30, crystal: 0, amber: 0, aether: 0, essence: 0 };
+            const START_BUDGET = { wood: 4000, stone: 3000, crystal: 1000, amber: 1000, aether: 1000, essence: 1000 };
             const START_WAVE_COUNT = 1;
             const WAVE_START_DELAY = 3600;
             const WAVE_BREAK_TICKS = 320;
@@ -1879,6 +1921,9 @@
             const MINION_HASTE_MULTIPLIER = 2;
             const MINION_HASTE_BASE_COST = 10;
             const DEFENDER_BASE_SPEED_BONUS = 0.45;
+            // A trader does nothing but cross the map. At a gatherer's pace the village
+            // round trip ran past three minutes, which no payout makes worth waiting for.
+            const TRADER_BASE_SPEED_BONUS = 1.5;
             const DEFENDER_CHASE_SPEED_BONUS = 0.75;
             const DEFENDER_REGEN_PER_TICK = 0.05;
             const DEFENDER_KILL_RECOIL_DAMAGE = 0.6;
@@ -1900,8 +1945,34 @@
                 2: W(1830),
                 // Tier 3 rides due north and south - the long haul, and the only ring
                 // whose reach is bounded by the map's height rather than its width.
-                3: W(3200)
+                3: W(3200),
+                // Tier 4 carries no resource field: the village is the only thing out
+                // this far, and the walk is the price of trading.
+                4: W(5200)
             };
+
+            // The village is deliberately not in `spawners`: it grows nothing, and a
+            // blight must never be able to claim it.
+            const VILLAGE_BEARING_DEG = -35;
+            const village = {
+                x: Math.cos((VILLAGE_BEARING_DEG * Math.PI) / 180) * SPAWNER_TIER_DISTANCE[4],
+                y: Math.sin((VILLAGE_BEARING_DEG * Math.PI) / 180) * SPAWNER_TIER_DISTANCE[4],
+                r: W(84)
+            };
+
+            // Curated routes rather than every pairing: each turns something you have in
+            // bulk into something further from the tower. The village keeps a cut, so no
+            // chain of trades can ever come out ahead of gathering.
+            const TRADE_ROUTES = [
+                { key: "wood-crystal", from: "wood", to: "crystal" },
+                { key: "stone-crystal", from: "stone", to: "crystal" },
+                { key: "wood-amber", from: "wood", to: "amber" },
+                { key: "stone-amber", from: "stone", to: "amber" },
+                { key: "crystal-aether", from: "crystal", to: "aether" },
+                { key: "amber-aether", from: "amber", to: "aether" }
+            ];
+            const TRADE_MARKUP = 0.7;
+            const TRADE_DWELL_TICKS = 90;
             const SPAWNER_LAYOUT = [
                 { type: "wood", tier: 1, angle: 180 },
                 { type: "stone", tier: 1, angle: 0 },
@@ -1973,6 +2044,8 @@
                 touchTarget: null,
                 placementPreview: null,
                 sellPulse: null,
+                villagePulse: 0,
+                ghoulTimer: GHOUL_FIRST_TICKS,
                 runOver: false,
                 runSummary: null,
                 // Essence is meta, so a run's haul is the difference from where it began.
@@ -2105,6 +2178,7 @@
                     bankAether: START_BUDGET.aether,
                     minions: 0,
                     defenderMinions: 0,
+                    traderMinions: 0,
                     minionSpeedLevel: 0,
                     minionCapacityLevel: 0,
                     globalMultiplierLevel: 0,
@@ -2123,7 +2197,8 @@
                     speedLevel: 0,
                     bagLevel: 0,
                     gathererFocusBySlot: {},
-                    gathererFocusCursor: 0
+                    gathererFocusCursor: 0,
+                    traderRouteBySlot: {}
                 };
             }
 
@@ -2153,6 +2228,9 @@
                     const gathererFocusBySlot = data.gathererFocusBySlot && typeof data.gathererFocusBySlot === "object"
                         ? data.gathererFocusBySlot
                         : {};
+                    const traderRouteBySlot = data.traderRouteBySlot && typeof data.traderRouteBySlot === "object"
+                        ? data.traderRouteBySlot
+                        : {};
                     const gathererFocusCursor = Number.isFinite(data.gathererFocusCursor)
                         ? Math.max(0, Math.floor(data.gathererFocusCursor))
                         : 0;
@@ -2175,6 +2253,7 @@
                         bankAether: Number.isFinite(data.bankAether) ? data.bankAether : fresh.bankAether,
                         minions: Number.isFinite(data.minions) ? data.minions : fresh.minions,
                         defenderMinions: Number.isFinite(data.defenderMinions) ? data.defenderMinions : fresh.defenderMinions,
+                        traderMinions: Number.isFinite(data.traderMinions) ? Math.max(0, Math.floor(data.traderMinions)) : fresh.traderMinions,
                         minionSpeedLevel: Number.isFinite(data.minionSpeedLevel) ? data.minionSpeedLevel : fresh.minionSpeedLevel,
                         minionCapacityLevel: Number.isFinite(data.minionCapacityLevel) ? data.minionCapacityLevel : fresh.minionCapacityLevel,
                         turretCapLevel,
@@ -2193,6 +2272,7 @@
                         bagLevel: Number.isFinite(data.bagLevel) ? data.bagLevel : fresh.bagLevel,
                         gathererFocusBySlot,
                         gathererFocusCursor,
+                        traderRouteBySlot,
                         unlockedSkills,
                         // Music starts off by default; only an explicit unmute in the save turns it on.
                         musicMuted: data.musicMuted !== false,
@@ -2592,6 +2672,7 @@
                     waveIntroPendingType: game.waveIntroPendingType,
                     towerHp: game.towerHp,
                     minionHasteTicks: game.minionHasteTicks,
+                    ghoulTimer: game.ghoulTimer,
                     runEssenceStart: game.runEssenceStart,
                     runBestAtStart: game.runBestAtStart,
                     player: {
@@ -2653,6 +2734,7 @@
                     ? Math.max(0, Math.floor(snapshot.minionHasteTicks))
                     : 0;
                 // A snapshot is always a run in progress - a finished one is cleared.
+                game.ghoulTimer = Number.isFinite(snapshot.ghoulTimer) ? Math.max(1, Math.floor(snapshot.ghoulTimer)) : GHOUL_FIRST_TICKS;
                 game.runEssenceStart = Number.isFinite(snapshot.runEssenceStart) ? Math.max(0, snapshot.runEssenceStart) : save.essence;
                 game.runBestAtStart = Number.isFinite(snapshot.runBestAtStart) ? Math.max(0, snapshot.runBestAtStart) : save.bestRunScore;
                 game.runOver = false;
@@ -2730,6 +2812,14 @@
                 return {
                     wood: 14 + save.minions * 8,
                     stone: 8 + save.minions * 6
+                };
+            }
+
+            function traderMinionRecipe() {
+                return {
+                    wood: 20 + save.traderMinions * 12,
+                    stone: 16 + save.traderMinions * 10,
+                    crystal: 6 + save.traderMinions * 4
                 };
             }
 
@@ -2912,6 +3002,81 @@
 
             function minionCarryCapacity() {
                 return 1 + save.minionCapacityLevel;
+            }
+
+            // A caravan load, not a pocketful: the walk to the village is far too long
+            // to be worth it one item at a time.
+            function traderCargoSize() {
+                return 24 + save.minionCapacityLevel * 6;
+            }
+
+            function tradeRouteByKey(key) {
+                for (const route of TRADE_ROUTES) {
+                    if (route.key === key) return route;
+                }
+                return TRADE_ROUTES[0];
+            }
+
+            function normalizedTradeRoute(key) {
+                return tradeRouteByKey(key).key;
+            }
+
+            function nextTradeRoute(key) {
+                const current = TRADE_ROUTES.findIndex((route) => route.key === key);
+                const safeIndex = current >= 0 ? current : 0;
+                return TRADE_ROUTES[(safeIndex + 1) % TRADE_ROUTES.length].key;
+            }
+
+            function tradeRouteLabel(key) {
+                const route = tradeRouteByKey(key);
+                const name = (type) => type.charAt(0).toUpperCase() + type.slice(1);
+                return `${name(route.from)} > ${name(route.to)}`;
+            }
+
+            // What a full load fetches. Value in, the village's cut off the top, value
+            // out - so every trade is a loss in raw worth and a gain in reach.
+            function tradePayoutFor(route, cargo) {
+                const inValue = cargo * materialConfig[route.from].value;
+                return Math.floor((inValue * TRADE_MARKUP) / materialConfig[route.to].value);
+            }
+
+            function traderMinionsSortedBySlot() {
+                return game.minionUnits
+                    .filter((minion) => minion && minion.role === "trader")
+                    .sort((a, b) => (a.slotIndex || 0) - (b.slotIndex || 0));
+            }
+
+            function traderRouteSummaryText() {
+                const traders = traderMinionsSortedBySlot();
+                return traders.length > 0 ? `Trade Routes (${traders.length})` : "Trade Routes";
+            }
+
+            function renderTraderRouteList() {
+                if (!traderRouteListEl) return;
+                const traders = traderMinionsSortedBySlot();
+                if (traders.length === 0) {
+                    if (traderRouteListEl.dataset.renderKey !== "empty") {
+                        traderRouteListEl.dataset.renderKey = "empty";
+                        traderRouteListEl.innerHTML = '<div class="gatherer-focus-empty">No traders to configure yet.</div>';
+                    }
+                    return;
+                }
+
+                const cargo = traderCargoSize();
+                const renderKey = traders
+                    .map((minion, index) => `${index}:${minion.slotIndex}:${normalizedTradeRoute(minion.tradeRoute)}:${cargo}`)
+                    .join("|");
+                if (traderRouteListEl.dataset.renderKey === renderKey) return;
+                traderRouteListEl.dataset.renderKey = renderKey;
+
+                traderRouteListEl.innerHTML = traders
+                    .map((minion, index) => {
+                        const slot = Number.isFinite(minion.slotIndex) ? minion.slotIndex : index;
+                        const route = tradeRouteByKey(normalizedTradeRoute(minion.tradeRoute));
+                        const payout = tradePayoutFor(route, cargo);
+                        return `<button class="secondary shop-btn gatherer-focus-row" data-trader-slot="${slot}"><span class="shop-btn-title"><span>Trader ${index + 1}</span><span class="shop-btn-level">${cargo} ${route.from} &gt; ${payout} ${route.to}</span></span></button>`;
+                    })
+                    .join("");
             }
 
             function gathererPriorityLabel(priority) {
@@ -3202,6 +3367,7 @@
                 const gathererUnlocked = canUseUpgrade("gatherer");
                 const gathererFocusUnlocked = canUseUpgrade("gathererFocus");
                 const defenderUnlocked = canUseUpgrade("defender");
+                const traderUnlocked = canUseUpgrade("trader");
                 const minionSpeedUnlocked = canUseUpgrade("minionSpeed");
                 const minionCapacityUnlocked = canUseUpgrade("minionCapacity");
                 const minionHasteUnlocked = canUseUpgrade("minionHaste");
@@ -3257,6 +3423,15 @@
                     }
                 }
                 renderGathererFocusList();
+                const traderRecipe = traderMinionRecipe();
+                setShopButtonContent(traderBtn, "Craft Trader", `Owned ${save.traderMinions}`, traderRecipe);
+                if (traderRouteSummaryEl) {
+                    const nextTraderSummary = traderRouteSummaryText();
+                    if (traderRouteSummaryEl.textContent !== nextTraderSummary) {
+                        traderRouteSummaryEl.textContent = nextTraderSummary;
+                    }
+                }
+                renderTraderRouteList();
                 const defenderRecipe = defenderMinionRecipe();
                 setShopButtonContent(defenderBtn, "Craft Defender", `Owned ${save.defenderMinions}`, defenderRecipe);
                 const minionSpeedCost = minionSpeedRecipe();
@@ -3285,6 +3460,8 @@
                 setButtonVisible(globalMultBtn, globalMultUnlocked);
                 setButtonVisible(craftBtn, gathererUnlocked);
                 setButtonVisible(gathererFocusPanelEl, gathererFocusUnlocked);
+                setButtonVisible(traderBtn, traderUnlocked);
+                setButtonVisible(traderRoutePanelEl, traderUnlocked);
                 setButtonVisible(defenderBtn, defenderUnlocked);
                 setButtonVisible(minionSpeedBtn, minionSpeedUnlocked);
                 setButtonVisible(minionCapBtn, minionCapacityUnlocked);
@@ -3308,6 +3485,7 @@
                 }
                 setButtonDisabled(globalMultBtn, !globalMultUnlocked);
                 setButtonDisabled(craftBtn, !gathererUnlocked);
+                setButtonDisabled(traderBtn, !traderUnlocked);
                 setButtonDisabled(defenderBtn, !defenderUnlocked);
                 setButtonDisabled(minionSpeedBtn, !minionSpeedUnlocked);
                 setButtonDisabled(minionCapBtn, !minionCapacityUnlocked);
@@ -4121,6 +4299,296 @@
                 }
             }
 
+            // The one place on the map that takes goods instead of giving them, so it
+            // is built like somewhere people live rather than another resource ring.
+            // Layout is deterministic and computed once: the huts must not shuffle
+            // between frames.
+            let villageLayout = null;
+
+            function getVillageLayout() {
+                if (villageLayout) return villageLayout;
+
+                const huts = [];
+                const hutCount = 6;
+                for (let i = 0; i < hutCount; i += 1) {
+                    const wobble = terrainNoise(7, i);
+                    const spread = terrainNoise(13, i);
+                    const size = terrainNoise(29, i);
+                    const angle = (i / hutCount) * Math.PI * 2 + (wobble - 0.5) * 0.55;
+                    const distance = village.r * (0.5 + spread * 0.2);
+                    huts.push({
+                        x: Math.cos(angle) * distance,
+                        y: Math.sin(angle) * distance,
+                        r: village.r * (0.15 + size * 0.06),
+                        facing: angle,
+                        emberPhase: spread * Math.PI * 2
+                    });
+                }
+
+                // The clearing is trodden earth, not a drawn circle: the same wobbled
+                // outline the resource fields use.
+                const rim = new Path2D();
+                const steps = 26;
+                const reachAt = (i) => village.r * (0.94 + terrainNoise(53, i % steps) * 0.13);
+                let previousAngle = ((steps - 1) / steps) * Math.PI * 2;
+                let previous = { x: Math.cos(previousAngle) * reachAt(steps - 1), y: Math.sin(previousAngle) * reachAt(steps - 1) };
+                const first = { x: Math.cos(0) * reachAt(0), y: Math.sin(0) * reachAt(0) };
+                rim.moveTo((previous.x + first.x) * 0.5, (previous.y + first.y) * 0.5);
+                for (let i = 0; i < steps; i += 1) {
+                    const angle = (i / steps) * Math.PI * 2;
+                    const nextAngle = ((i + 1) / steps) * Math.PI * 2;
+                    const current = { x: Math.cos(angle) * reachAt(i), y: Math.sin(angle) * reachAt(i) };
+                    const next = { x: Math.cos(nextAngle) * reachAt(i + 1), y: Math.sin(nextAngle) * reachAt(i + 1) };
+                    rim.quadraticCurveTo(current.x, current.y, (current.x + next.x) * 0.5, (current.y + next.y) * 0.5);
+                }
+                rim.closePath();
+
+                villageLayout = {
+                    huts,
+                    rim,
+                    // The village opens toward the tower, because that is the only
+                    // direction anyone ever arrives from.
+                    roadAngle: Math.atan2(TOWER_CENTER_Y - village.y, TOWER_CENTER_X - village.x)
+                };
+                return villageLayout;
+            }
+
+            // A house seen from directly above: a thatched gable, ridge running down
+            // its length, turned to face the square. Rectangles read as buildings at
+            // this size where circles only ever read as coins.
+            function drawVillageHut(targetCtx, hut, glow) {
+                const length = hut.r * 2.2;
+                const width = hut.r * 1.5;
+
+                targetCtx.save();
+                targetCtx.translate(hut.x, hut.y);
+                targetCtx.rotate(hut.facing + Math.PI / 2);
+
+                targetCtx.fillStyle = "rgba(8, 16, 26, 0.4)";
+                targetCtx.beginPath();
+                targetCtx.roundRect(-length * 0.5 + hut.r * 0.12, -width * 0.5 + hut.r * 0.16, length, width, hut.r * 0.3);
+                targetCtx.fill();
+
+                // Thatch, lit from the upper left like everything else on the map.
+                const roof = targetCtx.createLinearGradient(0, -width * 0.5, 0, width * 0.5);
+                roof.addColorStop(0, "#c9924f");
+                roof.addColorStop(0.5, "#8f5f2f");
+                roof.addColorStop(1, "#5d3c1d");
+                targetCtx.fillStyle = roof;
+                targetCtx.beginPath();
+                targetCtx.roundRect(-length * 0.5, -width * 0.5, length, width, hut.r * 0.26);
+                targetCtx.fill();
+
+                // Ridge beam along the top of the gable, and the two eave lines.
+                targetCtx.strokeStyle = "rgba(255, 226, 178, 0.5)";
+                targetCtx.lineWidth = Math.max(1, hut.r * 0.16);
+                targetCtx.beginPath();
+                targetCtx.moveTo(-length * 0.42, 0);
+                targetCtx.lineTo(length * 0.42, 0);
+                targetCtx.stroke();
+
+                targetCtx.strokeStyle = "rgba(44, 27, 12, 0.5)";
+                targetCtx.lineWidth = Math.max(0.6, hut.r * 0.07);
+                for (const side of [-1, 1]) {
+                    targetCtx.beginPath();
+                    targetCtx.moveTo(-length * 0.44, width * 0.32 * side);
+                    targetCtx.lineTo(length * 0.44, width * 0.32 * side);
+                    targetCtx.stroke();
+                }
+
+                targetCtx.strokeStyle = "rgba(38, 23, 10, 0.75)";
+                targetCtx.lineWidth = Math.max(1, hut.r * 0.1);
+                targetCtx.beginPath();
+                targetCtx.roundRect(-length * 0.5, -width * 0.5, length, width, hut.r * 0.26);
+                targetCtx.stroke();
+
+                // Chimney at one gable end, lit from the hearth inside.
+                targetCtx.shadowColor = "rgba(255, 190, 110, 0.8)";
+                targetCtx.shadowBlur = hut.r * (0.2 + glow * 0.3);
+                targetCtx.fillStyle = `rgba(255, 210, 146, ${0.55 + glow * 0.35})`;
+                targetCtx.beginPath();
+                targetCtx.arc(-length * 0.3, 0, hut.r * 0.16, 0, Math.PI * 2);
+                targetCtx.fill();
+                targetCtx.restore();
+            }
+
+            // Stalls around the fire: the only cool colour in the clearing, so the
+            // market square catches the eye before the houses do.
+            function drawVillageStall(targetCtx, x, y, angle, tint) {
+                const w = village.r * 0.3;
+                const h = village.r * 0.2;
+
+                targetCtx.save();
+                targetCtx.translate(x, y);
+                targetCtx.rotate(angle);
+
+                targetCtx.fillStyle = "rgba(8, 16, 26, 0.4)";
+                targetCtx.beginPath();
+                targetCtx.roundRect(-w * 0.5 + w * 0.08, -h * 0.5 + h * 0.12, w, h, h * 0.25);
+                targetCtx.fill();
+
+                targetCtx.fillStyle = "#f3e6cf";
+                targetCtx.beginPath();
+                targetCtx.roundRect(-w * 0.5, -h * 0.5, w, h, h * 0.25);
+                targetCtx.fill();
+
+                // Awning stripes.
+                targetCtx.save();
+                targetCtx.beginPath();
+                targetCtx.roundRect(-w * 0.5, -h * 0.5, w, h, h * 0.25);
+                targetCtx.clip();
+                targetCtx.fillStyle = tint;
+                for (let i = 0; i < 4; i += 1) {
+                    targetCtx.fillRect(-w * 0.5 + i * w * 0.25, -h * 0.5, w * 0.125, h);
+                }
+                targetCtx.restore();
+
+                targetCtx.strokeStyle = "rgba(38, 23, 10, 0.7)";
+                targetCtx.lineWidth = 1;
+                targetCtx.beginPath();
+                targetCtx.roundRect(-w * 0.5, -h * 0.5, w, h, h * 0.25);
+                targetCtx.stroke();
+                targetCtx.restore();
+            }
+
+            function drawVillage(targetCtx) {
+                const layout = getVillageLayout();
+                const cx = village.x;
+                const cy = village.y;
+                const R = village.r;
+                const breathe = 0.5 + 0.5 * Math.sin(game.dayTick * 0.05);
+                // A finished trade flares the hearth, so a caravan arriving is visible
+                // even when the camera is elsewhere in the clearing.
+                const trade = game.villagePulse > 0 ? game.villagePulse / 20 : 0;
+
+                targetCtx.save();
+                targetCtx.translate(cx, cy);
+
+                // The road home, tucked under the clearing so it reads as leading out.
+                targetCtx.save();
+                targetCtx.rotate(layout.roadAngle);
+                const road = targetCtx.createLinearGradient(0, 0, R * 2.6, 0);
+                road.addColorStop(0, "rgba(120, 92, 58, 0.5)");
+                road.addColorStop(1, "rgba(120, 92, 58, 0)");
+                targetCtx.fillStyle = road;
+                targetCtx.beginPath();
+                targetCtx.moveTo(0, -R * 0.3);
+                targetCtx.lineTo(R * 2.6, -R * 0.1);
+                targetCtx.lineTo(R * 2.6, R * 0.1);
+                targetCtx.lineTo(0, R * 0.3);
+                targetCtx.closePath();
+                targetCtx.fill();
+                targetCtx.restore();
+
+                targetCtx.fillStyle = "rgba(8, 16, 26, 0.34)";
+                targetCtx.beginPath();
+                targetCtx.ellipse(R * 0.06, R * 0.08, R * 1.1, R * 1.04, 0, 0, Math.PI * 2);
+                targetCtx.fill();
+
+                // Trodden earth.
+                const ground = targetCtx.createRadialGradient(-R * 0.25, -R * 0.3, R * 0.15, 0, 0, R * 1.1);
+                ground.addColorStop(0, "#6f5637");
+                ground.addColorStop(0.6, "#523f28");
+                ground.addColorStop(1, "#33281a");
+                targetCtx.fillStyle = ground;
+                targetCtx.fill(layout.rim);
+                targetCtx.strokeStyle = "rgba(36, 26, 15, 0.75)";
+                targetCtx.lineWidth = 2;
+                targetCtx.stroke(layout.rim);
+
+                // Hearth light pooling over the whole clearing.
+                const pool = targetCtx.createRadialGradient(0, 0, R * 0.1, 0, 0, R * 1.5);
+                pool.addColorStop(0, `rgba(255, 186, 110, ${0.2 + breathe * 0.06 + trade * 0.22})`);
+                pool.addColorStop(1, "rgba(255, 186, 110, 0)");
+                targetCtx.fillStyle = pool;
+                targetCtx.beginPath();
+                targetCtx.arc(0, 0, R * 1.5, 0, Math.PI * 2);
+                targetCtx.fill();
+
+                // Palisade: posts rather than a drawn ring.
+                for (let i = 0; i < 30; i += 1) {
+                    const angle = (i / 30) * Math.PI * 2;
+                    // Leave a gap where the road comes in.
+                    let delta = angle - layout.roadAngle;
+                    while (delta > Math.PI) delta -= Math.PI * 2;
+                    while (delta < -Math.PI) delta += Math.PI * 2;
+                    if (Math.abs(delta) < 0.34) continue;
+
+                    const postR = R * (0.99 + terrainNoise(91, i) * 0.05);
+                    targetCtx.save();
+                    targetCtx.translate(Math.cos(angle) * postR, Math.sin(angle) * postR);
+                    targetCtx.rotate(angle);
+                    targetCtx.fillStyle = "#7d5a35";
+                    targetCtx.beginPath();
+                    targetCtx.ellipse(0, 0, R * 0.035, R * 0.022, 0, 0, Math.PI * 2);
+                    targetCtx.fill();
+                    targetCtx.strokeStyle = "rgba(32, 21, 11, 0.8)";
+                    targetCtx.lineWidth = 1;
+                    targetCtx.stroke();
+                    targetCtx.restore();
+                }
+
+                for (const hut of layout.huts) {
+                    const flicker = 0.5 + 0.5 * Math.sin(game.dayTick * 0.09 + hut.emberPhase);
+                    drawVillageHut(targetCtx, hut, flicker * 0.6 + trade * 0.4);
+                }
+
+                for (let i = 0; i < 2; i += 1) {
+                    const angle = layout.roadAngle + Math.PI * (0.5 + i);
+                    drawVillageStall(
+                        targetCtx,
+                        Math.cos(angle) * R * 0.42,
+                        Math.sin(angle) * R * 0.42,
+                        angle + Math.PI / 2,
+                        i === 0 ? "#c8503f" : "#3f7fa8"
+                    );
+                }
+
+                // The market fire in the middle of the square, where the trading happens.
+                const fireR = R * 0.17;
+                targetCtx.fillStyle = "#4a3824";
+                targetCtx.beginPath();
+                targetCtx.arc(0, 0, fireR * 1.5, 0, Math.PI * 2);
+                targetCtx.fill();
+                targetCtx.strokeStyle = "#6d5637";
+                targetCtx.lineWidth = Math.max(1.5, fireR * 0.3);
+                targetCtx.beginPath();
+                targetCtx.arc(0, 0, fireR * 1.5, 0, Math.PI * 2);
+                targetCtx.stroke();
+
+                targetCtx.save();
+                targetCtx.shadowColor = "rgba(255, 176, 82, 0.95)";
+                targetCtx.shadowBlur = R * (0.3 + breathe * 0.16 + trade * 0.5);
+                const flame = targetCtx.createRadialGradient(0, 0, fireR * 0.1, 0, 0, fireR);
+                flame.addColorStop(0, "#fff3d2");
+                flame.addColorStop(0.5, `rgba(255, 190, 96, ${0.9 + trade * 0.1})`);
+                flame.addColorStop(1, "rgba(214, 108, 32, 0.55)");
+                targetCtx.fillStyle = flame;
+                targetCtx.beginPath();
+                targetCtx.arc(0, 0, fireR * (0.82 + breathe * 0.14 + trade * 0.2), 0, Math.PI * 2);
+                targetCtx.fill();
+                targetCtx.restore();
+
+                // Name plate, cut to the same pattern as the tower's.
+                const plateW = R * 0.66;
+                const plateH = R * 0.2;
+                const plateY = R * 1.16;
+                targetCtx.fillStyle = "#1d1508ee";
+                targetCtx.beginPath();
+                targetCtx.roundRect(-plateW * 0.5, plateY, plateW, plateH, plateH * 0.42);
+                targetCtx.fill();
+                targetCtx.strokeStyle = "rgba(255, 214, 160, 0.4)";
+                targetCtx.lineWidth = 1;
+                targetCtx.stroke();
+                targetCtx.fillStyle = "#ffd9b2";
+                targetCtx.font = `700 ${Math.max(9, Math.round(R * 0.14))}px Space Grotesk, sans-serif`;
+                targetCtx.textAlign = "center";
+                targetCtx.textBaseline = "middle";
+                targetCtx.fillText("VILLAGE", 0, plateY + plateH * 0.55);
+
+                targetCtx.restore();
+            }
+
             function drawSpawners(targetCtx) {
                 targetCtx.save();
                 targetCtx.lineWidth = 2;
@@ -4455,6 +4923,7 @@
                 drawSpawnTerrain(targetCtx);
                 drawClaimedFields(targetCtx);
                 drawSpawners(targetCtx);
+                drawVillage(targetCtx);
                 drawTower(targetCtx);
             }
 
@@ -4949,9 +5418,22 @@
                         nextSlot += 1;
                     }
 
-                    if (minion.role !== "defender") {
+                    const slotKey = Number.isFinite(minion.slotIndex) ? String(minion.slotIndex) : null;
+
+                    if (minion.role === "trader") {
+                        const savedRoute = slotKey && save.traderRouteBySlot
+                            ? save.traderRouteBySlot[slotKey]
+                            : undefined;
+                        minion.tradeRoute = normalizedTradeRoute(
+                            savedRoute !== undefined ? savedRoute : minion.tradeRoute
+                        );
+                        if (save.traderRouteBySlot && slotKey !== null && save.traderRouteBySlot[slotKey] === undefined) {
+                            save.traderRouteBySlot[slotKey] = minion.tradeRoute;
+                        }
+                    } else if (minion.role !== "defender") {
+                        // Anything unrecognised settles back to a gatherer, but a known
+                        // role must be left alone or crafting it would be undone here.
                         minion.role = "worker";
-                        const slotKey = Number.isFinite(minion.slotIndex) ? String(minion.slotIndex) : null;
                         const savedPriority = slotKey && save.gathererFocusBySlot
                             ? save.gathererFocusBySlot[slotKey]
                             : undefined;
@@ -5031,8 +5513,14 @@
                 return multiplier;
             }
 
+            function minionRoleSpeedBonus(role) {
+                if (role === "defender") return DEFENDER_BASE_SPEED_BONUS;
+                if (role === "trader") return TRADER_BASE_SPEED_BONUS;
+                return 0;
+            }
+
             function minionMaxHpFor(role) {
-                const base = role === "defender" ? 4 : 1;
+                const base = role === "defender" ? 4 : (role === "trader" ? 2 : 1);
                 return base * minionHealthMultiplier();
             }
 
@@ -5058,6 +5546,9 @@
                 const savedPriority = role === "worker" && save.gathererFocusBySlot
                     ? save.gathererFocusBySlot[String(resolvedSlot)]
                     : "auto";
+                const savedRoute = role === "trader" && save.traderRouteBySlot
+                    ? save.traderRouteBySlot[String(resolvedSlot)]
+                    : null;
                 const unit = {
                     id: game.nextMinionId,
                     slotIndex: resolvedSlot,
@@ -5080,7 +5571,9 @@
                     carryLoad: 0,
                     carry: { wood: 0, stone: 0, crystal: 0, amber: 0, aether: 0 },
                     gathererPriority: role === "worker" ? normalizedGathererPriority(savedPriority) : "auto",
-                    speed: minionMoveSpeed(resolvedSlot) + (role === "defender" ? DEFENDER_BASE_SPEED_BONUS : 0)
+                    tradeRoute: normalizedTradeRoute(savedRoute),
+                    tradeDwell: 0,
+                    speed: minionMoveSpeed(resolvedSlot) + minionRoleSpeedBonus(role)
                 };
 
                 game.nextMinionId += 1;
@@ -5354,13 +5847,33 @@
                 return true;
             }
 
+            // Every death used to be "defender, or else a gatherer", which quietly
+            // decremented the gatherer count when a trader died and left the trader
+            // count untouched.
+            function removeMinionAt(index) {
+                const minion = game.minionUnits[index];
+                if (!minion) return null;
+
+                game.minionUnits.splice(index, 1);
+                if (minion.role === "defender") {
+                    save.defenderMinions = Math.max(0, save.defenderMinions - 1);
+                } else if (minion.role === "trader") {
+                    save.traderMinions = Math.max(0, save.traderMinions - 1);
+                } else {
+                    save.minions = Math.max(0, save.minions - 1);
+                }
+                return minion;
+            }
+
             function syncMinionUnits(resetPositions = false) {
                 ensureMinionIdentityAndCounters();
 
                 let workerCount = 0;
                 let defenderCount = 0;
+                let traderCount = 0;
                 for (const minion of game.minionUnits) {
                     if (minion.role === "defender") defenderCount += 1;
+                    else if (minion.role === "trader") traderCount += 1;
                     else workerCount += 1;
                 }
 
@@ -5372,20 +5885,23 @@
                     game.minionUnits.push(createMinionUnit("defender"));
                     defenderCount += 1;
                 }
+                while (traderCount < save.traderMinions) {
+                    game.minionUnits.push(createMinionUnit("trader"));
+                    traderCount += 1;
+                }
 
-                let extraWorkers = Math.max(0, workerCount - save.minions);
-                let extraDefenders = Math.max(0, defenderCount - save.defenderMinions);
+                const surplus = {
+                    defender: Math.max(0, defenderCount - save.defenderMinions),
+                    trader: Math.max(0, traderCount - save.traderMinions),
+                    worker: Math.max(0, workerCount - save.minions)
+                };
                 for (let i = game.minionUnits.length - 1; i >= 0; i -= 1) {
-                    if (extraWorkers <= 0 && extraDefenders <= 0) break;
+                    if (surplus.defender <= 0 && surplus.trader <= 0 && surplus.worker <= 0) break;
                     const minion = game.minionUnits[i];
-                    if (minion.role === "defender" && extraDefenders > 0) {
+                    const key = minion.role === "defender" ? "defender" : (minion.role === "trader" ? "trader" : "worker");
+                    if (surplus[key] > 0) {
                         game.minionUnits.splice(i, 1);
-                        extraDefenders -= 1;
-                        continue;
-                    }
-                    if (minion.role !== "defender" && extraWorkers > 0) {
-                        game.minionUnits.splice(i, 1);
-                        extraWorkers -= 1;
+                        surplus[key] -= 1;
                     }
                 }
 
@@ -5396,7 +5912,7 @@
                     const slotIndex = Number.isFinite(minion.slotIndex) ? minion.slotIndex : i;
                     const home = minionTowerPoint(slotIndex);
 
-                    minion.speed = minionMoveSpeed(slotIndex) + (minion.role === "defender" ? DEFENDER_BASE_SPEED_BONUS : 0);
+                    minion.speed = minionMoveSpeed(slotIndex) + minionRoleSpeedBonus(minion.role);
                     if (resetPositions) {
                         minion.x = home.x;
                         minion.y = home.y;
@@ -5428,6 +5944,10 @@
             function resetSession() {
                 clearRuntimeSnapshot();
                 clearSpawnerClaims();
+                // Drop the old run's units before anything syncs: they carry per-slot
+                // config that would otherwise be written straight back into the fresh
+                // save by ensureMinionIdentityAndCounters, leaking across runs.
+                game.minionUnits = [];
                 game.runOver = false;
                 game.runSummary = null;
                 game.runEssenceStart = save.essence;
@@ -5454,6 +5974,7 @@
                 game.waveIntroPendingType = null;
                 game.towerHp = TOWER_MAX_HP;
                 game.minionHasteTicks = 0;
+                game.ghoulTimer = GHOUL_FIRST_TICKS;
                 game.enemies = [];
                 game.turrets = [];
                 game.pendingBasicTurretPlacements = 0;
@@ -5768,7 +6289,14 @@
                     shotTargetY: y,
                     claimsSpawner: enemyType.claimsSpawner === true,
                     claimTargetIndex: null,
-                    consumeCooldown: 0
+                    consumeCooldown: 0,
+                    roams: enemyType.roams === true,
+                    melee: enemyType.melee === true,
+                    meleeCooldown: 0,
+                    roamX: x,
+                    roamY: y,
+                    roamDwell: 0,
+                    meleeWindup: enemyType.melee === true
                 };
             }
 
@@ -5825,6 +6353,64 @@
                 enemy.shotTargetY = bestNode.y;
                 enemy.shotFlash = 8;
                 return true;
+            }
+
+            // Where a ghoul drifts next: usually the field it is already nearest, so a
+            // horde pools around the meadows, but now and then somewhere else entirely
+            // so they migrate instead of settling forever.
+            function pickGhoulRoamTarget(enemy) {
+                let spawner = null;
+                if (Math.random() < 0.8) {
+                    let bestDistSq = Infinity;
+                    for (const candidate of spawners) {
+                        const dx = candidate.x - enemy.x;
+                        const dy = candidate.y - enemy.y;
+                        const distSq = dx * dx + dy * dy;
+                        if (distSq < bestDistSq) {
+                            bestDistSq = distSq;
+                            spawner = candidate;
+                        }
+                    }
+                } else {
+                    spawner = spawners[Math.floor(Math.random() * spawners.length)];
+                }
+                if (!spawner) spawner = spawners[0];
+
+                enemy.roamX = clamp(spawner.x + random(-GHOUL_ROAM_JITTER, GHOUL_ROAM_JITTER), world.minX, world.maxX);
+                enemy.roamY = clamp(spawner.y + random(-GHOUL_ROAM_JITTER, GHOUL_ROAM_JITTER), world.minY, world.maxY);
+                enemy.roamDwell = Math.floor(random(GHOUL_ROAM_DWELL_MIN, GHOUL_ROAM_DWELL_MAX + 1));
+            }
+
+            function countGhouls() {
+                let ghouls = 0;
+                for (const enemy of game.enemies) {
+                    if (enemy.roams) ghouls += 1;
+                }
+                return ghouls;
+            }
+
+            function spawnGhoulHorde() {
+                if (countGhouls() >= GHOUL_MAX_ALIVE) return;
+
+                // The horde crawls up together, out in the fields rather than at the
+                // map edge: they are far too slow to walk in from the rim.
+                const anchor = spawners[Math.floor(Math.random() * spawners.length)];
+                const bearing = Math.random() * Math.PI * 2;
+                const originX = anchor.x + Math.cos(bearing) * GHOUL_SPAWN_DISTANCE;
+                const originY = anchor.y + Math.sin(bearing) * GHOUL_SPAWN_DISTANCE;
+                const size = Math.floor(random(GHOUL_HORDE_MIN, GHOUL_HORDE_MAX + 1));
+
+                for (let i = 0; i < size; i += 1) {
+                    if (countGhouls() >= GHOUL_MAX_ALIVE) return;
+
+                    const enemy = spawnEnemyOfType("ghoul");
+                    enemy.x = clamp(originX + random(-GHOUL_SPAWN_SCATTER, GHOUL_SPAWN_SCATTER), world.minX, world.maxX);
+                    enemy.y = clamp(originY + random(-GHOUL_SPAWN_SCATTER, GHOUL_SPAWN_SCATTER), world.minY, world.maxY);
+                    enemy.shotTargetX = enemy.x;
+                    enemy.shotTargetY = enemy.y;
+                    pickGhoulRoamTarget(enemy);
+                    game.enemies.push(enemy);
+                }
             }
 
             function claimersForWave(waveNumber) {
@@ -5969,6 +6555,7 @@
                 if (!enemy) return 0;
                 if (enemy.type === "boss") return 8;
                 if (enemy.claimsSpawner) return CLAIM_ESSENCE;
+                if (enemy.roams) return GHOUL_ESSENCE;
                 if (enemy.type === "hunter") return 2;
                 return 1;
             }
@@ -6056,6 +6643,12 @@
             }
 
             function updateEnemies() {
+                game.ghoulTimer -= 1;
+                if (game.ghoulTimer <= 0) {
+                    game.ghoulTimer = GHOUL_INTERVAL_TICKS;
+                    spawnGhoulHorde();
+                }
+
                 if (!game.waveInProgress) {
                     game.waveBreakTimer -= 1;
                     if (game.waveBreakTimer <= 0) {
@@ -6089,6 +6682,24 @@
                     if (claimTarget) {
                         moveTargetX = claimTarget.x;
                         moveTargetY = claimTarget.y;
+                    } else if (enemy.roams) {
+                        const preyIndex = findClosestMinionIndexFrom(enemy.x, enemy.y, GHOUL_AGGRO_RADIUS);
+                        if (preyIndex !== -1) {
+                            const prey = game.minionUnits[preyIndex];
+                            moveTargetX = prey.x;
+                            moveTargetY = prey.y;
+                        } else {
+                            // Nothing worth chasing: drift on toward a meadow, pausing
+                            // when it gets there so the horde loiters instead of orbiting.
+                            const dx = enemy.roamX - enemy.x;
+                            const dy = enemy.roamY - enemy.y;
+                            if (dx * dx + dy * dy <= GHOUL_STRIKE_RANGE * GHOUL_STRIKE_RANGE) {
+                                enemy.roamDwell -= 1;
+                                if (enemy.roamDwell <= 0) pickGhoulRoamTarget(enemy);
+                            }
+                            moveTargetX = enemy.roamX;
+                            moveTargetY = enemy.roamY;
+                        }
                     } else if (enemy.minionFocus && game.minionUnits.length > 0) {
                         const minionIndex = findClosestMinionIndexFrom(enemy.x, enemy.y, world.w + world.h);
                         if (minionIndex !== -1) {
@@ -6141,6 +6752,32 @@
                         }
                     }
 
+                    if (enemy.melee) {
+                        if (enemy.meleeCooldown > 0) enemy.meleeCooldown -= 1;
+
+                        const struckIndex = findClosestMinionIndexFrom(enemy.x, enemy.y, GHOUL_STRIKE_RANGE + enemy.r);
+                        // The first swing after crawling out costs a full wind-up too,
+                        // so brushing past a fresh horde is not instant death.
+                        if (struckIndex !== -1 && enemy.meleeWindup) {
+                            enemy.meleeWindup = false;
+                            enemy.meleeCooldown = GHOUL_ATTACK_COOLDOWN;
+                        } else if (struckIndex !== -1 && enemy.meleeCooldown <= 0) {
+                            const struck = game.minionUnits[struckIndex];
+                            enemy.meleeCooldown = GHOUL_ATTACK_COOLDOWN;
+                            enemy.shotFlash = 6;
+                            enemy.shotTargetX = struck.x;
+                            enemy.shotTargetY = struck.y;
+                            struck.hp = Math.max(0, (Number.isFinite(struck.hp) ? struck.hp : 1) - 1);
+                            struck.hitFlash = 8;
+
+                            if (struck.hp <= 0) {
+                                removeMinionAt(struckIndex);
+                                syncMinionUnits(false);
+                                saveGame();
+                            }
+                        }
+                    }
+
                     const canAttackMinions = enemy.type === "hunter" || enemy.type === "boss";
                     if (canAttackMinions && enemy.minionShotCooldown > 0) {
                         enemy.minionShotCooldown -= 1;
@@ -6159,12 +6796,7 @@
                             minion.hitFlash = 6;
 
                             if (minion.hp <= 0) {
-                                game.minionUnits.splice(minionIndex, 1);
-                                if (minion.role === "defender") {
-                                    save.defenderMinions = Math.max(0, save.defenderMinions - 1);
-                                } else {
-                                    save.minions = Math.max(0, save.minions - 1);
-                                }
+                                removeMinionAt(minionIndex);
                                 syncMinionUnits(false);
                                 if (enemy.minionFocus) {
                                     enemy.ticksSinceMinionKill = 0;
@@ -6176,7 +6808,7 @@
                         }
                     }
 
-                    const hitTower = !enemy.claimsSpawner
+                    const hitTower = !enemy.claimsSpawner && !enemy.roams
                         && enemy.x > tower.x && enemy.x < tower.x + tower.w
                         && enemy.y > tower.y && enemy.y < tower.y + tower.h;
                     if (hitTower) {
@@ -6427,6 +7059,65 @@
                         continue;
                     }
 
+                    if (minion.role === "trader") {
+                        // Loading happens at the tower, so the route can be re-pointed at
+                        // any time without stranding a caravan that is already loaded:
+                        // tradeCarryRoute is the deal it actually left with.
+                        const route = tradeRouteByKey(normalizedTradeRoute(minion.tradeRoute));
+
+                        if (minion.state === "toVillage") {
+                            const reached = moveEntityTowards(minion, village.x, village.y, minionTravelSpeed(minion));
+                            if (reached) {
+                                if (minion.tradeDwell > 0) {
+                                    minion.tradeDwell -= 1;
+                                } else {
+                                    const deal = tradeRouteByKey(minion.tradeCarryRoute || route.key);
+                                    const payout = tradePayoutFor(deal, minion.carryLoad);
+                                    minion.carry[deal.from] = 0;
+                                    minion.carry[deal.to] = payout;
+                                    minion.carryType = deal.to;
+                                    minion.carryLoad = payout;
+                                    minion.state = "toTower";
+                                    game.villagePulse = 20;
+                                }
+                            }
+                            continue;
+                        }
+
+                        if (minion.state === "toTower") {
+                            const reached = moveEntityTowards(minion, home.x, home.y, minionTravelSpeed(minion));
+                            if (reached) {
+                                if (minion.carryLoad > 0 && minion.carryType) {
+                                    refundBankForCost({ [minion.carryType]: minion.carryLoad });
+                                    game.minionPulse = Math.min(999, game.minionPulse + minion.carryLoad);
+                                }
+                                // No progress is scored here: what came back was bought
+                                // with resources already counted when they were gathered,
+                                // and the village took a cut on the way through.
+                                minion.carry[minion.carryType] = 0;
+                                minion.carryType = null;
+                                minion.carryLoad = 0;
+                                minion.tradeCarryRoute = null;
+                                minion.state = "idle";
+                            }
+                            continue;
+                        }
+
+                        // Idle: wait at the tower until the bank can cover a whole run.
+                        moveEntityTowards(minion, home.x, home.y, minionTravelSpeed(minion));
+                        const cargo = traderCargoSize();
+                        if (bankAmount(route.from) >= cargo && tradePayoutFor(route, cargo) > 0) {
+                            spendBankForCost({ [route.from]: cargo });
+                            minion.carry[route.from] = cargo;
+                            minion.carryType = route.from;
+                            minion.carryLoad = cargo;
+                            minion.tradeCarryRoute = route.key;
+                            minion.tradeDwell = TRADE_DWELL_TICKS;
+                            minion.state = "toVillage";
+                        }
+                        continue;
+                    }
+
                     if (minion.state === "idle") {
                         const preferredType = minion.carryLoad > 0 ? minion.carryType : gathererPreferredTypeFor(minion);
                         let nodeIndex = pickClosestActiveNodeIndex(minion, preferredType);
@@ -6567,6 +7258,7 @@
                 if (game.sellPulse && game.sellPulse.ticks > 0) {
                     game.sellPulse.ticks -= 1;
                 }
+                if (game.villagePulse > 0) game.villagePulse -= 1;
                 if (game.dayTick % 15 === 0) syncMusicMood();
                 if (game.dayTick % 120 === 0) {
                     captureRuntimeSnapshot();
@@ -6590,7 +7282,35 @@
 
                 for (let i = 0; i < game.minionUnits.length; i += 1) {
                     const minion = game.minionUnits[i];
-                    if (minion.role === "defender") {
+                    if (minion.role === "trader") {
+                        ctx.save();
+                        ctx.shadowColor = minion.hitFlash > 0 ? "#ffd7c8dd" : "#ffd88aaa";
+                        ctx.shadowBlur = 10;
+                        ctx.fillStyle = minion.hitFlash > 0 ? "#fff0d0" : "#ffd88a";
+                        drawDiamond(minion.x, minion.y, 8, minion.hitFlash > 0 ? "#fff0d0" : "#ffd88a");
+                        ctx.shadowBlur = 0;
+                        ctx.strokeStyle = "#5a4020";
+                        ctx.lineWidth = 2;
+                        ctx.beginPath();
+                        ctx.moveTo(minion.x, minion.y - 8);
+                        ctx.lineTo(minion.x + 8, minion.y);
+                        ctx.lineTo(minion.x, minion.y + 8);
+                        ctx.lineTo(minion.x - 8, minion.y);
+                        ctx.closePath();
+                        ctx.stroke();
+                        ctx.restore();
+
+                        if (minion.carryType && minion.carryLoad > 0) {
+                            ctx.fillStyle = materialConfig[minion.carryType].color;
+                            ctx.beginPath();
+                            ctx.arc(minion.x, minion.y - 12, 4, 0, Math.PI * 2);
+                            ctx.fill();
+                            ctx.fillStyle = "#f4f8ff";
+                            ctx.font = "700 10px Space Grotesk, sans-serif";
+                            ctx.textAlign = "left";
+                            ctx.fillText(String(minion.carryLoad), minion.x + 7, minion.y - 9);
+                        }
+                    } else if (minion.role === "defender") {
                         ctx.save();
                         ctx.shadowColor = minion.hitFlash > 0 ? "#ffd1c0dd" : "#ffb08aaa";
                         ctx.shadowBlur = minion.attackFlash > 0 ? 16 : 10;
@@ -6690,6 +7410,14 @@
                     } else {
                         ctx.beginPath();
                         ctx.arc(enemy.x, enemy.y, visualR, 0, Math.PI * 2);
+                        ctx.fill();
+                    }
+                    if (enemy.roams) {
+                        // Sunken middle: dull and hollow, not another glowing runner.
+                        ctx.shadowBlur = 0;
+                        ctx.fillStyle = "#1e2616bb";
+                        ctx.beginPath();
+                        ctx.arc(enemy.x, enemy.y, visualR * 0.46, 0, Math.PI * 2);
                         ctx.fill();
                     }
                     ctx.shadowBlur = 0;
@@ -7828,6 +8556,39 @@
                 if (selectedIndex >= 0) {
                     save.gathererFocusCursor = selectedIndex;
                 }
+                saveGame();
+                refreshHud();
+            });
+
+            traderBtn.addEventListener("click", () => {
+                if (!canUseUpgrade("trader")) return;
+                const recipe = traderMinionRecipe();
+                if (!hasBankForCost(recipe)) return;
+
+                spendBankForCost(recipe);
+                save.traderMinions += 1;
+                syncMinionUnits(false);
+                saveGame();
+                refreshHud();
+            });
+
+            traderRouteListEl.addEventListener("click", (event) => {
+                if (!canUseUpgrade("trader")) return;
+                const rowBtn = event.target.closest("button[data-trader-slot]");
+                if (!rowBtn) return;
+
+                const slot = Number.parseInt(rowBtn.dataset.traderSlot, 10);
+                if (!Number.isFinite(slot)) return;
+
+                const selected = traderMinionsSortedBySlot().find((minion) => minion.slotIndex === slot);
+                if (!selected) return;
+
+                const nextRoute = nextTradeRoute(normalizedTradeRoute(selected.tradeRoute));
+                selected.tradeRoute = nextRoute;
+                if (!save.traderRouteBySlot || typeof save.traderRouteBySlot !== "object") {
+                    save.traderRouteBySlot = {};
+                }
+                save.traderRouteBySlot[String(slot)] = nextRoute;
                 saveGame();
                 refreshHud();
             });
