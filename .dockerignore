@@ -1,0 +1,6 @@
+.git
+.gitignore
+server/target
+server/data
+README.md
+server/README.md

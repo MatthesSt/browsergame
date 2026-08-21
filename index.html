@@ -247,32 +247,46 @@
             border: 1px solid #355272;
             box-shadow: 0 8px 20px #02060d88;
             transition: transform 160ms ease, opacity 160ms ease;
+            display: flex;
+            flex-direction: column;
+            min-height: 0;
+            overflow: hidden;
+        }
+
+        /* The tab bar stays put; only the active pane scrolls. */
+        .shop-pane {
+            flex: 1;
+            min-height: 0;
             overflow-y: auto;
             scrollbar-gutter: stable;
             scrollbar-width: thin;
             scrollbar-color: #6b8fb4 #102033;
         }
 
-        .shop::-webkit-scrollbar,
+        .shop-pane[hidden] {
+            display: none;
+        }
+
+        .shop-pane::-webkit-scrollbar,
         .hud-bar.overlay::-webkit-scrollbar {
             width: 10px;
             height: 10px;
         }
 
-        .shop::-webkit-scrollbar-track,
+        .shop-pane::-webkit-scrollbar-track,
         .hud-bar.overlay::-webkit-scrollbar-track {
             background: linear-gradient(180deg, #102033, #14273d);
             border-radius: 999px;
         }
 
-        .shop::-webkit-scrollbar-thumb,
+        .shop-pane::-webkit-scrollbar-thumb,
         .hud-bar.overlay::-webkit-scrollbar-thumb {
             background: linear-gradient(180deg, #52779d, #3c6186);
             border-radius: 999px;
             border: 2px solid #102033;
         }
 
-        .shop::-webkit-scrollbar-thumb:hover,
+        .shop-pane::-webkit-scrollbar-thumb:hover,
         .hud-bar.overlay::-webkit-scrollbar-thumb:hover {
             background: linear-gradient(180deg, #6f96bd, #4f779f);
         }
@@ -282,10 +296,39 @@
             scrollbar-color: #6b8fb4 #102033;
         }
 
-        .shop h2 {
-            font-size: 0.96rem;
-            letter-spacing: 0.08em;
+        .shop-tabs {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 6px;
+            flex: none;
             margin-bottom: 10px;
+            padding: 4px;
+            border-radius: 12px;
+            border: 1px solid #355272;
+            background: #0e1e30;
+        }
+
+        .shop-tabs .shop-tab {
+            border: 1px solid transparent;
+            border-radius: 9px;
+            padding: 7px 6px;
+            background: transparent;
+            color: #9fb6cc;
+            font-size: 0.86rem;
+            font-weight: 700;
+            letter-spacing: 0.06em;
+        }
+
+        .shop-tabs .shop-tab:hover {
+            transform: none;
+            background: #16304a;
+            color: #eaf4ff;
+        }
+
+        .shop-tabs .shop-tab.active {
+            background: linear-gradient(160deg, #1d3a58, #16304a);
+            border-color: #4a7099;
+            color: #eaf4ff;
         }
 
         .shop-groups {
@@ -451,22 +494,18 @@
             display: none;
         }
 
-        .popover-card.leaderboard-card {
-            width: min(94vw, 760px);
-            height: min(88vh, 760px);
-            max-height: min(88vh, 760px);
-        }
-
         .leaderboard-identity {
             display: flex;
             align-items: center;
             gap: 8px;
+            margin-bottom: 10px;
             font-size: 0.78rem;
             color: #b8d4eb;
         }
 
         .leaderboard-identity input {
-            width: 168px;
+            flex: 1;
+            min-width: 0;
             padding: 6px 9px;
             border-radius: 8px;
             border: 1px solid #34506e;
@@ -477,6 +516,8 @@
         }
 
         .leaderboard-status {
+            flex: none;
+            white-space: nowrap;
             padding: 3px 8px;
             border-radius: 999px;
             border: 1px solid #34506e;
@@ -497,21 +538,16 @@
             color: #ff9f9f;
         }
 
-        .leaderboard-body {
-            overflow: auto;
-            padding-right: 4px;
-        }
-
         .leaderboard-table {
             width: 100%;
             border-collapse: collapse;
-            font-size: 0.86rem;
+            font-size: 0.82rem;
         }
 
         .leaderboard-table th {
             position: sticky;
             top: 0;
-            background: #13273d;
+            background: #132437;
             text-align: left;
             font-size: 0.72rem;
             letter-spacing: 0.06em;
@@ -522,8 +558,13 @@
         }
 
         .leaderboard-table td {
-            padding: 7px 8px;
+            padding: 6px 8px;
             border-bottom: 1px solid #1d3450;
+        }
+
+        /* Long names wrap instead of pushing the numbers off the narrow panel. */
+        .leaderboard-table .name {
+            overflow-wrap: anywhere;
         }
 
         .leaderboard-table .rank,
@@ -543,10 +584,20 @@
             color: #ffe7a8;
         }
 
-        .leaderboard-empty {
-            margin: 14px 4px;
+        .leaderboard-empty,
+        .leaderboard-offline-note {
+            margin: 12px 2px;
             color: #9fb6cc;
-            font-size: 0.86rem;
+            font-size: 0.8rem;
+            line-height: 1.4;
+        }
+
+        .leaderboard-offline-note {
+            padding: 8px 10px;
+            border-radius: 10px;
+            border: 1px solid #7d3a3a;
+            background: #2a1a1f66;
+            color: #ffbdbd;
         }
 
         /* Qualified with .popover-card so it wins over the full-screen sizing that
@@ -1279,7 +1330,6 @@
             </div>
             <div class="controls">
                 <button id="openSkillTreeBtn" class="secondary icon-title-btn" title="Open Skill Tree"><span class="ico skill" aria-hidden="true"></span><span>Skill Tree</span></button>
-                <button id="openLeaderboardBtn" class="secondary icon-title-btn" title="Open Leaderboard"><span class="ico best" aria-hidden="true"></span><span>Leaderboard</span></button>
                 <button id="resetBtn" class="secondary">Reset Save</button>
             </div>
         </section>
@@ -1290,52 +1340,72 @@
             </div>
             <div class="shop-dock">
                 <aside class="shop" aria-label="Shop panel">
-                    <h2>FIELD SHOP</h2>
-                    <div class="shop-groups">
-                        <details class="shop-group player" open>
-                            <summary class="shop-group-title">Player</summary>
-                            <div class="shop-controls">
-                                <button id="speedBtn" class="secondary shop-btn">Upgrade Speed</button>
-                                <button id="bagBtn" class="secondary shop-btn">Upgrade Bag</button>
-                            </div>
-                        </details>
+                    <div class="shop-tabs" role="tablist" aria-label="Shop panel sections">
+                        <button id="shopTabShopBtn" class="shop-tab active" role="tab" aria-selected="true" aria-controls="shopPane">Field Shop</button>
+                        <button id="shopTabLeaderboardBtn" class="shop-tab" role="tab" aria-selected="false" aria-controls="leaderboardPane">Leaderboard</button>
+                    </div>
+                    <div id="shopPane" class="shop-pane" role="tabpanel" aria-labelledby="shopTabShopBtn">
+                        <div class="shop-groups">
+                            <details class="shop-group player" open>
+                                <summary class="shop-group-title">Player</summary>
+                                <div class="shop-controls">
+                                    <button id="speedBtn" class="secondary shop-btn">Upgrade Speed</button>
+                                    <button id="bagBtn" class="secondary shop-btn">Upgrade Bag</button>
+                                </div>
+                            </details>
 
-                        <details class="shop-group economy" open>
-                            <summary class="shop-group-title">Economy</summary>
-                            <div class="shop-controls">
-                                <button id="spawnerWoodBtn" class="secondary shop-btn">Wood Spawner</button>
-                                <button id="spawnerStoneBtn" class="secondary shop-btn">Stone Spawner</button>
-                                <button id="spawnerCrystalBtn" class="secondary shop-btn">Crystal Spawner</button>
-                                <button id="spawnerAmberBtn" class="secondary shop-btn">Amber Spawner</button>
-                                <button id="globalMultBtn" class="secondary shop-btn">Global Multiplier</button>
-                            </div>
-                        </details>
+                            <details class="shop-group economy" open>
+                                <summary class="shop-group-title">Economy</summary>
+                                <div class="shop-controls">
+                                    <button id="spawnerWoodBtn" class="secondary shop-btn">Wood Spawner</button>
+                                    <button id="spawnerStoneBtn" class="secondary shop-btn">Stone Spawner</button>
+                                    <button id="spawnerCrystalBtn" class="secondary shop-btn">Crystal Spawner</button>
+                                    <button id="spawnerAmberBtn" class="secondary shop-btn">Amber Spawner</button>
+                                    <button id="globalMultBtn" class="secondary shop-btn">Global Multiplier</button>
+                                </div>
+                            </details>
 
-                        <details class="shop-group defense" open>
-                            <summary class="shop-group-title">Turrets <span id="turretGroupCount">0/15</span></summary>
-                            <div class="shop-controls">
-                                <button id="turretBtn" class="secondary shop-btn">Build Sentry</button>
-                                <button id="sniperTurretBtn" class="secondary shop-btn">Build Sniper</button>
-                                <button id="slowTurretBtn" class="secondary shop-btn">Build Slow Field</button>
-                                <button id="turretCapBtn" class="secondary shop-btn">Turret Capacity</button>
-                            </div>
-                        </details>
+                            <details class="shop-group defense" open>
+                                <summary class="shop-group-title">Turrets <span id="turretGroupCount">0/15</span></summary>
+                                <div class="shop-controls">
+                                    <button id="turretBtn" class="secondary shop-btn">Build Sentry</button>
+                                    <button id="sniperTurretBtn" class="secondary shop-btn">Build Sniper</button>
+                                    <button id="slowTurretBtn" class="secondary shop-btn">Build Slow Field</button>
+                                    <button id="turretCapBtn" class="secondary shop-btn">Turret Capacity</button>
+                                </div>
+                            </details>
 
-                        <details class="shop-group minions" open>
-                            <summary class="shop-group-title">Minions</summary>
-                            <div class="shop-controls">
-                                <button id="craftBtn" class="secondary shop-btn">Craft Gatherer</button>
-                                <details id="gathererFocusPanel" class="gatherer-focus-panel">
-                                    <summary id="gathererFocusSummary" class="secondary shop-btn gatherer-focus-summary">Gatherer Focus</summary>
-                                    <div id="gathererFocusList" class="gatherer-focus-list"></div>
-                                </details>
-                                <button id="defenderBtn" class="secondary shop-btn">Craft Defender</button>
-                                <button id="minionSpeedBtn" class="secondary shop-btn">Minion Speed</button>
-                                <button id="minionCapBtn" class="secondary shop-btn">Minion Capacity</button>
-                                <button id="minionHasteBtn" class="secondary shop-btn">Haste Spell</button>
-                            </div>
-                        </details>
+                            <details class="shop-group minions" open>
+                                <summary class="shop-group-title">Minions</summary>
+                                <div class="shop-controls">
+                                    <button id="craftBtn" class="secondary shop-btn">Craft Gatherer</button>
+                                    <details id="gathererFocusPanel" class="gatherer-focus-panel">
+                                        <summary id="gathererFocusSummary" class="secondary shop-btn gatherer-focus-summary">Gatherer Focus</summary>
+                                        <div id="gathererFocusList" class="gatherer-focus-list"></div>
+                                    </details>
+                                    <button id="defenderBtn" class="secondary shop-btn">Craft Defender</button>
+                                    <button id="minionSpeedBtn" class="secondary shop-btn">Minion Speed</button>
+                                    <button id="minionCapBtn" class="secondary shop-btn">Minion Capacity</button>
+                                    <button id="minionHasteBtn" class="secondary shop-btn">Haste Spell</button>
+                                </div>
+                            </details>
 
+                        </div>
+                    </div>
+                    <div id="leaderboardPane" class="shop-pane" role="tabpanel" aria-labelledby="shopTabLeaderboardBtn" hidden>
+                        <div class="leaderboard-identity">
+                            <label for="leaderboardName">Name</label>
+                            <input id="leaderboardName" type="text" maxlength="24" autocomplete="off" spellcheck="false" placeholder="Wanderer">
+                            <span id="leaderboardStatus" class="leaderboard-status offline">offline-mode</span>
+                        </div>
+                        <table class="leaderboard-table">
+                            <thead>
+                                <tr><th class="rank">#</th><th class="name">Name</th><th class="score">Best</th><th class="wave">Wave</th></tr>
+                            </thead>
+                            <tbody id="leaderboardRows"></tbody>
+                        </table>
+                        <p id="leaderboardEmpty" class="leaderboard-empty">Nothing banked yet - deposit some progress and the board is yours.</p>
+                        <p id="leaderboardOfflineNote" class="leaderboard-offline-note" hidden>Offline-mode: no leaderboard server reachable, so this is your own run only.</p>
                     </div>
                 </aside>
             </div>
@@ -1382,31 +1452,6 @@
         <span id="undoToastText">Save reset.</span>
         <button id="undoResetBtn" class="secondary">Undo</button>
         <button id="dismissUndoBtn" class="secondary subtle">Dismiss</button>
-    </div>
-
-    <div id="leaderboardPopover" class="popover-backdrop" aria-hidden="true">
-        <div class="popover-card leaderboard-card" role="dialog" aria-modal="true" aria-label="Leaderboard">
-            <div class="popover-head">
-                <h3>LEADERBOARD</h3>
-                <div class="leaderboard-identity">
-                    <label for="leaderboardName">Name</label>
-                    <input id="leaderboardName" type="text" maxlength="24" autocomplete="off" spellcheck="false" placeholder="Wanderer">
-                    <span id="leaderboardStatus" class="leaderboard-status offline">offline</span>
-                </div>
-                <div class="popover-head-actions">
-                    <button id="closeLeaderboardBtn" class="secondary">Close</button>
-                </div>
-            </div>
-            <div class="leaderboard-body">
-                <table class="leaderboard-table">
-                    <thead>
-                        <tr><th class="rank">#</th><th class="name">Name</th><th class="score">Best</th><th class="wave">Wave</th></tr>
-                    </thead>
-                    <tbody id="leaderboardRows"></tbody>
-                </table>
-                <p id="leaderboardEmpty" class="leaderboard-empty">Nothing banked yet - deposit some progress and the board is yours.</p>
-            </div>
-        </div>
     </div>
 
     <script src="leaderboard-client.js"></script>
@@ -1501,11 +1546,13 @@
             const musicVolumeValueEl = document.getElementById("musicVolumeValue");
             const openSkillTreeBtn = document.getElementById("openSkillTreeBtn");
             const closeSkillTreeBtn = document.getElementById("closeSkillTreeBtn");
-            const openLeaderboardBtn = document.getElementById("openLeaderboardBtn");
-            const closeLeaderboardBtn = document.getElementById("closeLeaderboardBtn");
-            const leaderboardPopoverEl = document.getElementById("leaderboardPopover");
+            const shopTabShopBtn = document.getElementById("shopTabShopBtn");
+            const shopTabLeaderboardBtn = document.getElementById("shopTabLeaderboardBtn");
+            const shopPaneEl = document.getElementById("shopPane");
+            const leaderboardPaneEl = document.getElementById("leaderboardPane");
             const leaderboardRowsEl = document.getElementById("leaderboardRows");
             const leaderboardEmptyEl = document.getElementById("leaderboardEmpty");
+            const leaderboardOfflineNoteEl = document.getElementById("leaderboardOfflineNote");
             const leaderboardNameEl = document.getElementById("leaderboardName");
             const leaderboardStatusEl = document.getElementById("leaderboardStatus");
             const skillTreeZoomOutBtn = document.getElementById("skillTreeZoomOutBtn");
@@ -1718,7 +1765,7 @@
 
             const tower = { x: -W(108) / 2, y: -W(88) / 2, w: W(108), h: W(88) };
             const TOWER_MAX_HP = 100;
-            const START_BUDGET = { wood: 4000, stone: 3000, crystal: 100, amber: 100, aether: 100, essence: 100 };
+            const START_BUDGET = { wood: 40, stone: 30, crystal: 0, amber: 0, aether: 0, essence: 0 };
             const START_WAVE_COUNT = 1;
             const WAVE_START_DELAY = 3600;
             const WAVE_BREAK_TICKS = 320;
@@ -4251,12 +4298,14 @@
             const LEADERBOARD_MIN_REPORT_GAP_MS = 5000;
             let lastReportedScore = -1;
             let lastReportAt = 0;
-            let resumeAfterLeaderboardClose = false;
+            let leaderboardOnline = false;
 
             // Only ever sends a new personal best, and never more than once every few
             // seconds - the server keeps the best anyway, so there is nothing to gain
             // from chattier reporting.
             function reportScore(force = false) {
+                // Offline the board shows this run, so it has to follow the run.
+                if (!leaderboardOnline && isLeaderboardTabActive()) renderOfflineLeaderboard();
                 if (!leaderboard) return;
                 const score = Math.max(0, Math.floor(save.bestStored));
                 if (score <= 0) return;
@@ -4270,72 +4319,87 @@
                 leaderboard.submit(score, Math.max(0, game.waveNumber));
             }
 
+            function leaderboardRow(entry, isSelf) {
+                const row = document.createElement("tr");
+                if (isSelf) row.className = "self";
+
+                const cells = [
+                    { className: "rank", text: entry.rank ? String(entry.rank) : "-" },
+                    // textContent, never innerHTML: names come from other players.
+                    { className: "name", text: entry.name },
+                    { className: "score", text: convertNotation(entry.score) },
+                    { className: "wave", text: String(entry.wave || 0) }
+                ];
+                for (const cell of cells) {
+                    const td = document.createElement("td");
+                    td.className = cell.className;
+                    td.textContent = cell.text;
+                    row.appendChild(td);
+                }
+                return row;
+            }
+
             function renderLeaderboard(entries) {
                 if (!leaderboardRowsEl) return;
 
+                leaderboardOnline = true;
                 leaderboardRowsEl.textContent = "";
                 leaderboardEmptyEl.hidden = entries.length > 0;
+                leaderboardOfflineNoteEl.hidden = true;
 
                 for (const entry of entries) {
-                    const row = document.createElement("tr");
-                    if (leaderboard && entry.player_id === leaderboard.playerId) {
-                        row.className = "self";
-                    }
-
-                    const cells = [
-                        { className: "rank", text: String(entry.rank) },
-                        // textContent, never innerHTML: names come from other players.
-                        { className: "name", text: entry.name },
-                        { className: "score", text: convertNotation(entry.score) },
-                        { className: "wave", text: String(entry.wave || 0) }
-                    ];
-                    for (const cell of cells) {
-                        const td = document.createElement("td");
-                        td.className = cell.className;
-                        td.textContent = cell.text;
-                        row.appendChild(td);
-                    }
-                    leaderboardRowsEl.appendChild(row);
+                    const isSelf = !!leaderboard && entry.player_id === leaderboard.playerId;
+                    leaderboardRowsEl.appendChild(leaderboardRow(entry, isSelf));
                 }
+            }
+
+            // No server to rank against, so the board is just this run: the player still
+            // gets to see where they stand, with the panel saying why it is alone.
+            function renderOfflineLeaderboard() {
+                if (!leaderboardRowsEl) return;
+
+                leaderboardRowsEl.textContent = "";
+                leaderboardEmptyEl.hidden = true;
+                leaderboardOfflineNoteEl.hidden = false;
+                leaderboardRowsEl.appendChild(leaderboardRow({
+                    rank: 0,
+                    name: (leaderboard && leaderboard.name) || "You",
+                    score: Math.max(0, Math.floor(save.bestStored)),
+                    wave: Math.max(0, game.waveNumber)
+                }, true));
             }
 
             function setLeaderboardStatus(status) {
-                if (!leaderboardStatusEl) return;
-                leaderboardStatusEl.textContent = status;
-                leaderboardStatusEl.classList.toggle("live", status === "live");
-                leaderboardStatusEl.classList.toggle("offline", status === "offline");
-            }
-
-            function isLeaderboardPopoverOpen() {
-                return leaderboardPopoverEl && leaderboardPopoverEl.classList.contains("open");
-            }
-
-            function openLeaderboardPopover() {
-                if (!leaderboardPopoverEl || isLeaderboardPopoverOpen()) return;
-
-                if (game.running) {
-                    togglePause();
-                    resumeAfterLeaderboardClose = true;
-                } else {
-                    resumeAfterLeaderboardClose = false;
+                leaderboardOnline = status === "live";
+                if (leaderboardStatusEl) {
+                    // Anything short of a live board is offline as far as the panel goes,
+                    // so the pill never disagrees with the note under the table.
+                    leaderboardStatusEl.textContent = leaderboardOnline ? "live" : "offline-mode";
+                    leaderboardStatusEl.classList.toggle("live", leaderboardOnline);
+                    leaderboardStatusEl.classList.toggle("offline", !leaderboardOnline);
                 }
-
-                leaderboardPopoverEl.classList.add("open");
-                leaderboardPopoverEl.setAttribute("aria-hidden", "false");
-                // Opening is the moment the player cares about their standing.
-                reportScore(true);
+                // A dropped connection leaves stale ranks on screen otherwise.
+                if (leaderboardOnline) leaderboardOfflineNoteEl.hidden = true;
+                else renderOfflineLeaderboard();
             }
 
-            function closeLeaderboardPopover() {
-                if (!leaderboardPopoverEl || !isLeaderboardPopoverOpen()) return;
+            function isLeaderboardTabActive() {
+                return leaderboardPaneEl && !leaderboardPaneEl.hidden;
+            }
 
-                leaderboardPopoverEl.classList.remove("open");
-                leaderboardPopoverEl.setAttribute("aria-hidden", "true");
+            function setShopTab(tab) {
+                const showBoard = tab === "leaderboard";
+                shopPaneEl.hidden = showBoard;
+                leaderboardPaneEl.hidden = !showBoard;
+                shopTabShopBtn.classList.toggle("active", !showBoard);
+                shopTabLeaderboardBtn.classList.toggle("active", showBoard);
+                shopTabShopBtn.setAttribute("aria-selected", String(!showBoard));
+                shopTabLeaderboardBtn.setAttribute("aria-selected", String(showBoard));
 
-                if (resumeAfterLeaderboardClose && game.started && !game.running) {
-                    togglePause();
-                }
-                resumeAfterLeaderboardClose = false;
+                if (!showBoard) return;
+                // Looking at the board is the moment the player cares about their standing.
+                if (leaderboardOnline) reportScore(true);
+                else renderOfflineLeaderboard();
             }
 
             if (leaderboard) {
@@ -4355,11 +4419,8 @@
                 setLeaderboardStatus("unavailable");
             }
 
-            openLeaderboardBtn.addEventListener("click", openLeaderboardPopover);
-            closeLeaderboardBtn.addEventListener("click", closeLeaderboardPopover);
-            leaderboardPopoverEl.addEventListener("click", (e) => {
-                if (e.target === leaderboardPopoverEl) closeLeaderboardPopover();
-            });
+            shopTabShopBtn.addEventListener("click", () => setShopTab("shop"));
+            shopTabLeaderboardBtn.addEventListener("click", () => setShopTab("leaderboard"));
 
             function isSkillTreePopoverOpen() {
                 return skillTreePopoverEl && skillTreePopoverEl.classList.contains("open");
@@ -6868,11 +6929,6 @@
                 if (key === "escape" && isSkillTreePopoverOpen()) {
                     e.preventDefault();
                     closeSkillTreePopover();
-                    return;
-                }
-                if (key === "escape" && isLeaderboardPopoverOpen()) {
-                    e.preventDefault();
-                    closeLeaderboardPopover();
                     return;
                 }
                 if (key === "escape" && isResetPopoverOpen()) {

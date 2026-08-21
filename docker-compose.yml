@@ -1,0 +1,78 @@
+# Leaderboard server behind an existing Traefik instance, with optional Cloudflare
+# tunnels for handing the game to friends without touching DNS or the firewall.
+#
+#   docker compose up -d --build                    Traefik only (needs DOMAIN)
+#   docker compose --profile quick up -d --build    + throwaway trycloudflare.com URL
+#   docker compose --profile tunnel up -d --build   + named tunnel (needs TUNNEL_TOKEN)
+#
+# Copy .env.example to .env first.
+
+services:
+  browsergame:
+    build:
+      context: .
+      dockerfile: server/Dockerfile
+    image: browsergame-server:latest
+    container_name: browsergame
+    restart: unless-stopped
+    # The board lives in memory and is written here after every change.
+    volumes:
+      - leaderboard-data:/data
+    networks:
+      # Traefik reaches it here; the tunnels reach it on `internal`.
+      - traefik
+      - internal
+    labels:
+      - traefik.enable=true
+      # Explicit, so Traefik picks the right IP when the container joins more
+      # than one network.
+      - traefik.docker.network=${TRAEFIK_NETWORK:-traefik}
+      - traefik.http.routers.browsergame.rule=Host(`${DOMAIN}`)
+      - traefik.http.routers.browsergame.entrypoints=${ENTRYPOINT:-websecure}
+      - traefik.http.routers.browsergame.tls=true
+      - traefik.http.routers.browsergame.tls.certresolver=${CERT_RESOLVER:-letsencrypt}
+      # Container port, not a host port. Websockets need nothing extra: Traefik
+      # forwards the upgrade on the same router.
+      - traefik.http.services.browsergame.loadbalancer.server.port=8090
+
+  # Throwaway public URL, no Cloudflare account and no domain involved. The address
+  # is printed to the log and is different after every restart:
+  #   docker compose logs quick-tunnel | grep trycloudflare.com
+  quick-tunnel:
+    image: cloudflare/cloudflared:latest
+    container_name: browsergame-quick-tunnel
+    profiles: ["quick"]
+    restart: unless-stopped
+    command: tunnel --no-autoupdate --url http://browsergame:8090
+    depends_on:
+      - browsergame
+    networks:
+      - internal
+
+  # Named tunnel: a stable hostname on a domain you have in Cloudflare. Create the
+  # tunnel under Zero Trust > Networks > Tunnels, point its public hostname at
+  # http://browsergame:8090, and put the token it gives you in .env.
+  cloudflared:
+    image: cloudflare/cloudflared:latest
+    container_name: browsergame-tunnel
+    profiles: ["tunnel"]
+    restart: unless-stopped
+    command: tunnel --no-autoupdate run
+    environment:
+      # Plain, not `:?required`: compose interpolates the whole file even when this
+      # profile is off, so a guard here would break the other two commands.
+      TUNNEL_TOKEN: ${TUNNEL_TOKEN:-}
+    depends_on:
+      - browsergame
+    networks:
+      - internal
+
+networks:
+  traefik:
+    external: true
+    name: ${TRAEFIK_NETWORK:-traefik}
+  # Private to this stack: how cloudflared talks to the game.
+  internal:
+
+volumes:
+  leaderboard-data:

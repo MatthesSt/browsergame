@@ -36,6 +36,60 @@ on 8080 and VS Code on 8081. Override with `ROCKET_PORT` if that changes.
 | `ROCKET_PORT`              | `8090`                  | Any `Rocket.toml` key works as `ROCKET_*` |
 | `ROCKET_ADDRESS`           | `0.0.0.0`               |                                           |
 
+## Deploy (Docker + Traefik)
+
+`../docker-compose.yml` builds `Dockerfile` and hands the container to an existing
+Traefik instance. The image carries the game files too, so the board and the game
+come off one origin and CORS never enters into it.
+
+```sh
+cp .env.example .env      # in the repo root: set DOMAIN, and the names your Traefik uses
+docker compose up -d --build
+```
+
+The compose file expects your Traefik network to exist already; on a machine that
+has no Traefik, `docker network create traefik` is enough to satisfy it.
+
+Traefik reaches port 8090 inside the container over the shared network; nothing is
+published on the host. The websocket at `/api/ws` needs no extra configuration - it
+rides the same router, and the client derives `wss://` from the page origin.
+
+The board is persisted to the `leaderboard-data` volume at `/data/leaderboard.json`.
+Run exactly one replica: the live-update fan-out is per-process state, so a second
+one would serve a board of its own.
+
+## Share it over a Cloudflare tunnel
+
+To hand the running game to a few friends there is no need to build anything. With
+`cloudflared` on the machine, next to `cargo run`:
+
+```sh
+cloudflared tunnel --url http://localhost:8090
+```
+
+It prints a `https://<random>.trycloudflare.com` address that anyone can open, with
+no Cloudflare account, no domain and no open port. Websockets ride through it, so
+the board still updates live. The address dies with the process and is different
+every time.
+
+The same thing as a container, alongside the server:
+
+```sh
+docker compose --profile quick up -d --build
+docker compose logs quick-tunnel | grep trycloudflare.com
+```
+
+For an address that survives a restart, create a named tunnel under Cloudflare Zero
+Trust > Networks > Tunnels on a domain you own, point its public hostname at
+`http://browsergame:8090`, put the connector token in `.env` as `TUNNEL_TOKEN`, and:
+
+```sh
+docker compose --profile tunnel up -d --build
+```
+
+Either tunnel makes the game reachable from the internet by anyone with the link,
+and scores are still taken on the client's word - see the last section.
+
 ## HTTP
 
 ```
