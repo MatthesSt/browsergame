@@ -1926,7 +1926,7 @@
             // Kept low on purpose: ghouls camp the meadows, and gatherers have to stand
             // still in a meadow to work. A standing infestation reads as an economy that
             // simply stops, so a horde should be an event to answer, not weather.
-            const GHOUL_MAX_ALIVE = 10;
+            const GHOUL_MAX_ALIVE = 20;
             const GHOUL_SPAWN_DISTANCE = W(420);
             const GHOUL_SPAWN_SCATTER = W(90);
             const GHOUL_AGGRO_RADIUS = W(160);
@@ -6879,6 +6879,18 @@
                 return ghouls;
             }
 
+            // Ghouls and blights share the enemy array but arrive on their own
+            // schedules, so they must not count against the wave: a horde loitering
+            // in the fields would otherwise hold the wave open for ever and eat the
+            // on-screen budget the wave spawns from.
+            function countWaveEnemies() {
+                let count = 0;
+                for (const enemy of game.enemies) {
+                    if (!enemy.roams && !enemy.claimsSpawner) count += 1;
+                }
+                return count;
+            }
+
             function spawnGhoulHorde() {
                 if (countGhouls() >= GHOUL_MAX_ALIVE) return;
 
@@ -7146,7 +7158,7 @@
                     }
                 } else if (game.waveRemainingSpawns > 0) {
                     game.waveSpawnTimer -= 1;
-                    if (game.waveSpawnTimer <= 0 && game.enemies.length < activeEnemyLimitForWave(game.waveNumber)) {
+                    if (game.waveSpawnTimer <= 0 && countWaveEnemies() < activeEnemyLimitForWave(game.waveNumber)) {
                         const nextType = game.waveIntroPendingType || pickWaveEnemyType(game.waveNumber);
                         game.waveIntroPendingType = null;
                         game.enemies.push(spawnEnemyOfType(nextType));
@@ -7314,7 +7326,7 @@
                     }
                 }
 
-                if (game.waveInProgress && game.waveRemainingSpawns <= 0 && game.enemies.length === 0) {
+                if (game.waveInProgress && game.waveRemainingSpawns <= 0 && countWaveEnemies() === 0) {
                     game.waveInProgress = false;
                     game.waveBreakTimer = waveBreakDuration(game.waveNumber);
                 }
