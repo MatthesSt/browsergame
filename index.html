@@ -236,6 +236,7 @@
         .ico.timer { background: #ffd166; border-radius: 50%; }
         .ico.field { background: #7fe0bb; border-radius: 3px; }
         .ico.field.claimed { background: #ff4d4d; }
+        .ico.tower.claimed { background: #ff4d4d; }
 
         /* A choked field is the kind of loss that is easy to miss on a map this big. */
         .chip.alert {
@@ -1398,6 +1399,7 @@
                     </div>
                     <div class="hud-spacer" aria-hidden="true"></div>
                     <div class="hud-section hud-section-wave">
+                        <div class="chip" id="towerHpChip" title="Tower health - the run ends when it reaches zero"><span class="ico tower" id="towerHpIco"></span><span>Tower</span><strong id="towerHpHud">100/100</strong></div>
                         <div class="chip" title="Current enemy wave"><span class="ico wave"></span><span>Wave</span><strong id="waveHud">0</strong></div>
                         <div class="chip" title="Time until next wave"><span class="ico timer"></span><span>Next</span><strong id="nextWaveHud">--:--</strong></div>
                         <div class="chip" id="fieldsChip" title="Resource fields still producing - blights claim them until killed"><span class="ico field" id="fieldsIco"></span><span>Fields</span><strong id="fieldsHud">8/8</strong></div>
@@ -1627,6 +1629,9 @@
             const waveHudEl = document.getElementById("waveHud");
             const nextWaveHudEl = document.getElementById("nextWaveHud");
             const startBtn = document.getElementById("startBtn");
+            const towerHpChipEl = document.getElementById("towerHpChip");
+            const towerHpIcoEl = document.getElementById("towerHpIco");
+            const towerHpHudEl = document.getElementById("towerHpHud");
             const fieldsChipEl = document.getElementById("fieldsChip");
             const fieldsIcoEl = document.getElementById("fieldsIco");
             const fieldsHudEl = document.getElementById("fieldsHud");
@@ -1836,20 +1841,25 @@
             };
             const SKILL_TREE_STRAND_ANGLE_DEG = {
                 player: 270,
-                // The gatherer branch forks off the bag (270): gatherers and traders
-                // split evenly around 250, then capacity carries the trunk outward
-                // into gatherer focus while speed sits between both of its parents.
-                minionCore: 238,
+                // The gatherer branch forks off the bag (270) into a level pair -
+                // gatherers left, traders right, mirrored around the trunk. Capacity
+                // carries the gatherer line straight outward into gatherer focus, and
+                // minion speed sits between both of its parents. Every angle here is
+                // spaced so no two node boxes in the branch touch: nodes are ~172px
+                // wide against a 78px tier step, so same-ring siblings need ~45 deg
+                // of separation and a child may not lean more than ~25 deg off the
+                // trunk or it loses the vertical clearance the next ring buys it.
+                minionCore: 248,
                 // The spell branch owns the empty south of the map: haste at the root,
                 // then a line each way - what the fields give you, and what holds the
-                // wave off. Traders sit beside gatherers, a second root off the bag.
+                // wave off.
                 minionHaste: 100,
                 spellEconomy: 82,
                 spellDefense: 118,
-                trade: 262,
+                trade: 294,
                 towerArmor: 214,
-                minionSpeed: 250,
-                focusLine: 232,
+                minionSpeed: 280,
+                focusLine: 244,
                 defense: 190,
                 defenseHaste: 163,
                 economy: 20
@@ -1995,7 +2005,7 @@
 
             const tower = { x: -W(108) / 2, y: -W(88) / 2, w: W(108), h: W(88) };
             const TOWER_MAX_HP = 100;
-            const START_BUDGET = { wood: 40, stone: 30, crystal: 0, amber: 0, aether: 0, essence: 0 };
+            const START_BUDGET = { wood: 4000, stone: 3000, crystal: 1000, amber: 1000, aether: 1000, essence: 1000 };
             const START_WAVE_COUNT = 1;
             const WAVE_START_DELAY = 3600;
             const WAVE_BREAK_TICKS = 320;
@@ -2098,6 +2108,155 @@
                 y: Math.sin((CITY_BEARING_DEG * Math.PI) / 180) * SPAWNER_TIER_DISTANCE[4],
                 r: W(126)
             };
+
+            // ---- The river ---------------------------------------------------------
+            //
+            // The map's whole north-west holds nothing: no field, no settlement, and no
+            // reason to ever walk out there. A river seals it off, taking a fifth of the
+            // map out of the ground your side can reach without moving a single thing
+            // that is actually on it. It meets the left edge below the middle of the map
+            // and runs up to the top edge inside the aether field. The nearest fields -
+            // crystal to the west and aether due north - keep well over a screen of
+            // clearance from the near bank, so the water is scenery on the walk out to
+            // them and a wall past them.
+            //
+            // Enemies wade. Only the player and the minions are held: the wave marches
+            // in from the map edge on a straight line, and water it could not cross
+            // would just be a corner of the rim that never attacks.
+            const RIVER_HALF_WIDTH = W(120);
+            // Both ends sit outside the map on purpose, so the water meets the left and
+            // top edges square instead of leaving a walkable sliver around a rounded cap.
+            // Bends alternate on purpose: a river that holds one bearing for a few
+            // thousand units reads as a drawn line, however wide it is.
+            const RIVER_CONTROL_POINTS = [
+                { x: W(-7900), y: W(2820) },
+                { x: W(-6750), y: W(2380) },
+                { x: W(-5700), y: W(1780) },
+                { x: W(-5050), y: W(900) },
+                { x: W(-4780), y: W(-40) },
+                { x: W(-4150), y: W(-700) },
+                { x: W(-3250), y: W(-1050) },
+                { x: W(-2600), y: W(-1750) },
+                { x: W(-2320), y: W(-2620) },
+                { x: W(-1850), y: W(-3200) },
+                { x: W(-1220), y: W(-3650) },
+                { x: W(-1030), y: W(-4600) }
+            ];
+
+            // Corners read as a canal, so the control points are rounded off into a
+            // dense polyline. Drawing and collision both walk this one list: the water
+            // you can see is exactly the water you cannot cross.
+            function buildRiverPath(controls) {
+                const STEPS_PER_SPAN = 14;
+                const midpoint = (a, b) => ({ x: (a.x + b.x) * 0.5, y: (a.y + b.y) * 0.5 });
+                const points = [controls[0]];
+
+                for (let i = 1; i < controls.length - 1; i += 1) {
+                    const from = i > 1 ? midpoint(controls[i - 1], controls[i]) : controls[0];
+                    const to = midpoint(controls[i], controls[i + 1]);
+                    for (let step = 1; step <= STEPS_PER_SPAN; step += 1) {
+                        const t = step / STEPS_PER_SPAN;
+                        const inv = 1 - t;
+                        points.push({
+                            x: inv * inv * from.x + 2 * inv * t * controls[i].x + t * t * to.x,
+                            y: inv * inv * from.y + 2 * inv * t * controls[i].y + t * t * to.y
+                        });
+                    }
+                }
+
+                points.push(controls[controls.length - 1]);
+                return points;
+            }
+
+            const RIVER_PATH = buildRiverPath(RIVER_CONTROL_POINTS);
+            // One box around the whole thing. The river touches a single corner of a map
+            // eight screens wide, so almost every test and every frame can stop here.
+            const RIVER_BOUNDS = (() => {
+                const reach = RIVER_HALF_WIDTH + W(80);
+                let minX = Infinity;
+                let maxX = -Infinity;
+                let minY = Infinity;
+                let maxY = -Infinity;
+                for (const point of RIVER_PATH) {
+                    if (point.x < minX) minX = point.x;
+                    if (point.x > maxX) maxX = point.x;
+                    if (point.y < minY) minY = point.y;
+                    if (point.y > maxY) maxY = point.y;
+                }
+                return { minX: minX - reach, maxX: maxX + reach, minY: minY - reach, maxY: maxY + reach };
+            })();
+            // Minions are drawn a few units across; the water holds them a little wider
+            // than a point so none of them ends up paddling with its feet on the bank.
+            const MINION_RIVER_RADIUS = W(9);
+
+            function nearRiverBounds(x, y, padding) {
+                return x >= RIVER_BOUNDS.minX - padding && x <= RIVER_BOUNDS.maxX + padding
+                    && y >= RIVER_BOUNDS.minY - padding && y <= RIVER_BOUNDS.maxY + padding;
+            }
+
+            // Closest point on the centre line, plus the normal that points at the side
+            // of the water the rest of the map is on. The path is drawn from the left
+            // edge up to the top one, so that side is always to its right.
+            function nearestRiverPoint(x, y) {
+                let bestDistSq = Infinity;
+                let bestX = RIVER_PATH[0].x;
+                let bestY = RIVER_PATH[0].y;
+                let bestNormalX = 0;
+                let bestNormalY = 1;
+
+                for (let i = 0; i < RIVER_PATH.length - 1; i += 1) {
+                    const from = RIVER_PATH[i];
+                    const to = RIVER_PATH[i + 1];
+                    const dx = to.x - from.x;
+                    const dy = to.y - from.y;
+                    const lengthSq = dx * dx + dy * dy;
+                    const t = lengthSq > 0 ? clamp(((x - from.x) * dx + (y - from.y) * dy) / lengthSq, 0, 1) : 0;
+                    const px = from.x + dx * t;
+                    const py = from.y + dy * t;
+                    const offX = x - px;
+                    const offY = y - py;
+                    const distSq = offX * offX + offY * offY;
+                    if (distSq < bestDistSq) {
+                        bestDistSq = distSq;
+                        bestX = px;
+                        bestY = py;
+                        const length = Math.sqrt(lengthSq) || 1;
+                        bestNormalX = -dy / length;
+                        bestNormalY = dx / length;
+                    }
+                }
+
+                return { x: bestX, y: bestY, distSq: bestDistSq, normalX: bestNormalX, normalY: bestNormalY };
+            }
+
+            function isInRiver(x, y, padding = 0) {
+                const clearance = RIVER_HALF_WIDTH + padding;
+                if (!nearRiverBounds(x, y, clearance)) return false;
+                return nearestRiverPoint(x, y).distSq < clearance * clearance;
+            }
+
+            // Puts anything that ended a step in the water back on the bank it came from.
+            // Pushing out to the nearest edge rather than cancelling the step is what
+            // makes a walk into the river slide along it instead of sticking to it.
+            function keepOutOfRiver(entity, radius = 0) {
+                const clearance = RIVER_HALF_WIDTH + radius;
+                if (!nearRiverBounds(entity.x, entity.y, clearance)) return false;
+
+                const near = nearestRiverPoint(entity.x, entity.y);
+                if (near.distSq >= clearance * clearance) return false;
+
+                const dist = Math.sqrt(near.distSq);
+                if (dist > 0.001) {
+                    entity.x = near.x + ((entity.x - near.x) / dist) * clearance;
+                    entity.y = near.y + ((entity.y - near.y) / dist) * clearance;
+                } else {
+                    // Dead on the centre line, so no bank is the nearer one: put it out
+                    // on the side the rest of the map is on.
+                    entity.x = near.x + near.normalX * clearance;
+                    entity.y = near.y + near.normalY * clearance;
+                }
+                return true;
+            }
 
             // Curated routes rather than every pairing: each turns something you have in
             // bulk into something further from the tower. The village keeps a cut, so no
@@ -2929,6 +3088,8 @@
                 game.player.speed = BASE_PLAYER_SPEED + save.speedLevel * PLAYER_SPEED_LEVEL_STEP;
                 game.player.x = Number.isFinite(player.x) ? clamp(player.x, world.minX + game.player.r, world.maxX - game.player.r) : 0;
                 game.player.y = Number.isFinite(player.y) ? clamp(player.y, world.minY + game.player.r, world.maxY - game.player.r) : 0;
+                // A run saved standing where the river now runs resumes on the bank.
+                keepOutOfRiver(game.player, game.player.r);
                 game.player.stamina = Number.isFinite(player.stamina) ? clamp(player.stamina, 0, PLAYER_STAMINA_MAX) : PLAYER_STAMINA_MAX;
                 centerCameraOn(game.player.x, game.player.y);
 
@@ -3824,6 +3985,17 @@
                 setHudNumber("bankAmber", bankAmberHudEl, save.bankAmber);
                 setHudNumber("bankAether", bankAetherHudEl, save.bankAether);
                 refreshSkillTreeBank();
+                // Damage to the tower used to show up only as a bar on the tower itself,
+                // which is off screen as often as not. Mend prices itself against this
+                // number, so it belongs where the rest of the run's state is read.
+                const towerHpText = `${Math.ceil(game.towerHp)}/${TOWER_MAX_HP}`;
+                if (towerHpHudEl.textContent !== towerHpText) {
+                    towerHpHudEl.textContent = towerHpText;
+                }
+                const towerHurt = game.towerHp <= TOWER_MAX_HP * 0.5;
+                towerHpChipEl.classList.toggle("alert", towerHurt);
+                towerHpIcoEl.classList.toggle("claimed", towerHurt);
+
                 const claimedFields = countClaimedSpawners();
                 const freeFields = spawners.length - claimedFields;
                 fieldsHudEl.textContent = `${freeFields}/${spawners.length}`;
@@ -5631,10 +5803,258 @@
                 targetCtx.drawImage(worldMacroLayer, world.minX, world.minY, world.w, world.h);
             }
 
+            // Both banks of the river as one closed polygon, each edge pushed out from
+            // the centre line by `pad` plus a little noise. The noise is what keeps the
+            // water from reading as a canal - a constant width looks like a road.
+            //
+            // It only ever pushes outwards, so the drawn water is never narrower than
+            // the band that actually stops you: you wade at the edge you can see.
+            // Noise sampled between whole steps rather than at every point: the banks
+            // are meant to wander over a stretch of river, not fray from point to point.
+            function riverBankNoise(seed, t) {
+                const index = Math.floor(t);
+                const frac = t - index;
+                const from = terrainNoise(seed, index);
+                const to = terrainNoise(seed, index + 1);
+                return from + (to - from) * frac * frac * (3 - 2 * frac);
+            }
+
+            function buildRiverBand(pad, wobble, seed) {
+                const outline = [];
+                const right = [];
+
+                for (let i = 0; i < RIVER_PATH.length; i += 1) {
+                    const point = RIVER_PATH[i];
+                    const from = RIVER_PATH[Math.max(0, i - 1)];
+                    const to = RIVER_PATH[Math.min(RIVER_PATH.length - 1, i + 1)];
+                    const dx = to.x - from.x;
+                    const dy = to.y - from.y;
+                    const length = Math.sqrt(dx * dx + dy * dy) || 1;
+                    const normalX = -dy / length;
+                    const normalY = dx / length;
+                    // Both ends run off the map, so they are left straight: a wobbling
+                    // mouth would show a notch of dry ground against the map edge.
+                    const taper = i === 0 || i === RIVER_PATH.length - 1 ? 0 : 1;
+                    const outLeft = RIVER_HALF_WIDTH + pad + riverBankNoise(seed, i / 5) * wobble * taper;
+                    const outRight = RIVER_HALF_WIDTH + pad + riverBankNoise(seed + 3.7, i / 5) * wobble * taper;
+                    outline.push({ x: point.x - normalX * outLeft, y: point.y - normalY * outLeft });
+                    right.push({ x: point.x + normalX * outRight, y: point.y + normalY * outRight });
+                }
+
+                // Down one bank and back up the other, so the band closes into one shape.
+                for (let i = right.length - 1; i >= 0; i -= 1) outline.push(right[i]);
+                return outline;
+            }
+
+            function traceRiverBand(targetCtx, outline) {
+                targetCtx.beginPath();
+                targetCtx.moveTo(outline[0].x, outline[0].y);
+                for (let i = 1; i < outline.length; i += 1) targetCtx.lineTo(outline[i].x, outline[i].y);
+                targetCtx.closePath();
+            }
+
+            // The centre line itself, optionally shifted sideways - the current lanes and
+            // the foam along either edge are drawn from the same points as the water.
+            function traceRiver(targetCtx, offset = 0) {
+                targetCtx.beginPath();
+                for (let i = 0; i < RIVER_PATH.length; i += 1) {
+                    const point = RIVER_PATH[i];
+                    let x = point.x;
+                    let y = point.y;
+
+                    if (offset !== 0) {
+                        const from = RIVER_PATH[Math.max(0, i - 1)];
+                        const to = RIVER_PATH[Math.min(RIVER_PATH.length - 1, i + 1)];
+                        const dx = to.x - from.x;
+                        const dy = to.y - from.y;
+                        const length = Math.sqrt(dx * dx + dy * dy) || 1;
+                        x += (-dy / length) * offset;
+                        y += (dx / length) * offset;
+                    }
+
+                    if (i === 0) targetCtx.moveTo(x, y);
+                    else targetCtx.lineTo(x, y);
+                }
+            }
+
+            function riverInView() {
+                return RIVER_BOUNDS.maxX >= cameraState.x
+                    && RIVER_BOUNDS.minX <= cameraState.x + viewWorldW()
+                    && RIVER_BOUNDS.maxY >= cameraState.y
+                    && RIVER_BOUNDS.minY <= cameraState.y + viewWorldH();
+            }
+
+            // Damp earth, then the reeds that grow in it, then the water: bands of the
+            // same shape, each narrower and each with its own ragged edge. Every one
+            // outside the water is the meadow's own colour a shade darker and goes down
+            // under a low alpha, so the ground texture reads straight through and the
+            // bank arrives in four soft steps instead of at a painted line. None of it
+            // ever moves, so the outlines are built once and the frame only fills them.
+            const RIVER_BANDS = [
+                { color: "#252a1e", alpha: 0.22, outline: buildRiverBand(W(132), W(118), 181.1) },
+                { color: "#262a1d", alpha: 0.3, outline: buildRiverBand(W(92), W(100), 197.7) },
+                { color: "#27291b", alpha: 0.42, outline: buildRiverBand(W(56), W(76), 211.3) },
+                { color: "#2a3423", alpha: 0.52, outline: buildRiverBand(W(26), W(54), 233.9) },
+                { color: "#1d4250", alpha: 1, outline: buildRiverBand(0, W(22), 251.1) }
+            ];
+
+            // Silt and reeds scattered along the banks, so the two outer bands read as
+            // ground rather than as fills. Every position comes off the same noise the
+            // rest of the terrain uses, so the bank looks the same in every session, and
+            // it is all worked out once: a frame only walks the finished lists.
+            function buildRiverBankDetail() {
+                const stones = [];
+                const blades = [];
+                const steps = RIVER_PATH.length - 1;
+
+                // Three per step per bank, which lands a tuft every seventy units or so.
+                for (let i = 0; i < steps * 3; i += 1) {
+                    const t = (i + 0.5) / 3;
+                    const index = Math.min(steps - 1, Math.floor(t));
+                    const frac = t - index;
+                    const from = RIVER_PATH[index];
+                    const to = RIVER_PATH[index + 1];
+                    const dx = to.x - from.x;
+                    const dy = to.y - from.y;
+                    const length = Math.sqrt(dx * dx + dy * dy) || 1;
+                    const normalX = -dy / length;
+                    const normalY = dx / length;
+                    const baseX = from.x + dx * frac;
+                    const baseY = from.y + dy * frac;
+
+                    for (const side of [-1, 1]) {
+                        const seed = side < 0 ? 307.1 : 331.7;
+                        const along = (terrainNoise(seed, i) - 0.5) * W(70);
+                        const reedOut = RIVER_HALF_WIDTH + W(6) + terrainNoise(seed + 1.9, i) * W(56);
+                        const rootX = baseX + normalX * reedOut * side + (dx / length) * along;
+                        const rootY = baseY + normalY * reedOut * side + (dy / length) * along;
+
+                        // A tuft of blades leaning the same way out of the water, not a
+                        // fan - three blades splayed wide read as a scatter of little
+                        // crosses rather than as grass.
+                        const lean = (terrainNoise(seed + 4.3, i) - 0.5) * 0.5;
+                        for (let blade = 0; blade < 3; blade += 1) {
+                            const angle = lean + (blade - 1) * 0.15;
+                            const reach = W(8) + terrainNoise(seed + 7.1, i * 3 + blade) * W(13);
+                            const outX = normalX * side;
+                            const outY = normalY * side;
+                            blades.push({
+                                x1: rootX + (dx / length) * (blade - 1) * W(2.4),
+                                y1: rootY + (dy / length) * (blade - 1) * W(2.4),
+                                x2: rootX + (outX * Math.cos(angle) - outY * Math.sin(angle)) * reach,
+                                y2: rootY + (outX * Math.sin(angle) + outY * Math.cos(angle)) * reach
+                            });
+                        }
+
+                        // A stone or a dried patch further up the bank, in the earth band.
+                        if (terrainNoise(seed + 11.3, i) > 0.45) {
+                            const stoneOut = RIVER_HALF_WIDTH + W(34) + terrainNoise(seed + 13.7, i) * W(74);
+                            stones.push({
+                                x: baseX + normalX * stoneOut * side - (dx / length) * along,
+                                y: baseY + normalY * stoneOut * side - (dy / length) * along,
+                                rx: W(4) + terrainNoise(seed + 17.9, i) * W(9),
+                                ry: W(2) + terrainNoise(seed + 19.3, i) * W(5),
+                                angle: terrainNoise(seed + 23.1, i) * Math.PI,
+                                pale: terrainNoise(seed + 29.7, i) > 0.62
+                            });
+                        }
+                    }
+                }
+
+                return { stones, blades };
+            }
+
+            const RIVER_BANK_DETAIL = buildRiverBankDetail();
+
+            function drawRiver(targetCtx) {
+                // One corner of a map eight screens across: on most frames the whole
+                // thing is behind the camera and this test is all it costs.
+                if (!riverInView()) return;
+
+                targetCtx.save();
+                targetCtx.lineJoin = "round";
+                targetCtx.lineCap = "round";
+
+                for (const band of RIVER_BANDS) {
+                    traceRiverBand(targetCtx, band.outline);
+                    targetCtx.globalAlpha = band.alpha;
+                    targetCtx.fillStyle = band.color;
+                    targetCtx.fill();
+                }
+                targetCtx.globalAlpha = 1;
+
+                // Silt on the dry side, then the reeds standing in the wet one - each a
+                // single path however many pieces it holds. A blade is a couple of units
+                // long, so below half zoom there is nothing there to see and the whole
+                // lot is skipped.
+                if (cameraState.zoom >= 0.45) {
+                    for (const pass of [{ pale: false, color: "#1f2317", alpha: 0.45 }, { pale: true, color: "#33352a", alpha: 0.26 }]) {
+                        targetCtx.beginPath();
+                        for (const stone of RIVER_BANK_DETAIL.stones) {
+                            if (stone.pale !== pass.pale) continue;
+                            targetCtx.moveTo(stone.x + stone.rx, stone.y);
+                            targetCtx.ellipse(stone.x, stone.y, stone.rx, stone.ry, stone.angle, 0, Math.PI * 2);
+                        }
+                        targetCtx.globalAlpha = pass.alpha;
+                        targetCtx.fillStyle = pass.color;
+                        targetCtx.fill();
+                    }
+
+                    targetCtx.beginPath();
+                    for (const blade of RIVER_BANK_DETAIL.blades) {
+                        targetCtx.moveTo(blade.x1, blade.y1);
+                        targetCtx.lineTo(blade.x2, blade.y2);
+                    }
+                    targetCtx.globalAlpha = 0.38;
+                    targetCtx.strokeStyle = "#3a4c2e";
+                    targetCtx.lineWidth = W(1.7);
+                    targetCtx.stroke();
+                    targetCtx.globalAlpha = 1;
+                }
+
+                // The channel: the water darkens off the shallows and runs pale down the
+                // middle, which is what gives the surface a direction.
+                targetCtx.strokeStyle = "#1a5a6d";
+                targetCtx.lineWidth = RIVER_HALF_WIDTH * 1.35;
+                traceRiver(targetCtx);
+                targetCtx.stroke();
+                targetCtx.strokeStyle = "#217585";
+                targetCtx.lineWidth = RIVER_HALF_WIDTH * 0.62;
+                traceRiver(targetCtx);
+                targetCtx.stroke();
+
+                // Foam where the water meets either bank.
+                targetCtx.globalAlpha = 0.26;
+                targetCtx.strokeStyle = "#cfeef5";
+                targetCtx.lineWidth = W(4);
+                targetCtx.setLineDash([W(90), W(70)]);
+                for (const side of [-1, 1]) {
+                    targetCtx.lineDashOffset = side * W(60);
+                    traceRiver(targetCtx, RIVER_HALF_WIDTH * 0.9 * side);
+                    targetCtx.stroke();
+                }
+
+                // Two lanes of current sliding downstream. The dash offset rides the day
+                // tick, so the water runs with the game and holds still when it pauses.
+                targetCtx.globalAlpha = 0.34;
+                targetCtx.strokeStyle = "#9fe0ef";
+                targetCtx.lineWidth = W(6);
+                targetCtx.setLineDash([W(110), W(260)]);
+                for (const lane of [-0.45, 0.3]) {
+                    targetCtx.lineDashOffset = -game.dayTick * W(lane < 0 ? 1.5 : 1.1);
+                    traceRiver(targetCtx, RIVER_HALF_WIDTH * lane);
+                    targetCtx.stroke();
+                }
+
+                targetCtx.setLineDash([]);
+                targetCtx.restore();
+            }
+
             function drawBackdrop(targetCtx) {
                 targetCtx.fillStyle = getWorldGroundPattern(targetCtx) || GROUND_BASE_COLOR;
                 targetCtx.fillRect(cameraState.x, cameraState.y, viewWorldW(), viewWorldH());
                 drawGroundMacro(targetCtx);
+                drawRiver(targetCtx);
 
                 drawSpawnTerrain(targetCtx);
                 drawClaimedFields(targetCtx);
@@ -6209,11 +6629,15 @@
                 const slot = minion && Number.isFinite(minion.slotIndex) ? String(minion.slotIndex) : null;
                 const stored = slot !== null && save.defenderPostBySlot ? save.defenderPostBySlot[slot] : null;
                 if (stored && Number.isFinite(stored.x) && Number.isFinite(stored.y)) {
-                    return {
+                    // A post in the water is one its defender can never stand on, so it
+                    // would never finish walking there and never regenerate. Read it back
+                    // on the bank instead - that also fixes posts saved before the river.
+                    const point = {
                         x: clamp(stored.x, world.minX + 16, world.maxX - 16),
-                        y: clamp(stored.y, world.minY + 16, world.maxY - 16),
-                        custom: true
+                        y: clamp(stored.y, world.minY + 16, world.maxY - 16)
                     };
+                    keepOutOfRiver(point, MINION_RIVER_RADIUS);
+                    return { x: point.x, y: point.y, custom: true };
                 }
                 return { x: TOWER_CENTER_X, y: TOWER_CENTER_Y, custom: false };
             }
@@ -6231,7 +6655,10 @@
                     const radius = random(DEFENDER_PATROL_MIN_RADIUS, DEFENDER_PATROL_MAX_RADIUS);
                     const x = clamp(centerX + Math.cos(angle) * radius, world.minX + 16, world.maxX - 16);
                     const y = clamp(centerY + Math.sin(angle) * radius, world.minY + 16, world.maxY - 16);
-                    if (!isInsideTower(x, y)) {
+                    // A wander target in the river is one it can never reach, and a
+                    // defender only picks the next one on arrival - so it would stand at
+                    // the bank for the rest of the run.
+                    if (!isInsideTower(x, y) && !isInRiver(x, y, MINION_RIVER_RADIUS)) {
                         return { x, y };
                     }
                 }
@@ -6339,6 +6766,9 @@
             function canPlaceTurretAt(x, y) {
                 const inTower = x > tower.x && x < tower.x + tower.w && y > tower.y && y < tower.y + tower.h;
                 if (inTower) return false;
+                // Nothing can be built in the water - and a turret out there could never
+                // be walked to, so it could never be sold back either.
+                if (isInRiver(x, y)) return false;
 
                 for (const turret of game.turrets) {
                     const dx = turret.x - x;
@@ -6812,6 +7242,7 @@
 
                 game.player.x = clamp(game.player.x, world.minX + game.player.r, world.maxX - game.player.r);
                 game.player.y = clamp(game.player.y, world.minY + game.player.r, world.maxY - game.player.r);
+                keepOutOfRiver(game.player, game.player.r);
             }
 
             function drawDiamond(x, y, size, color) {
@@ -6951,6 +7382,11 @@
                 const invD = 1 / Math.sqrt(dSq);
                 entity.x += dx * invD * speed;
                 entity.y += dy * invD * speed;
+                // Minions carry a role and the wave does not: the river stops your side
+                // at the bank and lets theirs wade straight through.
+                if (entity.role) {
+                    keepOutOfRiver(entity, MINION_RIVER_RADIUS);
+                }
                 return false;
             }
 
@@ -9453,10 +9889,14 @@
                 if (!save.defenderPostBySlot || typeof save.defenderPostBySlot !== "object") {
                     save.defenderPostBySlot = {};
                 }
-                save.defenderPostBySlot[String(slot)] = {
+                const post = {
                     x: clamp(x, world.minX + 16, world.maxX - 16),
                     y: clamp(y, world.minY + 16, world.maxY - 16)
                 };
+                // Clicking the water stations the defender on the near bank rather than
+                // handing it somewhere it cannot stand.
+                keepOutOfRiver(post, MINION_RIVER_RADIUS);
+                save.defenderPostBySlot[String(slot)] = post;
                 // Drop the old wander target so it heads for the new ground at once.
                 const defender = defenderMinionsSortedBySlot().find((minion) => minion.slotIndex === slot);
                 if (defender) {
