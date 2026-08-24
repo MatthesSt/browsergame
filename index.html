@@ -310,7 +310,11 @@
 
         .shop-tabs {
             display: grid;
-            grid-template-columns: 1fr 1fr;
+            /* Auto columns rather than a fixed pair: the leaderboard tab is only there
+               when there is a board to look at, and the shop must fill the strip on its
+               own the rest of the time. */
+            grid-auto-flow: column;
+            grid-auto-columns: 1fr;
             gap: 6px;
             flex: none;
             margin-bottom: 10px;
@@ -652,20 +656,11 @@
             color: #ffe7a8;
         }
 
-        .leaderboard-empty,
-        .leaderboard-offline-note {
+        .leaderboard-empty {
             margin: 12px 2px;
             color: #9fb6cc;
             font-size: 0.8rem;
             line-height: 1.4;
-        }
-
-        .leaderboard-offline-note {
-            padding: 8px 10px;
-            border-radius: 10px;
-            border: 1px solid #7d3a3a;
-            background: #2a1a1f66;
-            color: #ffbdbd;
         }
 
         /* Qualified with .popover-card so it wins over the full-screen sizing that
@@ -1521,7 +1516,6 @@
                             <tbody id="leaderboardRows"></tbody>
                         </table>
                         <p id="leaderboardEmpty" class="leaderboard-empty">Nothing banked yet - deposit some progress and the board is yours.</p>
-                        <p id="leaderboardOfflineNote" class="leaderboard-offline-note" hidden>Offline-mode: no leaderboard server reachable, so this is your own run only.</p>
                     </div>
                 </aside>
             </div>
@@ -1722,7 +1716,6 @@
             const leaderboardPaneEl = document.getElementById("leaderboardPane");
             const leaderboardRowsEl = document.getElementById("leaderboardRows");
             const leaderboardEmptyEl = document.getElementById("leaderboardEmpty");
-            const leaderboardOfflineNoteEl = document.getElementById("leaderboardOfflineNote");
             const leaderboardNameEl = document.getElementById("leaderboardName");
             const leaderboardStatusEl = document.getElementById("leaderboardStatus");
             const skillTreeZoomOutBtn = document.getElementById("skillTreeZoomOutBtn");
@@ -6696,8 +6689,6 @@
             // seconds - the server keeps the best anyway, so there is nothing to gain
             // from chattier reporting.
             function reportScore(force = false) {
-                // Offline the board shows this run, so it has to follow the run.
-                if (!leaderboardOnline && isLeaderboardTabActive()) renderOfflineLeaderboard();
                 if (!leaderboard) return;
                 const score = Math.max(0, Math.floor(save.bestRunScore));
                 if (score <= 0) return;
@@ -6735,30 +6726,14 @@
                 if (!leaderboardRowsEl) return;
 
                 leaderboardOnline = true;
+                syncLeaderboardTabVisibility();
                 leaderboardRowsEl.textContent = "";
                 leaderboardEmptyEl.hidden = entries.length > 0;
-                leaderboardOfflineNoteEl.hidden = true;
 
                 for (const entry of entries) {
                     const isSelf = !!leaderboard && entry.player_id === leaderboard.playerId;
                     leaderboardRowsEl.appendChild(leaderboardRow(entry, isSelf));
                 }
-            }
-
-            // No server to rank against, so the board is just this run: the player still
-            // gets to see where they stand, with the panel saying why it is alone.
-            function renderOfflineLeaderboard() {
-                if (!leaderboardRowsEl) return;
-
-                leaderboardRowsEl.textContent = "";
-                leaderboardEmptyEl.hidden = true;
-                leaderboardOfflineNoteEl.hidden = false;
-                leaderboardRowsEl.appendChild(leaderboardRow({
-                    rank: 0,
-                    name: (leaderboard && leaderboard.name) || "You",
-                    score: Math.max(0, Math.floor(save.bestRunScore)),
-                    wave: Math.max(0, save.bestRunWave)
-                }, true));
             }
 
             function setLeaderboardStatus(status) {
@@ -6770,9 +6745,18 @@
                     leaderboardStatusEl.classList.toggle("live", leaderboardOnline);
                     leaderboardStatusEl.classList.toggle("offline", !leaderboardOnline);
                 }
-                // A dropped connection leaves stale ranks on screen otherwise.
-                if (leaderboardOnline) leaderboardOfflineNoteEl.hidden = true;
-                else renderOfflineLeaderboard();
+                syncLeaderboardTabVisibility();
+            }
+
+            // No server, no tab. An offline board could only ever show the player their
+            // own run back, which is already on the HUD - so rather than a panel that
+            // explains why it is empty, there is nothing to click at all.
+            function syncLeaderboardTabVisibility() {
+                const available = Boolean(leaderboard) && leaderboardOnline;
+                setButtonVisible(shopTabLeaderboardBtn, available);
+                // A board that drops while you are reading it must not leave you looking
+                // at a panel with no way back.
+                if (!available && isLeaderboardTabActive()) setShopTab("shop");
             }
 
             function isLeaderboardTabActive() {
@@ -6790,9 +6774,10 @@
 
                 if (!showBoard) return;
                 // Looking at the board is the moment the player cares about their standing.
-                if (leaderboardOnline) reportScore(true);
-                else renderOfflineLeaderboard();
+                reportScore(true);
             }
+
+            syncLeaderboardTabVisibility();
 
             if (leaderboard) {
                 leaderboardNameEl.value = leaderboard.name;
