@@ -531,6 +531,109 @@
             font-weight: 500;
         }
 
+        .defender-bulk {
+            display: flex;
+            gap: 6px;
+            margin-bottom: 2px;
+        }
+
+        .defender-bulk .focus-option {
+            flex: 1;
+            text-align: center;
+        }
+
+        .focus-option.strong {
+            border-color: #5d84ab;
+            color: #eaf4ff;
+        }
+
+        /* Sits inside the row button, so it is a span the click handler picks out by
+           hit-testing rather than a nested button, which markup does not allow. */
+        .defender-tick {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            width: 18px;
+            height: 18px;
+            margin-right: 8px;
+            border-radius: 5px;
+            border: 1px solid #4d6d90;
+            background: #0e1e30;
+            color: #eaf4ff;
+            font-size: 0.7rem;
+            line-height: 1;
+        }
+
+        .defender-row .shop-btn-title {
+            align-items: center;
+        }
+
+        /* Both halves are boxes of their own, so each centres its own contents and the
+           row no longer hangs its text off a shared text baseline. */
+        .defender-row .shop-btn-title > span {
+            display: inline-flex;
+            align-items: center;
+            min-height: 20px;
+        }
+
+        /* Centring the line box leaves the capitals riding high, because the box
+           reserves room for descenders these words do not use. Both text runs get the
+           half-descender back so the ink is centred rather than the box. */
+        .defender-row .defender-name,
+        .defender-row .shop-btn-level {
+            position: relative;
+            top: 1px;
+        }
+
+        .defender-row-right {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .defender-name[data-defender-rename]:hover {
+            text-decoration: underline dotted;
+            text-underline-offset: 3px;
+        }
+
+        .defender-name-input {
+            width: 100%;
+            min-width: 0;
+            padding: 1px 5px;
+            border-radius: 6px;
+            border: 1px solid #6f9ac4;
+            background: #0b1a2b;
+            color: #eaf4ff;
+            font: inherit;
+            font-size: 0.82rem;
+        }
+
+        .defender-name-input:focus {
+            outline: none;
+            border-color: #7fd7ff;
+        }
+
+        .defender-recall {
+            padding: 2px 8px;
+            border-radius: 7px;
+            border: 1px solid #4d6d90;
+            background: #12283e;
+            color: #9fb6cc;
+            font-size: 0.72rem;
+            font-weight: 700;
+            letter-spacing: 0.04em;
+        }
+
+        .defender-recall:hover {
+            background: #1b3a56;
+            color: #eaf4ff;
+        }
+
+        .defender-tick.on {
+            border-color: #7fd7ff;
+            background: #1b4a63;
+        }
+
         .gatherer-focus-empty {
             font-size: 0.74rem;
             color: #b8cbe0;
@@ -2049,7 +2152,7 @@
 
             const tower = { x: -W(108) / 2, y: -W(88) / 2, w: W(108), h: W(88) };
             const TOWER_MAX_HP = 100;
-            const START_BUDGET = { wood: 40, stone: 30, crystal: 0, amber: 0, aether: 0, essence: 0 };
+            const START_BUDGET = { wood: 4000, stone: 3000, crystal: 1000, amber: 1000, aether: 1000, essence: 0 };
             const START_WAVE_COUNT = 1;
             const WAVE_START_DELAY = 3600;
             const WAVE_BREAK_TICKS = 320;
@@ -2351,6 +2454,12 @@
             const FERRY_DOCKS = buildFerryDocks();
 
             // Which bank a point is on: 1 for the tower's side, -1 for the tribe's.
+            // Plain box overlap. Named for what it is asked rather than for the camera,
+            // because the ferry uses it to ask whether a walk goes anywhere near water.
+            function viewIntersectsBox(aMinX, aMinY, aMaxX, aMaxY, bMinX, bMinY, bMaxX, bMaxY) {
+                return aMaxX >= bMinX && aMinX <= bMaxX && aMaxY >= bMinY && aMinY <= bMaxY;
+            }
+
             function bankOf(x, y) {
                 const near = nearestRiverPoint(x, y);
                 return ((x - near.x) * near.normalX + (y - near.y) * near.normalY) >= 0 ? 1 : -1;
@@ -2403,6 +2512,16 @@
                     // seconds, that the water is allowed to hold.
                     return true;
                 }
+
+                // To be on opposite banks the walk has to cross the water, and to cross
+                // the water it has to pass through the river's own box. If it does not,
+                // the two ends are on the same side and none of this needs working out -
+                // which is every step of every minion for the whole of the meadow.
+                if (!viewIntersectsBox(
+                    Math.min(entity.x, targetX), Math.min(entity.y, targetY),
+                    Math.max(entity.x, targetX), Math.max(entity.y, targetY),
+                    RIVER_BOUNDS.minX, RIVER_BOUNDS.minY, RIVER_BOUNDS.maxX, RIVER_BOUNDS.maxY
+                )) return false;
 
                 if (!minionMayCross(entity)) return false;
                 const side = trackBank(entity);
@@ -2579,7 +2698,14 @@
                 // silent reassignment.
                 openMinionPicker: null,
                 // Slot of the defender waiting for its post to be clicked on the map.
-                pendingDefenderPost: null,
+                // Slots waiting on a map click. A single defender arms a set of one, so
+                // there is one placement path rather than two that drift apart.
+                pendingDefenderPosts: [],
+                // Ticked rows, kept between placements: moving the same four defenders
+                // twice should not mean picking them out twice.
+                selectedDefenders: [],
+                // Slot whose name is being typed, or null.
+                renamingDefender: null,
                 // Which kind of stored turret the next map click places. Traded turrets
                 // sit in the store until then, rather than demanding to be placed the
                 // moment the caravan gets home.
@@ -2743,6 +2869,7 @@
                     gathererFocusBySlot: {},
                     gathererFocusCursor: 0,
                     farBankBySlot: {},
+                    defenderNameBySlot: {},
                     traderRouteBySlot: {},
                     defenderPostBySlot: {}
                 };
@@ -2779,6 +2906,9 @@
                         : {};
                     const farBankBySlot = data.farBankBySlot && typeof data.farBankBySlot === "object"
                         ? data.farBankBySlot
+                        : {};
+                    const defenderNameBySlot = data.defenderNameBySlot && typeof data.defenderNameBySlot === "object"
+                        ? data.defenderNameBySlot
                         : {};
                     const defenderPostBySlot = data.defenderPostBySlot && typeof data.defenderPostBySlot === "object"
                         ? data.defenderPostBySlot
@@ -2827,6 +2957,7 @@
                         gathererFocusBySlot,
                         gathererFocusCursor,
                         farBankBySlot,
+                        defenderNameBySlot,
                         traderRouteBySlot,
                         defenderPostBySlot,
                         unlockedSkills,
@@ -3757,24 +3888,49 @@
                     .map((minion, index) => {
                         const slot = Number.isFinite(minion.slotIndex) ? minion.slotIndex : index;
                         const post = defenderPostFor(minion);
-                        return `${index}:${slot}:${Math.round(post.x)},${Math.round(post.y)}`;
+                        return `${index}:${slot}:${Math.round(post.x)},${Math.round(post.y)}:${isDefenderSelected(slot) ? 1 : 0}:${defenderDisplayName(slot, index)}`;
                     })
-                    .join("|") + `|place:${game.pendingDefenderPost}`;
+                    .join("|") + `|place:${game.pendingDefenderPosts.join(",")}|rename:${game.renamingDefender}`;
                 if (defenderPostListEl.dataset.renderKey === renderKey) return;
                 defenderPostListEl.dataset.renderKey = renderKey;
 
-                defenderPostListEl.innerHTML = defenders
+                // Bulk first: with a dozen defenders the common job is moving a group,
+                // and a row on its own still stations one the way it always has.
+                const picked = selectedDefenderSlots();
+                const allPicked = picked.length === defenders.length && defenders.length > 0;
+                const bulk = `<div class="defender-bulk">`
+                    + `<button class="focus-option" data-defender-select="${allPicked ? "none" : "all"}">${allPicked ? "Untick all" : "Tick all"}</button>`
+                    + (picked.length > 0
+                        ? `<button class="focus-option strong" data-defender-station-group="1">Station ${picked.length}</button>`
+                            + `<button class="focus-option" data-defender-recall-group="1">Recall ${picked.length}</button>`
+                        : "")
+                    + `</div>`;
+
+                defenderPostListEl.innerHTML = bulk + defenders
                     .map((minion, index) => {
                         const slot = Number.isFinite(minion.slotIndex) ? minion.slotIndex : index;
                         const custom = hasCustomDefenderPost(slot);
-                        const placing = game.pendingDefenderPost === slot;
+                        const placing = isDefenderArmed(slot);
+                        const ticked = isDefenderSelected(slot);
                         const label = placing
                             ? "click the map"
                             : (custom ? "Stationed" : "At tower");
-                        return `<button class="secondary shop-btn gatherer-focus-row${placing ? " picker-open" : ""}${custom ? "" : " route-idle"}" data-defender-slot="${slot}"><span class="shop-btn-title"><span>Defender ${index + 1}</span><span class="shop-btn-level">${label}</span></span></button>`
-                            + (custom && !placing
-                                ? `<div class="focus-options"><button class="focus-option" data-defender-recall="${slot}">Recall to tower</button></div>`
-                                : "");
+                        // Tick, name, status and recall all on the one line: a defender
+                        // is a single row however it is stationed, so a dozen of them is
+                        // a list you can read rather than a list you have to scroll.
+                        const name = defenderDisplayName(slot, index);
+
+                        // While a name is being typed the row is a plain div: an input
+                        // cannot live inside a button, and the row must not arm a
+                        // placement every time you click into the box.
+                        if (game.renamingDefender === slot) {
+                            return `<div class="secondary shop-btn gatherer-focus-row defender-row picker-open"><span class="shop-btn-title"><span><span class="defender-tick${ticked ? " on" : ""}" data-defender-pick="${slot}">${ticked ? "&#10003;" : ""}</span><input class="defender-name-input" data-defender-name="${slot}" value="${escapeHtml(name)}" maxlength="${DEFENDER_NAME_MAX}" aria-label="Defender name"></span><span class="defender-row-right"><span class="shop-btn-level">enter to save</span></span></span></div>`;
+                        }
+
+                        const recall = custom && !placing
+                            ? `<span class="defender-recall" data-defender-recall="${slot}" role="button" title="Send this one back to the tower">Recall</span>`
+                            : "";
+                        return `<button class="secondary shop-btn gatherer-focus-row defender-row${placing ? " picker-open" : ""}${custom ? "" : " route-idle"}" data-defender-slot="${slot}"><span class="shop-btn-title"><span><span class="defender-tick${ticked ? " on" : ""}" data-defender-pick="${slot}" role="checkbox" aria-checked="${ticked}" title="Tick to move this one with the group">${ticked ? "&#10003;" : ""}</span><span class="defender-name" data-defender-rename="${slot}" title="Click the name to rename this one">${escapeHtml(name)}</span></span><span class="defender-row-right"><span class="shop-btn-level">${label}</span>${recall}</span></span></button>`;
                     })
                     .join("");
             }
@@ -3814,6 +3970,85 @@
 
             function minionPickerKey(kind, slot) {
                 return `${kind}:${slot}`;
+            }
+
+            const DEFENDER_FORMATION_SPACING = W(52);
+            const DEFENDER_FORMATION_MIN_RADIUS = W(44);
+
+            const DEFENDER_NAME_MAX = 18;
+
+            // A defender is "Defender 3" until you give it something better to answer to.
+            function defenderDisplayName(slot, index) {
+                const stored = save.defenderNameBySlot ? save.defenderNameBySlot[String(slot)] : null;
+                const name = typeof stored === "string" ? stored.trim() : "";
+                return name || `Defender ${index + 1}`;
+            }
+
+            function setDefenderName(slot, rawName) {
+                if (!save.defenderNameBySlot || typeof save.defenderNameBySlot !== "object") {
+                    save.defenderNameBySlot = {};
+                }
+                const name = String(rawName || "").trim().slice(0, DEFENDER_NAME_MAX);
+                // Clearing the box gives it its number back rather than leaving it blank.
+                if (name) save.defenderNameBySlot[String(slot)] = name;
+                else delete save.defenderNameBySlot[String(slot)];
+                saveGame();
+            }
+
+            function escapeHtml(value) {
+                return String(value)
+                    .replace(/&/g, "&amp;")
+                    .replace(/</g, "&lt;")
+                    .replace(/>/g, "&gt;")
+                    .replace(/"/g, "&quot;");
+            }
+
+            function isDefenderArmed(slot) {
+                return game.pendingDefenderPosts.includes(slot);
+            }
+
+            function defenderPlacementPending() {
+                return game.pendingDefenderPosts.length > 0;
+            }
+
+            function clearDefenderPlacement() {
+                game.pendingDefenderPosts = [];
+            }
+
+            function isDefenderSelected(slot) {
+                return game.selectedDefenders.includes(slot);
+            }
+
+            // The selection is only ever a list of ticks in a panel, so it is pruned on
+            // read rather than tracked through every death and disband.
+            function selectedDefenderSlots() {
+                const live = defenderMinionsSortedBySlot().map((minion) => minion.slotIndex);
+                return game.selectedDefenders.filter((slot) => live.includes(slot));
+            }
+
+            function toggleDefenderSelection(slot) {
+                if (isDefenderSelected(slot)) {
+                    game.selectedDefenders = game.selectedDefenders.filter((entry) => entry !== slot);
+                } else {
+                    game.selectedDefenders = game.selectedDefenders.concat(slot);
+                }
+            }
+
+            // Where a group of defenders ends up standing. A ring sized by how many there
+            // are, so eight of them cordon the thing you clicked instead of piling onto
+            // it - and one of them just stands where you pointed.
+            function defenderFormationPoints(count, centerX, centerY) {
+                if (count <= 1) return [{ x: centerX, y: centerY }];
+
+                const radius = Math.max(DEFENDER_FORMATION_MIN_RADIUS, (count * DEFENDER_FORMATION_SPACING) / (Math.PI * 2));
+                const points = [];
+                for (let i = 0; i < count; i += 1) {
+                    // Starting at the top means an even count reads as a ring rather than
+                    // as two ranks either side of the point.
+                    const angle = (i / count) * Math.PI * 2 - Math.PI * 0.5;
+                    points.push({ x: centerX + Math.cos(angle) * radius, y: centerY + Math.sin(angle) * radius });
+                }
+                return points;
             }
 
             function isMinionPickerOpen(kind, slot) {
@@ -4603,6 +4838,16 @@
                 clampCameraPosition();
             }
 
+            // Every label on the map is drawn into a backing store that is roughly twice
+            // the size of the frame it is shown in, so a nominal 11px label lands on
+            // screen nearer five and reads as a smudge however far you zoom in. Every
+            // font on the canvas goes through here, so the whole map is one number.
+            const MAP_TEXT_SCALE = 1.45;
+
+            function mapFont(size, weight = 700) {
+                return `${weight} ${Math.max(9, Math.round(size * MAP_TEXT_SCALE))}px Space Grotesk, sans-serif`;
+            }
+
             // The tower is drawn from directly above: a stone plinth ringed with
             // crenellations, a conical shingled roof drawn as radial seams converging on
             // the apex crystal, and a rune circle that turns as the day runs.
@@ -4825,7 +5070,7 @@
                 targetCtx.lineWidth = 1;
                 targetCtx.stroke();
                 targetCtx.fillStyle = "#ffd9b2";
-                targetCtx.font = `700 ${Math.max(9, Math.round(R * 0.19))}px Space Grotesk, sans-serif`;
+                targetCtx.font = mapFont(Math.max(9, Math.round(R * 0.19)), 700);
                 targetCtx.textAlign = "center";
                 targetCtx.textBaseline = "middle";
                 targetCtx.fillText("TOWER", cx, plateY + plateH * 0.55);
@@ -4968,12 +5213,13 @@
                 targetCtx.setLineDash([]);
 
                 const label = `Sell +${formatCostShort(refund)}`;
-                targetCtx.font = "700 20px Space Grotesk, sans-serif";
+                targetCtx.font = mapFont(20, 700);
                 targetCtx.textAlign = "center";
                 targetCtx.textBaseline = "alphabetic";
                 const width = targetCtx.measureText(label).width + 21;
-                const boxHeight = 30;
-                const boxTop = turret.y - 66;
+                // Scales with the text, or a bigger label would sit outside its plate.
+                const boxHeight = Math.round(30 * MAP_TEXT_SCALE);
+                const boxTop = turret.y - 66 - (boxHeight - 30);
                 targetCtx.fillStyle = "#0b1422dd";
                 targetCtx.fillRect(turret.x - width / 2, boxTop, width, boxHeight);
                 targetCtx.strokeStyle = "#ffd16688";
@@ -4991,7 +5237,7 @@
                 targetCtx.save();
                 targetCtx.globalAlpha = Math.min(1, life * 1.6);
                 targetCtx.fillStyle = "#8ce99a";
-                targetCtx.font = "700 16px Space Grotesk, sans-serif";
+                targetCtx.font = mapFont(16, 700);
                 targetCtx.textAlign = "center";
                 targetCtx.textBaseline = "alphabetic";
                 targetCtx.fillText(`+${pulse.text}`, pulse.x, pulse.y - 26 - (1 - life) * 22);
@@ -5001,13 +5247,16 @@
             // Where each defender is stationed, and the ground it answers for. Without
             // this the post is invisible and a defender looks like it is wandering off.
             function drawDefenderPosts(targetCtx) {
+                const defenders = defenderMinionsSortedBySlot();
                 for (const minion of game.minionUnits) {
                     if (minion.role !== "defender") continue;
                     const slot = Number.isFinite(minion.slotIndex) ? minion.slotIndex : -1;
                     if (slot < 0 || !hasCustomDefenderPost(slot)) continue;
 
                     const post = defenderPostFor(minion);
-                    const armed = game.pendingDefenderPost === slot;
+                    if (!circleInView(post.x, post.y, DEFENDER_PATROL_MAX_RADIUS + 40)
+                        && !circleInView(minion.x, minion.y, 40)) continue;
+                    const armed = isDefenderArmed(slot);
 
                     targetCtx.save();
                     targetCtx.strokeStyle = armed ? "#ffd7c8" : "#ffb08a66";
@@ -5034,16 +5283,29 @@
                     targetCtx.moveTo(post.x, post.y);
                     targetCtx.lineTo(minion.x, minion.y);
                     targetCtx.stroke();
+
+                    // And the name over the post, which is the whole point of giving it
+                    // one: on the map you are looking at ground, not at a list.
+                    const index = defenders.findIndex((entry) => entry.slotIndex === slot);
+                    targetCtx.fillStyle = armed ? "#ffd7c8" : "#ffb08acc";
+                    targetCtx.font = mapFont(11, 700);
+                    targetCtx.textAlign = "center";
+                    targetCtx.textBaseline = "alphabetic";
+                    targetCtx.fillText(defenderDisplayName(slot, index === -1 ? 0 : index), post.x, post.y - 12);
                     targetCtx.restore();
                 }
             }
 
             function drawDefenderPostPreview(targetCtx) {
                 const preview = game.placementPreview;
-                if (!preview || game.pendingDefenderPost === null) return;
+                if (!preview || !defenderPlacementPending()) return;
 
                 const x = clamp(preview.x, world.minX + 16, world.maxX - 16);
                 const y = clamp(preview.y, world.minY + 16, world.maxY - 16);
+                // The same ring the click will actually hand out, so what you are shown
+                // is where they end up rather than roughly where you pointed.
+                const count = game.pendingDefenderPosts.length;
+                const points = defenderFormationPoints(count, x, y);
 
                 targetCtx.save();
                 targetCtx.fillStyle = "#ffb08a14";
@@ -5057,16 +5319,23 @@
                 targetCtx.arc(x, y, DEFENDER_PATROL_MAX_RADIUS, 0, Math.PI * 2);
                 targetCtx.stroke();
                 targetCtx.setLineDash([]);
-                targetCtx.beginPath();
-                targetCtx.arc(x, y, 6, 0, Math.PI * 2);
-                targetCtx.fillStyle = "#ffd7c8";
-                targetCtx.fill();
-                targetCtx.stroke();
+
+                for (const point of points) {
+                    targetCtx.beginPath();
+                    targetCtx.arc(point.x, point.y, 6, 0, Math.PI * 2);
+                    targetCtx.fillStyle = "#ffd7c8";
+                    targetCtx.fill();
+                    targetCtx.stroke();
+                }
 
                 targetCtx.fillStyle = "#ffd7c8";
-                targetCtx.font = "700 18px Space Grotesk, sans-serif";
+                targetCtx.font = mapFont(18, 700);
                 targetCtx.textAlign = "center";
-                targetCtx.fillText("Station defender here", x, y - DEFENDER_PATROL_MAX_RADIUS - 14);
+                targetCtx.fillText(
+                    count > 1 ? `Station ${count} defenders here` : "Station defender here",
+                    x,
+                    y - DEFENDER_PATROL_MAX_RADIUS - 14
+                );
                 targetCtx.restore();
             }
 
@@ -5160,7 +5429,7 @@
 
                 targetCtx.save();
                 targetCtx.fillStyle = "#ffe7a8";
-                targetCtx.font = "700 11px Space Grotesk, sans-serif";
+                targetCtx.font = mapFont(11, 700);
                 targetCtx.textAlign = "center";
                 targetCtx.textBaseline = "alphabetic";
                 targetCtx.fillText("YOU", x, y - 10);
@@ -5231,7 +5500,7 @@
 
                     targetCtx.save();
                     targetCtx.fillStyle = "#ffd1d1";
-                    targetCtx.font = "700 14px Space Grotesk, sans-serif";
+                    targetCtx.font = mapFont(14, 700);
                     targetCtx.textAlign = "center";
                     targetCtx.textBaseline = "alphabetic";
                     targetCtx.fillText("BOSS", x, y - 15 * scale);
@@ -5319,6 +5588,7 @@
                 for (const patch of patches) {
                     const style = patch.style;
                     if (!style) continue;
+                    if (!circleInView(patch.cx, patch.cy, patch.r * TERRAIN_OVERHANG)) continue;
 
                     targetCtx.save();
                     // The patch never moves, so its gradient is built once per context
@@ -5567,6 +5837,7 @@
             }
 
             function drawVillage(targetCtx) {
+                if (!circleInView(village.x, village.y, village.r * 2.2)) return;
                 const layout = getVillageLayout();
                 const cx = village.x;
                 const cy = village.y;
@@ -5696,7 +5967,7 @@
                 targetCtx.lineWidth = 1;
                 targetCtx.stroke();
                 targetCtx.fillStyle = "#ffd9b2";
-                targetCtx.font = `700 ${Math.max(9, Math.round(R * 0.14))}px Space Grotesk, sans-serif`;
+                targetCtx.font = mapFont(Math.max(9, Math.round(R * 0.14)), 700);
                 targetCtx.textAlign = "center";
                 targetCtx.textBaseline = "middle";
                 targetCtx.fillText("VILLAGE", 0, plateY + plateH * 0.55);
@@ -5736,6 +6007,7 @@
             }
 
             function drawCity(targetCtx) {
+                if (!circleInView(city.x, city.y, city.r * 2.2)) return;
                 const layout = getCityLayout();
                 const R = city.r;
                 const breathe = 0.5 + 0.5 * Math.sin(game.dayTick * 0.04);
@@ -5856,7 +6128,7 @@
                 targetCtx.lineWidth = 1;
                 targetCtx.stroke();
                 targetCtx.fillStyle = "#dbe6f5";
-                targetCtx.font = `700 ${Math.max(9, Math.round(R * 0.12))}px Space Grotesk, sans-serif`;
+                targetCtx.font = mapFont(Math.max(9, Math.round(R * 0.12)), 700);
                 targetCtx.textAlign = "center";
                 targetCtx.textBaseline = "middle";
                 targetCtx.fillText("CITY", 0, plateY + plateH * 0.55);
@@ -5868,6 +6140,8 @@
                 targetCtx.lineWidth = 2;
 
                 for (const spawner of spawners) {
+                    // The marker, its labels and the capture ring all sit inside this.
+                    if (!circleInView(spawner.x, spawner.y, 70)) continue;
                     const config = materialConfig[spawner.type];
                     const claimed = spawner.claimedBy !== null;
                     const tribeHeld = spawner.owner === "tribe";
@@ -5896,7 +6170,7 @@
                     targetCtx.globalAlpha = 1;
 
                     targetCtx.fillStyle = claimed ? "#ffd3d3" : (tribeHeld ? "#ffd8c4" : "#f4f8ffcc");
-                    targetCtx.font = "700 9px Space Grotesk, sans-serif";
+                    targetCtx.font = mapFont(9, 700);
                     targetCtx.textAlign = "center";
                     targetCtx.textBaseline = "alphabetic";
                     targetCtx.fillText(spawner.type.toUpperCase(), spawner.x, spawner.y + 42);
@@ -5942,6 +6216,7 @@
 
                 for (let i = 0; i < spawners.length; i += 1) {
                     const spawner = spawners[i];
+                    if (!circleInView(spawner.x, spawner.y, 70)) continue;
                     const cap = Math.max(1, activeNodeCapForSpawner(i));
                     const current = activeBySpawner[i];
                     const ratio = Math.max(0, Math.min(1, current / cap));
@@ -6282,11 +6557,42 @@
                 }
             }
 
+            // The map is eight screens wide, so on any given frame most of what there is
+            // to draw is behind the camera. Everything drawn in world space gets a box
+            // test first - it is the difference between a few hundred canvas calls a
+            // frame and a few thousand.
+            function viewIntersects(minX, minY, maxX, maxY) {
+                return maxX >= cameraState.x
+                    && minX <= cameraState.x + viewWorldW()
+                    && maxY >= cameraState.y
+                    && minY <= cameraState.y + viewWorldH();
+            }
+
+            function circleInView(x, y, radius) {
+                return viewIntersects(x - radius, y - radius, x + radius, y + radius);
+            }
+
+            // A box around the whole river answers "no" almost never: the water runs
+            // corner to corner, so its bounding box covers half the map and takes in the
+            // tower with it. The segments are tested one at a time instead, behind the
+            // whole-river box as a cheap first reject.
+            const RIVER_SEGMENT_REACH = RIVER_HALF_WIDTH + W(140);
+
             function riverInView() {
-                return RIVER_BOUNDS.maxX >= cameraState.x
-                    && RIVER_BOUNDS.minX <= cameraState.x + viewWorldW()
-                    && RIVER_BOUNDS.maxY >= cameraState.y
-                    && RIVER_BOUNDS.minY <= cameraState.y + viewWorldH();
+                if (!viewIntersects(RIVER_BOUNDS.minX, RIVER_BOUNDS.minY, RIVER_BOUNDS.maxX, RIVER_BOUNDS.maxY)) {
+                    return false;
+                }
+
+                for (let i = 0; i < RIVER_PATH.length - 1; i += 1) {
+                    const from = RIVER_PATH[i];
+                    const to = RIVER_PATH[i + 1];
+                    const minX = Math.min(from.x, to.x) - RIVER_SEGMENT_REACH;
+                    const maxX = Math.max(from.x, to.x) + RIVER_SEGMENT_REACH;
+                    const minY = Math.min(from.y, to.y) - RIVER_SEGMENT_REACH;
+                    const maxY = Math.max(from.y, to.y) + RIVER_SEGMENT_REACH;
+                    if (viewIntersects(minX, minY, maxX, maxY)) return true;
+                }
+                return false;
             }
 
             // Damp earth, then the reeds that grow in it, then the water: bands of the
@@ -6397,6 +6703,10 @@
                         targetCtx.beginPath();
                         for (const stone of RIVER_BANK_DETAIL.stones) {
                             if (stone.pale !== pass.pale) continue;
+                            // The bank runs the length of the map; the frame shows a few
+                            // hundred units of it. Testing each piece is far cheaper than
+                            // handing the whole shoreline to the rasteriser every frame.
+                            if (!circleInView(stone.x, stone.y, stone.rx + 4)) continue;
                             targetCtx.moveTo(stone.x + stone.rx, stone.y);
                             targetCtx.ellipse(stone.x, stone.y, stone.rx, stone.ry, stone.angle, 0, Math.PI * 2);
                         }
@@ -6407,6 +6717,10 @@
 
                     targetCtx.beginPath();
                     for (const blade of RIVER_BANK_DETAIL.blades) {
+                        if (!viewIntersects(
+                            Math.min(blade.x1, blade.x2) - 4, Math.min(blade.y1, blade.y2) - 4,
+                            Math.max(blade.x1, blade.x2) + 4, Math.max(blade.y1, blade.y2) + 4
+                        )) continue;
                         targetCtx.moveTo(blade.x1, blade.y1);
                         targetCtx.lineTo(blade.x2, blade.y2);
                     }
@@ -6571,6 +6885,7 @@
             }
 
             function drawTribeCamp(targetCtx) {
+                if (!circleInView(tribeCamp.x, tribeCamp.y, tribeCamp.r * 1.6)) return;
                 const layout = getTribeCampLayout();
 
                 targetCtx.save();
@@ -6629,7 +6944,7 @@
                 targetCtx.stroke();
 
                 targetCtx.fillStyle = "#ffd8c4";
-                targetCtx.font = "700 11px Space Grotesk, sans-serif";
+                targetCtx.font = mapFont(11, 700);
                 targetCtx.textAlign = "center";
                 targetCtx.fillText("TRIBE CAMP", tribeCamp.x, tribeCamp.y + tribeCamp.r + 18);
                 targetCtx.restore();
@@ -7511,7 +7826,13 @@
                         y: clamp(stored.y, world.minY + 16, world.maxY - 16)
                     };
                     keepOutOfRiver(point, MINION_RIVER_RADIUS);
-                    return { x: point.x, y: point.y, bank: bankOf(point.x, point.y), custom: true };
+                    // Worked out once when the post is placed and kept on the record:
+                    // this is read several times a tick by every defender that has one,
+                    // and each miss is a walk over every segment of the river.
+                    if (stored.bank !== 1 && stored.bank !== -1) {
+                        stored.bank = bankOf(point.x, point.y);
+                    }
+                    return { x: point.x, y: point.y, bank: stored.bank, custom: true };
                 }
                 return { x: TOWER_CENTER_X, y: TOWER_CENTER_Y, bank: 1, custom: false };
             }
@@ -8037,7 +8358,9 @@
             function resetSession() {
                 clearRuntimeSnapshot();
                 closeMinionPicker();
-                game.pendingDefenderPost = null;
+                clearDefenderPlacement();
+                game.selectedDefenders = [];
+                game.renamingDefender = null;
                 game.selectedTurretType = null;
                 clearSpawnerClaims();
                 // Drop the old run's units before anything syncs: they carry per-slot
@@ -9649,7 +9972,7 @@
                             ctx.arc(minion.x, minion.y - 12, 4, 0, Math.PI * 2);
                             ctx.fill();
                             ctx.fillStyle = "#f4f8ff";
-                            ctx.font = "700 10px Space Grotesk, sans-serif";
+                            ctx.font = mapFont(10, 700);
                             ctx.textAlign = "left";
                             ctx.fillText(String(minion.carryLoad), minion.x + 7, minion.y - 9);
                         }
@@ -9699,7 +10022,7 @@
 
                         if (minion.carryLoad > 1) {
                             ctx.fillStyle = "#f4f8ff";
-                            ctx.font = "700 10px Space Grotesk, sans-serif";
+                            ctx.font = mapFont(10, 700);
                             ctx.textAlign = "left";
                             ctx.textBaseline = "alphabetic";
                             ctx.fillText(String(minion.carryLoad), minion.x + 5, minion.y - 7);
@@ -9775,7 +10098,7 @@
                         ctx.fillStyle = ratio > 0.35 ? "#ff7043" : "#ffd166";
                         ctx.fillRect(enemy.x - barW * 0.5, enemy.y - enemy.r - 22, barW * ratio, 8);
                         ctx.fillStyle = "#ffd8c4";
-                        ctx.font = "700 10px Space Grotesk, sans-serif";
+                        ctx.font = mapFont(10, 700);
                         ctx.textAlign = "center";
                         ctx.fillText("WAR-CHIEF", enemy.x, enemy.y - enemy.r - 27);
                     }
@@ -9865,25 +10188,25 @@
                 const inTower = canDeposit();
                 if (inTower && carryNow > 0) {
                     ctx.fillStyle = "#1f7a56";
-                    ctx.font = "700 16px Space Grotesk, sans-serif";
+                    ctx.font = mapFont(16, 700);
                     ctx.fillText("Depositing...", tower.x - 12, tower.y - 10);
                 }
 
                 if (game.depositPulse > 0) {
                     ctx.fillStyle = "#1f7a56";
-                    ctx.font = "700 18px Space Grotesk, sans-serif";
+                    ctx.font = mapFont(18, 700);
                     ctx.fillText(`+${Math.ceil(game.depositPulse)} stored`, tower.x - 8, tower.y - 34);
                 }
 
                 if (game.minionPulse > 0) {
                     ctx.fillStyle = "#1f7a56";
-                    ctx.font = "700 14px Space Grotesk, sans-serif";
+                    ctx.font = mapFont(14, 700);
                     ctx.fillText(`Minions +${Math.ceil(game.minionPulse)} bank`, tower.x - 8, tower.y - 52);
                 }
 
                 if (game.towerPulse < 0) {
                     ctx.fillStyle = "#ff7f7f";
-                    ctx.font = "700 16px Space Grotesk, sans-serif";
+                    ctx.font = mapFont(16, 700);
                     ctx.fillText(`${Math.floor(game.towerPulse)} tower`, tower.x - 8, tower.y - 70);
                 }
 
@@ -9904,7 +10227,7 @@
                 if (pendingTurretTotal > 0) {
                     ctx.save();
                     ctx.fillStyle = "#9be7ff";
-                    ctx.font = "700 16px Space Grotesk, sans-serif";
+                    ctx.font = mapFont(16, 700);
                     ctx.textAlign = "center";
                     ctx.textBaseline = "alphabetic";
                     const basicPending = game.pendingBasicTurretPlacements;
@@ -9912,7 +10235,7 @@
                     const slowPending = game.pendingSlowTurretPlacements;
                     ctx.fillText(`Place turret: ${pendingTurretTotal} (B:${basicPending} S:${sniperPending} F:${slowPending})`, viewport.w / 2, 34);
                     ctx.fillStyle = "#9be7ffaa";
-                    ctx.font = "500 13px Space Grotesk, sans-serif";
+                    ctx.font = mapFont(13, 500);
                     ctx.fillText("Right-click to cancel and refund", viewport.w / 2, 54);
                     ctx.restore();
                 }
@@ -9927,15 +10250,15 @@
                     ctx.textAlign = "center";
 
                     ctx.fillStyle = "#ff8f8f";
-                    ctx.font = "700 48px Space Grotesk, sans-serif";
+                    ctx.font = mapFont(48, 700);
                     ctx.fillText("RUN OVER", cx, cy - 96);
 
                     ctx.fillStyle = "#ffdede";
-                    ctx.font = "500 21px Space Grotesk, sans-serif";
+                    ctx.font = mapFont(21, 500);
                     ctx.fillText(`The tower fell on wave ${summary.wave}.`, cx, cy - 58);
 
                     ctx.fillStyle = summary.record ? "#ffe08a" : "#ff9f9f";
-                    ctx.font = "700 30px Space Grotesk, sans-serif";
+                    ctx.font = mapFont(30, 700);
                     ctx.fillText(
                         summary.record
                             ? `${summary.score} progress - new best run`
@@ -9945,28 +10268,28 @@
                     );
 
                     ctx.fillStyle = "#cfe9d8";
-                    ctx.font = "500 19px Space Grotesk, sans-serif";
+                    ctx.font = mapFont(19, 500);
                     ctx.fillText(`+${summary.essence} essence kept - best run so far ${save.bestRunScore}, deepest wave ${save.bestRunWave}`, cx, cy + 22);
 
                     ctx.fillStyle = "#e0b9b9";
-                    ctx.font = "500 17px Space Grotesk, sans-serif";
+                    ctx.font = mapFont(17, 500);
                     ctx.fillText(`Lost with the run: ${summary.turrets} turret${summary.turrets === 1 ? "" : "s"}, ${summary.minions} minion${summary.minions === 1 ? "" : "s"}, and the bank.`, cx, cy + 60);
                     ctx.fillStyle = "#f3e2e2";
                     ctx.fillText("Your skill tree and essence carry over - spend them before going again.", cx, cy + 88);
 
                     ctx.fillStyle = "#cde6f2";
-                    ctx.font = "500 18px Space Grotesk, sans-serif";
+                    ctx.font = mapFont(18, 500);
                     ctx.fillText(`New Run to start run ${summary.runsPlayed + 1}.`, cx, cy + 128);
                 } else if (!game.running) {
                     ctx.fillStyle = "#112233cc";
                     ctx.fillRect(0, 0, viewport.w, viewport.h);
                     ctx.fillStyle = "#f8fcff";
                     ctx.textAlign = "center";
-                    ctx.font = "700 44px Space Grotesk, sans-serif";
+                    ctx.font = mapFont(44, 700);
                     ctx.fillText("Meadow Gatherer", viewport.w / 2, viewport.h / 2 - 20);
 
                     ctx.fillStyle = "#cde6f2";
-                    ctx.font = "500 20px Space Grotesk, sans-serif";
+                    ctx.font = mapFont(20, 500);
                     if (game.started) {
                         ctx.fillText("Paused - Press Pause/Resume or P", viewport.w / 2, viewport.h / 2 + 20);
                     } else {
@@ -9974,7 +10297,7 @@
                     }
 
                     ctx.fillStyle = "#e9f4fb";
-                    ctx.font = "500 17px Space Grotesk, sans-serif";
+                    ctx.font = mapFont(17, 500);
                     ctx.fillText("Move: Arrow Keys / WASD (or touch drag)", viewport.w / 2, viewport.h / 2 + 56);
                     ctx.fillText("Zoom the map: mouse wheel, [ and ], 0 to reset", viewport.w / 2, viewport.h / 2 + 84);
                     ctx.fillText("Walk into TOWER to bank materials", viewport.w / 2, viewport.h / 2 + 112);
@@ -10545,10 +10868,14 @@
                     cameraState.suppressClick = false;
                     return;
                 }
-                if (game.pendingDefenderPost !== null) {
+                if (defenderPlacementPending()) {
                     const postPoint = worldPointFromClient(e.clientX, e.clientY);
-                    setDefenderPost(game.pendingDefenderPost, postPoint.x, postPoint.y);
-                    game.pendingDefenderPost = null;
+                    const slots = game.pendingDefenderPosts;
+                    const points = defenderFormationPoints(slots.length, postPoint.x, postPoint.y);
+                    for (let i = 0; i < slots.length; i += 1) {
+                        setDefenderPost(slots[i], points[i].x, points[i].y);
+                    }
+                    clearDefenderPlacement();
                     refreshHud();
                     updatePlacementPreview(e.clientX, e.clientY);
                     return;
@@ -10563,8 +10890,8 @@
                 e.preventDefault();
                 // A queued purchase is the more recent intent, so cancel that first;
                 // with nothing pending, right-click sells whatever turret is under it.
-                if (game.pendingDefenderPost !== null) {
-                    game.pendingDefenderPost = null;
+                if (defenderPlacementPending()) {
+                    clearDefenderPlacement();
                     refreshHud();
                     updatePlacementPreview(e.clientX, e.clientY);
                     return;
@@ -10909,6 +11236,34 @@
                 refreshHud();
             });
 
+            // Enter keeps the name, Escape drops it, and clicking away keeps it too -
+            // the same bargain every rename box in every other program makes.
+            function commitDefenderName(input, keep) {
+                const slot = Number.parseInt(input.dataset.defenderName, 10);
+                if (!Number.isFinite(slot)) return;
+                if (keep) setDefenderName(slot, input.value);
+                game.renamingDefender = null;
+                refreshHud();
+            }
+
+            defenderPostListEl.addEventListener("keydown", (event) => {
+                const input = event.target.closest("[data-defender-name]");
+                if (!input) return;
+                if (event.key === "Enter") {
+                    event.preventDefault();
+                    commitDefenderName(input, true);
+                } else if (event.key === "Escape") {
+                    event.preventDefault();
+                    commitDefenderName(input, false);
+                }
+            });
+
+            defenderPostListEl.addEventListener("focusout", (event) => {
+                const input = event.target.closest("[data-defender-name]");
+                if (!input) return;
+                commitDefenderName(input, true);
+            });
+
             farBankListEl.addEventListener("click", (event) => {
                 if (!canUseUpgrade("farBankAssign")) return;
 
@@ -10995,6 +11350,7 @@
                 // Clicking the water stations the defender on the near bank rather than
                 // handing it somewhere it cannot stand.
                 keepOutOfRiver(post, MINION_RIVER_RADIUS);
+                post.bank = bankOf(post.x, post.y);
                 save.defenderPostBySlot[String(slot)] = post;
                 // Drop the old wander target so it heads for the new ground at once.
                 const defender = defenderMinionsSortedBySlot().find((minion) => minion.slotIndex === slot);
@@ -11020,21 +11376,82 @@
                 refreshHud();
             });
 
+            // Sends a defender home. Shared by the row's own recall and the group one.
+            function recallDefenderToTower(slot) {
+                if (save.defenderPostBySlot) delete save.defenderPostBySlot[String(slot)];
+                const defender = defenderMinionsSortedBySlot().find((minion) => minion.slotIndex === slot);
+                if (defender) {
+                    defender.patrolTargetX = NaN;
+                    defender.patrolTargetY = NaN;
+                    defender.patrolIdleTicks = 0;
+                }
+            }
+
             defenderPostListEl.addEventListener("click", (event) => {
                 if (!canUseUpgrade("defender")) return;
 
-                const recallBtn = event.target.closest("button[data-defender-recall]");
+                // The tick is a span inside the row button, so it has to be tested for
+                // before the row is, or every tick would also arm the one it sits on.
+                const pickEl = event.target.closest("[data-defender-pick]");
+                if (pickEl) {
+                    const slot = Number.parseInt(pickEl.dataset.defenderPick, 10);
+                    if (!Number.isFinite(slot)) return;
+                    toggleDefenderSelection(slot);
+                    refreshHud();
+                    return;
+                }
+
+                const renameEl = event.target.closest("[data-defender-rename]");
+                if (renameEl) {
+                    const slot = Number.parseInt(renameEl.dataset.defenderRename, 10);
+                    if (!Number.isFinite(slot)) return;
+                    game.renamingDefender = slot;
+                    refreshHud();
+                    const input = defenderPostListEl.querySelector("[data-defender-name]");
+                    if (input) {
+                        input.focus();
+                        input.select();
+                    }
+                    return;
+                }
+
+                // A click inside the open box is for the box, not for the row behind it.
+                if (event.target.closest("[data-defender-name]")) return;
+
+                const selectBtn = event.target.closest("button[data-defender-select]");
+                if (selectBtn) {
+                    game.selectedDefenders = selectBtn.dataset.defenderSelect === "all"
+                        ? defenderMinionsSortedBySlot().map((minion) => minion.slotIndex)
+                        : [];
+                    refreshHud();
+                    return;
+                }
+
+                if (event.target.closest("button[data-defender-station-group]")) {
+                    const picked = selectedDefenderSlots();
+                    if (picked.length === 0) return;
+                    // Arms the whole group against one click on the map.
+                    game.pendingDefenderPosts = picked;
+                    refreshHud();
+                    return;
+                }
+
+                if (event.target.closest("button[data-defender-recall-group]")) {
+                    const picked = selectedDefenderSlots();
+                    if (picked.length === 0) return;
+                    for (const slot of picked) recallDefenderToTower(slot);
+                    clearDefenderPlacement();
+                    saveGame();
+                    refreshHud();
+                    return;
+                }
+
+                const recallBtn = event.target.closest("[data-defender-recall]");
                 if (recallBtn) {
                     const slot = Number.parseInt(recallBtn.dataset.defenderRecall, 10);
                     if (!Number.isFinite(slot)) return;
-                    if (save.defenderPostBySlot) delete save.defenderPostBySlot[String(slot)];
-                    game.pendingDefenderPost = null;
-                    const defender = defenderMinionsSortedBySlot().find((minion) => minion.slotIndex === slot);
-                    if (defender) {
-                        defender.patrolTargetX = NaN;
-                        defender.patrolTargetY = NaN;
-                        defender.patrolIdleTicks = 0;
-                    }
+                    recallDefenderToTower(slot);
+                    clearDefenderPlacement();
                     saveGame();
                     refreshHud();
                     return;
@@ -11045,8 +11462,9 @@
                 const slot = Number.parseInt(rowBtn.dataset.defenderSlot, 10);
                 if (!Number.isFinite(slot)) return;
 
-                // Arm, do not act: the next click on the map is what stations it.
-                game.pendingDefenderPost = game.pendingDefenderPost === slot ? null : slot;
+                // Arm, do not act: the next click on the map is what stations it. A row
+                // on its own arms only itself, whatever is ticked.
+                game.pendingDefenderPosts = isDefenderArmed(slot) && game.pendingDefenderPosts.length === 1 ? [] : [slot];
                 refreshHud();
             });
 
