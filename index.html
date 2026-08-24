@@ -415,6 +415,10 @@
             border-color: #5d7ea3;
         }
 
+        .shop-group.spells {
+            border-color: #9e5f7d;
+        }
+
         .shop-controls {
             display: grid;
             gap: 8px;
@@ -1474,7 +1478,17 @@
                                     </details>
                                     <button id="minionSpeedBtn" class="secondary shop-btn">Minion Speed</button>
                                     <button id="minionCapBtn" class="secondary shop-btn">Minion Capacity</button>
+                                </div>
+                            </details>
+
+                            <details class="shop-group spells" open>
+                                <summary class="shop-group-title">Spells</summary>
+                                <div class="shop-controls">
                                     <button id="minionHasteBtn" class="secondary shop-btn">Haste Spell</button>
+                                    <button id="bloomSpellBtn" class="secondary shop-btn">Bloom</button>
+                                    <button id="waygateSpellBtn" class="secondary shop-btn">Waygate</button>
+                                    <button id="chillSpellBtn" class="secondary shop-btn">Chill</button>
+                                    <button id="mendSpellBtn" class="secondary shop-btn">Mend Tower</button>
                                 </div>
                             </details>
 
@@ -1647,6 +1661,16 @@
             const defenderPostListEl = document.getElementById("defenderPostList");
             const minionSpeedBtn = document.getElementById("minionSpeedBtn");
             const minionHasteBtn = document.getElementById("minionHasteBtn");
+            const bloomSpellBtn = document.getElementById("bloomSpellBtn");
+            const waygateSpellBtn = document.getElementById("waygateSpellBtn");
+            const chillSpellBtn = document.getElementById("chillSpellBtn");
+            const mendSpellBtn = document.getElementById("mendSpellBtn");
+            const spellButtons = {
+                mend: mendSpellBtn,
+                waygate: waygateSpellBtn,
+                chill: chillSpellBtn,
+                bloom: bloomSpellBtn
+            };
             const minionCapBtn = document.getElementById("minionCapBtn");
             const resetBtn = document.getElementById("resetBtn");
             const resetPopoverEl = document.getElementById("resetPopover");
@@ -1706,19 +1730,23 @@
                 "speed",
                 "bag",
                 "gatherer",
-                "defender",
                 "minionSpeed",
                 "minionCapacity",
                 "gathererFocus",
                 "minionHaste",
+                "bloomSpell",
+                "waygateSpell",
+                "chillSpell",
+                "mendSpell",
                 "trader",
-                "minionArmor",
-                "minionArmor2",
+                "defender",
                 "turret",
                 "sniperTurret",
                 "slowTurret",
                 "turretCap",
                 "turretHaste",
+                "minionArmor",
+                "minionArmor2",
                 "spawnerWood",
                 "spawnerStone",
                 "spawnerCrystal",
@@ -1729,18 +1757,22 @@
                 speed: { label: "Unlock Player Speed", cost: { wood: 12 }, requires: [] },
                 bag: { label: "Unlock Bag Capacity", cost: { wood: 10, stone: 8 }, requires: ["speed"] },
                 gatherer: { label: "Unlock Gatherers", cost: { wood: 14, stone: 10 }, requires: ["bag"] },
-                gathererFocus: { label: "Unlock Gatherer Focus", cost: { stone: 12, crystal: 4 }, requires: ["minionSpeed", "minionCapacity","defender"] },
-                defender: { label: "Unlock Defenders", cost: { stone: 16, amber: 4 }, requires: ["gatherer"] },
-                minionSpeed: { label: "Unlock Minion Speed", cost: { stone: 12, crystal: 4 }, requires: ["gatherer"] },
+                gathererFocus: { label: "Unlock Gatherer Focus", cost: { stone: 12, crystal: 4 }, requires: ["minionCapacity"] },
+                defender: { label: "Unlock Defenders", cost: { wood: 14, stone: 14 }, requires: [] },
+                minionSpeed: { label: "Unlock Minion Speed", cost: { stone: 12, crystal: 4 }, requires: ["gatherer", "trader"] },
                 minionCapacity: { label: "Unlock Minion Capacity", cost: { wood: 14, amber: 3 }, requires: ["gatherer"] },
-                turret: { label: "Unlock Sentries", cost: { wood: 18, stone: 16 }, requires: [] },
+                turret: { label: "Unlock Sentries", cost: { wood: 18, stone: 16 }, requires: ["defender"] },
                 sniperTurret: { label: "Unlock Snipers", cost: { wood: 24, stone: 26 }, requires: ["turret"] },
                 slowTurret: { label: "Unlock Slow Field", cost: { crystal: 14, amber: 9, essence: 2 }, requires: ["sniperTurret"] },
                 turretCap: { label: "Unlock Turret Capacity", cost: { crystal: 18, amber: 10, essence: 3 }, requires: ["slowTurret"] },
-                trader: { label: "Unlock Traders", desc: "Caravans that carry bank goods to the village and trade them", cost: { wood: 60, stone: 60, crystal: 20, amber: 12 }, requires: ["gathererFocus"] },
-                minionHaste: { label: "Unlock Haste Spell", desc: "Cast to double every minion's pace for a minute", cost: { crystal: 40, amber: 24, aether: 4 }, requires: ["gathererFocus"] },
+                trader: { label: "Unlock Traders", desc: "Caravans that carry bank goods to the village and trade them", cost: { wood: 26, stone: 22 }, requires: ["bag"] },
+                minionHaste: { label: "Unlock Haste Spell", desc: "Cast to lift every minion's pace by half for a minute", cost: { wood: 24, stone: 18 }, requires: [] },
+                bloomSpell: { label: "Unlock Bloom", desc: "Cast to refill every field a blight is not sitting on", cost: { wood: 45, stone: 35, crystal: 12 }, requires: ["minionHaste"] },
+                waygateSpell: { label: "Unlock Waygate", desc: "Cast to snap every minion home, full bags banked on the way", cost: { stone: 60, crystal: 30, amber: 18 }, requires: ["bloomSpell"] },
+                chillSpell: { label: "Unlock Chill", desc: "Cast to slow every enemy on the map for ten seconds", cost: { stone: 50, crystal: 24, amber: 14 }, requires: ["minionHaste"] },
+                mendSpell: { label: "Unlock Mend", desc: "Cast to repair the tower - nothing else brings its health back", cost: { crystal: 60, amber: 40, essence: 6 }, requires: ["chillSpell"] },
                 minionArmor2: { label: "Unlock Minion Plating", desc: "Doubles minion health again, 4x in total", cost: { stone: 180, crystal: 90, amber: 60, essence: 80 }, requires: ["minionArmor"] },
-                minionArmor: { label: "Unlock Minion Armor", desc: "Doubles the health of every gatherer and defender", cost: { stone: 90, crystal: 48, amber: 48 }, requires: ["defender"] },
+                minionArmor: { label: "Unlock Minion Armor", desc: "Doubles the health of every gatherer and defender", cost: { stone: 90, crystal: 48, amber: 48 }, requires: ["turret"] },
                 turretHaste: { label: "Unlock Rapid Fire", desc: "All sentries and snipers fire 30% faster", cost: { crystal: 240, amber: 140, essence: 50 }, requires: ["slowTurret"] },
                 spawnerWood: { label: "Unlock Wood Spawner", cost: { wood: 12, stone: 18 }, requires: [] },
                 spawnerStone: { label: "Unlock Stone Spawner", cost: { wood: 22, stone: 12 }, requires: ["spawnerWood"] },
@@ -1753,18 +1785,22 @@
                 bag: 2,
                 gatherer: 3,
                 gathererFocus: 5,
-                trader: 6,
-                minionHaste: 6,
-                minionArmor: 5,
-                minionArmor2: 6,
-                defender: 4,
+                trader: 3,
+                minionHaste: 1,
+                bloomSpell: 2,
+                waygateSpell: 3,
+                chillSpell: 2,
+                mendSpell: 3,
+                minionArmor: 3,
+                minionArmor2: 4,
                 minionSpeed: 4,
                 minionCapacity: 4,
-                turret: 1,
-                sniperTurret: 2,
-                slowTurret: 3,
-                turretCap: 4,
-                turretHaste: 4,
+                defender: 1,
+                turret: 2,
+                sniperTurret: 3,
+                slowTurret: 4,
+                turretCap: 5,
+                turretHaste: 5,
                 spawnerWood: 1,
                 spawnerStone: 2,
                 spawnerCrystal: 3,
@@ -1775,14 +1811,18 @@
                 speed: "player",
                 bag: "player",
                 gatherer: "minionCore",
-                gathererFocus: "minionCore",
-                minionHaste: "minionCore",
+                gathererFocus: "focusLine",
+                minionHaste: "minionHaste",
+                bloomSpell: "spellEconomy",
+                waygateSpell: "spellEconomy",
+                chillSpell: "spellDefense",
+                mendSpell: "spellDefense",
                 trader: "trade",
-                defender: "defender",
-                minionArmor: "minionArmor",
-                minionArmor2: "minionArmor",
-                minionSpeed: "minionCore",
-                minionCapacity: "minionCapacity",
+                defender: "defense",
+                minionArmor: "towerArmor",
+                minionArmor2: "towerArmor",
+                minionSpeed: "minionSpeed",
+                minionCapacity: "focusLine",
                 turret: "defense",
                 sniperTurret: "defense",
                 slowTurret: "defense",
@@ -1796,11 +1836,20 @@
             };
             const SKILL_TREE_STRAND_ANGLE_DEG = {
                 player: 270,
-                minionCore: 246,
-                trade: 300,
-                defender: 224,
-                minionArmor: 205,
-                minionCapacity: 272,
+                // The gatherer branch forks off the bag (270): gatherers and traders
+                // split evenly around 250, then capacity carries the trunk outward
+                // into gatherer focus while speed sits between both of its parents.
+                minionCore: 238,
+                // The spell branch owns the empty south of the map: haste at the root,
+                // then a line each way - what the fields give you, and what holds the
+                // wave off. Traders sit beside gatherers, a second root off the bag.
+                minionHaste: 100,
+                spellEconomy: 82,
+                spellDefense: 118,
+                trade: 262,
+                towerArmor: 214,
+                minionSpeed: 250,
+                focusLine: 232,
                 defense: 190,
                 defenseHaste: 163,
                 economy: 20
@@ -1824,7 +1873,11 @@
                 traderRoute: "trader",
                 defender: "defender",
                 minionSpeed: "minionSpeed",
-                minionCapacity: "minionCapacity"
+                minionCapacity: "minionCapacity",
+                bloomSpell: "bloomSpell",
+                waygateSpell: "waygateSpell",
+                chillSpell: "chillSpell",
+                mendSpell: "mendSpell"
             };
             const keys = new Set();
             const enemyById = new Map();
@@ -1975,11 +2028,30 @@
             const DEFENDER_PATROL_IDLE_MAX_TICKS = 210;
             const DEFENDER_AGGRO_RADIUS = W(320);
             const DEFENDER_TOWER_ALERT_RADIUS = W(460);
-            // Haste spell: burns aether to double every minion's pace for a minute.
+            // Haste spell: burns aether to lift every minion's pace by half for a minute.
             const TICKS_PER_MINUTE = 60 * 60;   // 60 ticks a second
             const MINION_HASTE_DURATION_TICKS = TICKS_PER_MINUTE;
-            const MINION_HASTE_MULTIPLIER = 2;
+            const MINION_HASTE_MULTIPLIER = 1.5;
             const MINION_HASTE_BASE_COST = 10;
+            // The rest of the spell book. Each one is an instant cast paid out of the
+            // bank's aether - the only sink aether has - and held back by a limit of its
+            // own rather than a shared one: a cooldown for the three that settle in a
+            // single cast, a rising price for the one that stacks.
+            const MEND_SPELL_COST = 12;
+            const MEND_SPELL_COOLDOWN_TICKS = TICKS_PER_MINUTE;
+            const MEND_SPELL_HEAL = 25;
+            const WAYGATE_SPELL_COST = 8;
+            const WAYGATE_SPELL_COOLDOWN_TICKS = Math.round(TICKS_PER_MINUTE * 0.75);
+            // Chill stacks the way haste does: no cooldown at all, but every ten
+            // seconds still on the clock adds an aether to the next cast, so holding a
+            // wave under it costs more the longer you hold it.
+            const CHILL_SPELL_BASE_COST = 14;
+            const CHILL_SPELL_DURATION_TICKS = 600;
+            // Weaker than a slow field, which is the point: the field is ground you
+            // chose in advance, the spell is the wave you did not see coming.
+            const CHILL_SPELL_SPEED_MULTIPLIER = 0.45;
+            const BLOOM_SPELL_COST = 10;
+            const BLOOM_SPELL_COOLDOWN_TICKS = Math.round(TICKS_PER_MINUTE * 1.5);
             const DEFENDER_BASE_SPEED_BONUS = 0.45;
             // A trader does nothing but cross the map. At a gatherer's pace the village
             // round trip ran past three minutes, which no payout makes worth waiting for.
@@ -2093,6 +2165,8 @@
                 waveIntroPendingType: null,
                 towerHp: TOWER_MAX_HP,
                 minionHasteTicks: 0,
+                chillTicks: 0,
+                spellCooldowns: { mend: 0, waygate: 0, chill: 0, bloom: 0 },
                 player: {
                     x: 0,
                     y: 0,
@@ -2679,8 +2753,11 @@
                     const x = 50 + Math.cos(angle) * radius;
                     const y = 50 + Math.sin(angle) * radius;
                     positions[skillId] = {
-                        x: Math.max(6, Math.min(94, x)),
-                        y: Math.max(6, Math.min(94, y))
+                        // Outer-tier nodes ride close to the map edge; clamping at 6
+                        // pulled the symmetric forks off-axis, and the map layer is
+                        // wider than the viewport anyway.
+                        x: Math.max(3, Math.min(97, x)),
+                        y: Math.max(3, Math.min(97, y))
                     };
                 }
 
@@ -2765,6 +2842,13 @@
                     waveIntroPendingType: game.waveIntroPendingType,
                     towerHp: game.towerHp,
                     minionHasteTicks: game.minionHasteTicks,
+                    chillTicks: game.chillTicks,
+                    spellCooldowns: {
+                        mend: game.spellCooldowns.mend,
+                        waygate: game.spellCooldowns.waygate,
+                        chill: game.spellCooldowns.chill,
+                        bloom: game.spellCooldowns.bloom
+                    },
                     ghoulTimer: game.ghoulTimer,
                     runEssenceStart: game.runEssenceStart,
                     runBestAtStart: game.runBestAtStart,
@@ -2826,6 +2910,14 @@
                 game.minionHasteTicks = Number.isFinite(snapshot.minionHasteTicks)
                     ? Math.max(0, Math.floor(snapshot.minionHasteTicks))
                     : 0;
+                game.chillTicks = Number.isFinite(snapshot.chillTicks) ? Math.max(0, Math.floor(snapshot.chillTicks)) : 0;
+                const savedCooldowns = snapshot.spellCooldowns && typeof snapshot.spellCooldowns === "object"
+                    ? snapshot.spellCooldowns
+                    : {};
+                for (const spellKey of SPELL_KEYS) {
+                    const saved = savedCooldowns[spellKey];
+                    game.spellCooldowns[spellKey] = Number.isFinite(saved) ? Math.max(0, Math.floor(saved)) : 0;
+                }
                 // A snapshot is always a run in progress - a finished one is cleared.
                 game.ghoulTimer = Number.isFinite(snapshot.ghoulTimer) ? Math.max(1, Math.floor(snapshot.ghoulTimer)) : GHOUL_FIRST_TICKS;
                 game.runEssenceStart = Number.isFinite(snapshot.runEssenceStart) ? Math.max(0, snapshot.runEssenceStart) : save.essence;
@@ -3403,6 +3495,186 @@
                 refreshHud();
             }
 
+            const SPELL_KEYS = ["mend", "waygate", "chill", "bloom"];
+
+            // Every spell but haste settles in a single cast: what it costs, how long it
+            // stays spent, whether casting it right now would do anything at all, and the
+            // thing it does. castSpell is the one path through all four.
+            const SPELL_DEFS = {
+                mend: {
+                    skill: "mendSpell",
+                    cost: MEND_SPELL_COST,
+                    cooldown: MEND_SPELL_COOLDOWN_TICKS,
+                    ready: () => game.towerHp < TOWER_MAX_HP,
+                    apply: () => {
+                        game.towerHp = Math.min(TOWER_MAX_HP, game.towerHp + MEND_SPELL_HEAL);
+                        return true;
+                    }
+                },
+                waygate: {
+                    skill: "waygateSpell",
+                    cost: WAYGATE_SPELL_COST,
+                    cooldown: WAYGATE_SPELL_COOLDOWN_TICKS,
+                    ready: () => game.minionUnits.length > 0,
+                    apply: () => recallAllMinions() > 0
+                },
+                chill: {
+                    skill: "chillSpell",
+                    // Priced against the clock as it stands, before this cast extends it.
+                    cost: () => CHILL_SPELL_BASE_COST + Math.floor(game.chillTicks / CHILL_SPELL_DURATION_TICKS),
+                    cooldown: 0,
+                    ready: () => game.enemies.length > 0,
+                    apply: () => {
+                        // Casting again while it runs stacks another ten seconds onto the
+                        // clock rather than restarting it.
+                        game.chillTicks += CHILL_SPELL_DURATION_TICKS;
+                        return true;
+                    }
+                },
+                bloom: {
+                    skill: "bloomSpell",
+                    cost: BLOOM_SPELL_COST,
+                    cooldown: BLOOM_SPELL_COOLDOWN_TICKS,
+                    ready: () => true,
+                    apply: () => bloomFields() > 0
+                }
+            };
+
+            function chillSpellActive() {
+                return game.chillTicks > 0;
+            }
+
+            const SPELL_LABELS = {
+                mend: "Mend Tower",
+                waygate: "Waygate",
+                chill: "Chill",
+                bloom: "Bloom"
+            };
+
+            // The line under a spell's name while it is castable: what it would do now,
+            // or why casting it right now would be a waste.
+            function spellStatusText(key) {
+                if (key === "mend") {
+                    return game.towerHp >= TOWER_MAX_HP ? "Tower intact" : `+${MEND_SPELL_HEAL} HP`;
+                }
+                if (key === "waygate") {
+                    return game.minionUnits.length > 0 ? `Recall ${game.minionUnits.length}` : "No minions";
+                }
+                if (key === "chill") {
+                    if (chillSpellActive()) return `Active ${formatWaveCountdown(game.chillTicks)}`;
+                    if (game.enemies.length === 0) return "No enemies";
+                    return `x${CHILL_SPELL_SPEED_MULTIPLIER} for ${formatWaveCountdown(CHILL_SPELL_DURATION_TICKS)}`;
+                }
+                return "Refill fields";
+            }
+
+            function spellCooldownTicks(key) {
+                const ticks = game.spellCooldowns ? game.spellCooldowns[key] : 0;
+                return Number.isFinite(ticks) ? Math.max(0, ticks) : 0;
+            }
+
+            // A spell that stacks prices itself off the clock it is already holding, so
+            // the cost is asked for at the moment of the cast rather than fixed up front.
+            function spellRecipe(key) {
+                const def = SPELL_DEFS[key];
+                if (!def) return { aether: 0 };
+                return { aether: typeof def.cost === "function" ? def.cost() : def.cost };
+            }
+
+            function spellCastable(key) {
+                const def = SPELL_DEFS[key];
+                if (!def) return false;
+                if (!canUseUpgrade(def.skill)) return false;
+                if (spellCooldownTicks(key) > 0) return false;
+                if (!def.ready()) return false;
+                return hasBankForCost(spellRecipe(key));
+            }
+
+            function castSpell(key) {
+                if (!spellCastable(key)) return false;
+                const def = SPELL_DEFS[key];
+                // Priced against the clock as it stands, before this cast extends it -
+                // a stacking spell would otherwise charge for the second it just added.
+                const recipe = spellRecipe(key);
+                // The effect runs first: one that turns out to have nothing to do leaves
+                // the aether in the bank rather than burning it on nothing.
+                if (!def.apply()) return false;
+
+                spendBankForCost(recipe);
+                game.spellCooldowns[key] = def.cooldown;
+                saveGame();
+                refreshHud();
+                return true;
+            }
+
+            // Waygate. Gatherers come home with their bags banked, caravans put back
+            // whatever they were carrying, and defenders snap to the post they are meant
+            // to be holding instead of wherever the last chase left them.
+            function recallAllMinions() {
+                let moved = 0;
+                for (let i = 0; i < game.minionUnits.length; i += 1) {
+                    const minion = game.minionUnits[i];
+                    const slotIndex = Number.isFinite(minion.slotIndex) ? minion.slotIndex : i;
+
+                    if (minion.role === "defender") {
+                        const post = defenderPostFor(minion);
+                        minion.x = post.x;
+                        minion.y = post.y;
+                        minion.targetEnemyId = null;
+                        minion.patrolIdleTicks = 0;
+                        const patrolPoint = randomDefenderPatrolPoint(post);
+                        minion.patrolTargetX = patrolPoint.x;
+                        minion.patrolTargetY = patrolPoint.y;
+                        minion.state = "guard";
+                        moved += 1;
+                        continue;
+                    }
+
+                    const home = minionTowerPoint(slotIndex);
+                    minion.x = home.x;
+                    minion.y = home.y;
+                    if (minion.role === "trader") {
+                        minion.tradeDwell = 0;
+                        settleTraderArrival(minion);
+                    } else {
+                        bankMinionCarry(minion);
+                        minion.targetNodeIndex = -1;
+                        minion.state = "idle";
+                    }
+                    moved += 1;
+                }
+
+                if (moved > 0) {
+                    game.depositPulse = Math.min(999, game.depositPulse + 12);
+                    syncMinionUnits(false);
+                }
+                return moved;
+            }
+
+            // Bloom. Fills every field back to the cap it is allowed right now; a field a
+            // blight is sitting on grows nothing, spell or no spell.
+            function bloomFields() {
+                let spawned = 0;
+                let activeNodes = countActiveNodes();
+                for (let i = 0; i < spawners.length; i += 1) {
+                    const spawner = spawners[i];
+                    if (spawner.claimedBy !== null) continue;
+
+                    const cap = activeNodeCapForSpawner(i);
+                    let attempts = 0;
+                    while (activeNodes < MAX_ACTIVE_NODES
+                        && countActiveNodesForSpawner(i) < cap
+                        && attempts < cap) {
+                        const before = activeNodes;
+                        activeNodes = spawnFromSpawnerWithActiveCount(spawner, i, activeNodes);
+                        attempts += 1;
+                        if (activeNodes === before) break;
+                        spawned += 1;
+                    }
+                }
+                return spawned;
+            }
+
             function totalMinionCount() {
                 return save.minions + save.defenderMinions;
             }
@@ -3653,6 +3925,22 @@
                     hasteRunning ? `Active ${formatWaveCountdown(game.minionHasteTicks)}` : `x${MINION_HASTE_MULTIPLIER} for 1:00`,
                     minionHasteRecipe()
                 );
+
+                // Every spell button reads the same way: what it would do, or how long
+                // until it can do it again.
+                for (const spellKey of SPELL_KEYS) {
+                    const button = spellButtons[spellKey];
+                    if (!button) continue;
+                    const def = SPELL_DEFS[spellKey];
+                    const unlocked = canUseUpgrade(def.skill);
+                    const cooldown = spellCooldownTicks(spellKey);
+                    const status = cooldown > 0
+                        ? `Ready ${formatWaveCountdown(cooldown)}`
+                        : spellStatusText(spellKey);
+                    setShopButtonContent(button, SPELL_LABELS[spellKey], status, spellRecipe(spellKey));
+                    setButtonVisible(button, unlocked);
+                    setButtonDisabled(button, !spellCastable(spellKey));
+                }
 
                 setButtonVisible(speedBtn, speedUnlocked);
                 setButtonVisible(bagBtn, bagUnlocked);
@@ -6464,6 +6752,8 @@
                 game.waveIntroPendingType = null;
                 game.towerHp = TOWER_MAX_HP;
                 game.minionHasteTicks = 0;
+                game.chillTicks = 0;
+                for (const spellKey of SPELL_KEYS) game.spellCooldowns[spellKey] = 0;
                 game.ghoulTimer = GHOUL_FIRST_TICKS;
                 game.enemies = [];
                 game.turrets = [];
@@ -7415,7 +7705,9 @@
             }
 
             function slowMultiplierAtEnemy(enemy) {
-                let slowMultiplier = 1;
+                // Chill is a slow field over the whole map for as long as it runs, so it
+                // enters here rather than as a second speed term at every call site.
+                let slowMultiplier = chillSpellActive() ? CHILL_SPELL_SPEED_MULTIPLIER : 1;
                 const slowRadiusSq = SLOW_FIELD_RADIUS * SLOW_FIELD_RADIUS;
                 for (const turret of game.turrets) {
                     if (turret.type !== "slow") continue;
@@ -7442,6 +7734,74 @@
                     }
                 }
                 return bestIndex;
+            }
+
+            // What a caravan does the moment it is back at the tower, whether it walked
+            // the whole way or a waygate pulled it in: hand over anything it bought, put
+            // the load back in the bank, and stand down for the next run.
+            function settleTraderArrival(minion) {
+                if (minion.carryTurret) {
+                    // Arrives as a turret waiting to be placed, exactly as a shop
+                    // purchase used to.
+                    if (minion.carryTurret === "sniper") save.sniperTurrets += 1;
+                    else if (minion.carryTurret === "slow") save.slowTurrets += 1;
+                    else save.turrets += 1;
+                    minion.carryTurret = null;
+                    syncTurretsFromSave();
+                }
+                if (minion.carryLoad > 0 && minion.carryType) {
+                    refundBankForCost({ [minion.carryType]: minion.carryLoad });
+                    game.minionPulse = Math.min(999, game.minionPulse + minion.carryLoad);
+                }
+                // No progress is scored here: what came back was bought with resources
+                // already counted when they were gathered, and the village took a cut on
+                // the way through.
+                if (minion.carryType) minion.carry[minion.carryType] = 0;
+                minion.carryType = null;
+                minion.carryLoad = 0;
+                minion.tradeCarryRoute = null;
+                minion.state = "idle";
+            }
+
+            // Banking a gatherer's load, wherever it happens: on arrival at the tower, or
+            // when a waygate pulls the minion home with its bag still full.
+            function bankMinionCarry(minion) {
+                if (minion.carryLoad <= 0) return 0;
+
+                const gainedWood = minion.carry.wood;
+                const gainedStone = minion.carry.stone;
+                const gainedCrystal = minion.carry.crystal;
+                const gainedAmber = minion.carry.amber;
+                const gainedAether = minion.carry.aether;
+                const mult = resourceMultiplier();
+                const bankWoodGain = Math.max(gainedWood, Math.round(gainedWood * mult));
+                const bankStoneGain = Math.max(gainedStone, Math.round(gainedStone * mult));
+                const bankCrystalGain = Math.max(gainedCrystal, Math.round(gainedCrystal * mult));
+                const bankAmberGain = Math.max(gainedAmber, Math.round(gainedAmber * mult));
+                const bankAetherGain = Math.max(gainedAether, Math.round(gainedAether * mult));
+                save.bankWood += bankWoodGain;
+                save.bankStone += bankStoneGain;
+                save.bankCrystal += bankCrystalGain;
+                save.bankAmber += bankAmberGain;
+                save.bankAether += bankAetherGain;
+
+                const gainedValue = bankWoodGain * materialConfig.wood.value
+                    + bankStoneGain * materialConfig.stone.value
+                    + bankCrystalGain * materialConfig.crystal.value
+                    + bankAmberGain * materialConfig.amber.value
+                    + bankAetherGain * materialConfig.aether.value;
+                save.stored += gainedValue;
+                if (save.stored > save.bestRunScore) save.bestRunScore = save.stored;
+                game.minionPulse = Math.min(999, game.minionPulse + gainedValue);
+
+                minion.carryType = null;
+                minion.carryLoad = 0;
+                minion.carry.wood = 0;
+                minion.carry.stone = 0;
+                minion.carry.crystal = 0;
+                minion.carry.amber = 0;
+                minion.carry.aether = 0;
+                return gainedValue;
             }
 
             function updateMinions() {
@@ -7610,29 +7970,7 @@
 
                         if (minion.state === "toTower") {
                             const reached = moveEntityTowards(minion, home.x, home.y, minionTravelSpeed(minion));
-                            if (reached) {
-                                if (minion.carryTurret) {
-                                    // Arrives as a turret waiting to be placed, exactly
-                                    // as a shop purchase used to.
-                                    if (minion.carryTurret === "sniper") save.sniperTurrets += 1;
-                                    else if (minion.carryTurret === "slow") save.slowTurrets += 1;
-                                    else save.turrets += 1;
-                                    minion.carryTurret = null;
-                                    syncTurretsFromSave();
-                                }
-                                if (minion.carryLoad > 0 && minion.carryType) {
-                                    refundBankForCost({ [minion.carryType]: minion.carryLoad });
-                                    game.minionPulse = Math.min(999, game.minionPulse + minion.carryLoad);
-                                }
-                                // No progress is scored here: what came back was bought
-                                // with resources already counted when they were gathered,
-                                // and the village took a cut on the way through.
-                                minion.carry[minion.carryType] = 0;
-                                minion.carryType = null;
-                                minion.carryLoad = 0;
-                                minion.tradeCarryRoute = null;
-                                minion.state = "idle";
-                            }
+                            if (reached) settleTraderArrival(minion);
                             continue;
                         }
 
@@ -7711,39 +8049,7 @@
                     if (minion.state === "toTower") {
                         const reached = moveEntityTowards(minion, home.x, home.y, minionTravelSpeed(minion));
                         if (reached && minion.carryLoad > 0) {
-                            const gainedWood = minion.carry.wood;
-                            const gainedStone = minion.carry.stone;
-                            const gainedCrystal = minion.carry.crystal;
-                            const gainedAmber = minion.carry.amber;
-                            const gainedAether = minion.carry.aether;
-                            const mult = resourceMultiplier();
-                            const bankWoodGain = Math.max(gainedWood, Math.round(gainedWood * mult));
-                            const bankStoneGain = Math.max(gainedStone, Math.round(gainedStone * mult));
-                            const bankCrystalGain = Math.max(gainedCrystal, Math.round(gainedCrystal * mult));
-                            const bankAmberGain = Math.max(gainedAmber, Math.round(gainedAmber * mult));
-                            const bankAetherGain = Math.max(gainedAether, Math.round(gainedAether * mult));
-                            save.bankWood += bankWoodGain;
-                            save.bankStone += bankStoneGain;
-                            save.bankCrystal += bankCrystalGain;
-                            save.bankAmber += bankAmberGain;
-                            save.bankAether += bankAetherGain;
-
-                            const gainedValue = bankWoodGain * materialConfig.wood.value
-                                + bankStoneGain * materialConfig.stone.value
-                                + bankCrystalGain * materialConfig.crystal.value
-                                + bankAmberGain * materialConfig.amber.value
-                                + bankAetherGain * materialConfig.aether.value;
-                            save.stored += gainedValue;
-                            if (save.stored > save.bestRunScore) save.bestRunScore = save.stored;
-                            game.minionPulse = Math.min(999, game.minionPulse + gainedValue);
-
-                            minion.carryType = null;
-                            minion.carryLoad = 0;
-                            minion.carry.wood = 0;
-                            minion.carry.stone = 0;
-                            minion.carry.crystal = 0;
-                            minion.carry.amber = 0;
-                            minion.carry.aether = 0;
+                            bankMinionCarry(minion);
                             minion.state = "idle";
                         }
                     }
@@ -7794,6 +8100,15 @@
                 if (game.minionHasteTicks > 0) {
                     game.minionHasteTicks -= 1;
                     if (game.minionHasteTicks === 0) refreshHud();   // the spell just lapsed
+                }
+                if (game.chillTicks > 0) {
+                    game.chillTicks -= 1;
+                    if (game.chillTicks === 0) refreshHud();
+                }
+                for (const spellKey of SPELL_KEYS) {
+                    if (game.spellCooldowns[spellKey] <= 0) continue;
+                    game.spellCooldowns[spellKey] -= 1;
+                    if (game.spellCooldowns[spellKey] === 0) refreshHud();   // castable again
                 }
 
                 if (game.sellPulse && game.sellPulse.ticks > 0) {
@@ -9223,6 +9538,14 @@
             minionHasteBtn.addEventListener("click", () => {
                 castMinionHaste();
             });
+
+            for (const spellKey of SPELL_KEYS) {
+                const button = spellButtons[spellKey];
+                if (!button) continue;
+                button.addEventListener("click", () => {
+                    castSpell(spellKey);
+                });
+            }
 
             minionCapBtn.addEventListener("click", () => {
                 if (!canUseUpgrade("minionCapacity")) return;
