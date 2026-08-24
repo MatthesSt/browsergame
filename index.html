@@ -1846,7 +1846,14 @@
             };
             // The viewport follows the on-screen frame's aspect (see fitCanvasToStage) so the map
             // fills the stage without stretching. Vertical coverage stays fixed at BASE_VIEW_H.
+            // The view in world units. It stays the same however many device pixels the
+            // frame happens to have, so the camera, the culling and every screen-space
+            // overlay keep working in one coordinate system.
             const viewport = { w: canvas.width, h: canvas.height };
+            // Device pixels per world unit. The backing store used to be pinned to the
+            // world view, which meant rendering five times the pixels a 1x display can
+            // actually show and throwing four of them away on the downscale.
+            let renderScale = 1;
             const RESOURCE_TYPES = ["wood", "stone", "crystal", "amber", "aether", "ivory", "essence"];
             const GATHERER_PRIORITY_MODES = ["auto", "wood", "stone", "crystal", "amber", "aether", "ivory"];
             const SKILL_TREE_ORDER = [
@@ -2389,7 +2396,21 @@
                 const clearance = RIVER_HALF_WIDTH + radius;
                 if (!nearRiverBounds(entity.x, entity.y, clearance)) return false;
 
+                // Measuring the distance to the water means walking every segment of it.
+                // The answer only shrinks as fast as the entity moves, so a wide berth
+                // measured once holds for as many steps as it takes to close it - which
+                // for anything working the western fields is most of the run.
+                if (entity.riverClear > clearance) {
+                    const driftX = entity.x - entity.riverClearX;
+                    const driftY = entity.y - entity.riverClearY;
+                    const slack = entity.riverClear - clearance;
+                    if (driftX * driftX + driftY * driftY < slack * slack) return false;
+                }
+
                 const near = nearestRiverPoint(entity.x, entity.y);
+                entity.riverClear = Math.sqrt(near.distSq);
+                entity.riverClearX = entity.x;
+                entity.riverClearY = entity.y;
                 if (near.distSq >= clearance * clearance) return false;
 
                 const dist = Math.sqrt(near.distSq);
@@ -2470,11 +2491,23 @@
             // outside that box last tick's answer is still right, and a walk over every
             // river segment is skipped. That box is most of a map eight screens wide.
             function trackBank(entity) {
-                if ((entity.bank === 1 || entity.bank === -1)
-                    && !nearRiverBounds(entity.x, entity.y, 0)) {
-                    return entity.bank;
+                if (entity.bank === 1 || entity.bank === -1) {
+                    if (!nearRiverBounds(entity.x, entity.y, 0)) return entity.bank;
+                    // Same bargain as the push-out: to change banks it has to reach the
+                    // water, and it can only do that by covering the distance it was
+                    // last measured at. Until then the old answer still stands.
+                    const driftX = entity.x - entity.bankSafeX;
+                    const driftY = entity.y - entity.bankSafeY;
+                    const safe = entity.bankSafe || 0;
+                    if (driftX * driftX + driftY * driftY < safe * safe) return entity.bank;
                 }
-                entity.bank = bankOf(entity.x, entity.y);
+
+                const near = nearestRiverPoint(entity.x, entity.y);
+                const dot = (entity.x - near.x) * near.normalX + (entity.y - near.y) * near.normalY;
+                entity.bank = dot >= 0 ? 1 : -1;
+                entity.bankSafe = Math.sqrt(near.distSq);
+                entity.bankSafeX = entity.x;
+                entity.bankSafeY = entity.y;
                 return entity.bank;
             }
 
@@ -4654,7 +4687,7 @@
                         turretStockSummaryEl.textContent = nextStockSummary;
                     }
                 }
-                renderTurretStockList();
+                if (turretStockPanelEl && turretStockPanelEl.open) renderTurretStockList();
                 const turretCapCost = turretCapRecipe();
                 setShopButtonContent(turretCapBtn, "Turret Capacity", `Lv ${save.turretCapLevel} cap ${turretCapacity}`, turretCapCost);
                 const globalMultCost = globalMultiplierRecipe();
@@ -4667,14 +4700,14 @@
                         gathererFocusSummaryEl.textContent = nextSummary;
                     }
                 }
-                renderGathererFocusList();
+                if (gathererFocusPanelEl && gathererFocusPanelEl.open) renderGathererFocusList();
                 if (farBankSummaryEl) {
                     const nextFarBankSummary = farBankSummaryText();
                     if (farBankSummaryEl.textContent !== nextFarBankSummary) {
                         farBankSummaryEl.textContent = nextFarBankSummary;
                     }
                 }
-                renderFarBankList();
+                if (farBankPanelEl && farBankPanelEl.open) renderFarBankList();
                 const traderRecipe = traderMinionRecipe();
                 setShopButtonContent(traderBtn, "Craft Trader", `Owned ${save.traderMinions}`, traderRecipe);
                 if (traderRouteSummaryEl) {
@@ -4683,7 +4716,7 @@
                         traderRouteSummaryEl.textContent = nextTraderSummary;
                     }
                 }
-                renderTraderRouteList();
+                if (traderRoutePanelEl && traderRoutePanelEl.open) renderTraderRouteList();
                 const defenderRecipe = defenderMinionRecipe();
                 setShopButtonContent(defenderBtn, "Craft Defender", `Owned ${save.defenderMinions}`, defenderRecipe);
                 if (defenderPostSummaryEl) {
@@ -4692,7 +4725,7 @@
                         defenderPostSummaryEl.textContent = nextPostSummary;
                     }
                 }
-                renderDefenderPostList();
+                if (defenderPostPanelEl && defenderPostPanelEl.open) renderDefenderPostList();
                 const minionSpeedCost = minionSpeedRecipe();
                 setShopButtonContent(minionSpeedBtn, "Minion Speed", `Lv ${save.minionSpeedLevel}`, minionSpeedCost);
                 const minionCapCost = minionCapacityRecipe();
@@ -4831,10 +4864,20 @@
                     viewH *= world.w / viewW;
                     viewW = world.w;
                 }
-                canvas.width = Math.round(viewW);
-                canvas.height = Math.round(viewH);
-                viewport.w = canvas.width;
-                viewport.h = canvas.height;
+                viewport.w = viewW;
+                viewport.h = viewH;
+
+                // Draw exactly what the display can show: the frame's own size in device
+                // pixels, capped so a huge window on a HiDPI screen cannot ask for a
+                // backing store larger than the world view it is showing.
+                const dpr = Math.min(window.devicePixelRatio || 1, 2);
+                const targetW = Math.max(1, Math.round(Math.min(availableW * dpr, viewW)));
+                const targetH = Math.max(1, Math.round(targetW * (viewH / viewW)));
+                if (canvas.width !== targetW || canvas.height !== targetH) {
+                    canvas.width = targetW;
+                    canvas.height = targetH;
+                }
+                renderScale = canvas.width / viewport.w;
                 clampCameraPosition();
             }
 
@@ -4843,6 +4886,49 @@
             // screen nearer five and reads as a smudge however far you zoom in. Every
             // font on the canvas goes through here, so the whole map is one number.
             const MAP_TEXT_SCALE = 1.45;
+
+            // Canvas shadow blur is a blur pass per draw, and the entity loops were
+            // asking for a hundred of them a frame. A glow is the same picture every
+            // time for a given colour and size, so it is drawn once into a little
+            // offscreen canvas and blitted after that.
+            const glowSpriteCache = new Map();
+
+            function glowSprite(color, radius) {
+                const key = `${color}|${Math.round(radius)}`;
+                const cached = glowSpriteCache.get(key);
+                if (cached) return cached;
+
+                const reach = Math.max(2, Math.round(radius * 2.2));
+                const sprite = document.createElement("canvas");
+                sprite.width = reach * 2;
+                sprite.height = reach * 2;
+                const spriteCtx = sprite.getContext("2d");
+                const gradient = spriteCtx.createRadialGradient(reach, reach, 0, reach, reach, reach);
+                gradient.addColorStop(0, color);
+                gradient.addColorStop(0.45, `${color}66`);
+                gradient.addColorStop(1, `${color}00`);
+                spriteCtx.fillStyle = gradient;
+                spriteCtx.fillRect(0, 0, sprite.width, sprite.height);
+
+                const entry = { canvas: sprite, reach };
+                glowSpriteCache.set(key, entry);
+                return entry;
+            }
+
+            // Colours arrive as #rgb, #rrggbb or #rrggbbaa; the glow wants the opaque
+            // six-digit form so its own stops control the falloff.
+            function solidHex(color) {
+                if (typeof color !== "string" || color[0] !== "#") return "#ffffff";
+                if (color.length === 4) return `#${color[1]}${color[1]}${color[2]}${color[2]}${color[3]}${color[3]}`;
+                return color.slice(0, 7);
+            }
+
+            function drawGlow(targetCtx, x, y, radius, color, alpha = 0.55) {
+                const sprite = glowSprite(solidHex(color), radius);
+                targetCtx.globalAlpha = alpha;
+                targetCtx.drawImage(sprite.canvas, x - sprite.reach, y - sprite.reach);
+                targetCtx.globalAlpha = 1;
+            }
 
             function mapFont(size, weight = 700) {
                 return `${weight} ${Math.max(9, Math.round(size * MAP_TEXT_SCALE))}px Space Grotesk, sans-serif`;
@@ -4854,7 +4940,45 @@
             const TOWER_RADIUS = Math.min(tower.w, tower.h) * 0.5;
             const TOWER_WARD_RADIUS = TOWER_RADIUS * 1.18;
 
+            // The tower is four hundred canvas calls of plinth, crenellations, roof
+            // seams and runes, and it is on screen for the whole game. Only two things
+            // about it move - a slow rotation and a breathing glow - so it is drawn into
+            // a sprite and that sprite is rebuilt a few times a second rather than sixty.
+            const TOWER_SPRITE_TICKS = 4;
+            const TOWER_SPRITE_REACH = TOWER_RADIUS * 2.3;
+            let towerSprite = null;
+            let towerSpriteKey = "";
+
             function drawTower(targetCtx) {
+                const key = `${Math.floor(game.dayTick / TOWER_SPRITE_TICKS)}|${renderScale.toFixed(3)}`;
+                if (!towerSprite || towerSpriteKey !== key) {
+                    const size = Math.max(8, Math.ceil(TOWER_SPRITE_REACH * 2 * renderScale));
+                    if (!towerSprite || towerSprite.width !== size) {
+                        towerSprite = document.createElement("canvas");
+                        towerSprite.width = size;
+                        towerSprite.height = size;
+                    }
+                    const spriteCtx = towerSprite.getContext("2d");
+                    spriteCtx.setTransform(1, 0, 0, 1, 0, 0);
+                    spriteCtx.clearRect(0, 0, size, size);
+                    spriteCtx.scale(renderScale, renderScale);
+                    // The art is drawn around the tower's own world position, so the
+                    // sprite is offset to put that position in the middle.
+                    spriteCtx.translate(TOWER_SPRITE_REACH - TOWER_CENTER_X, TOWER_SPRITE_REACH - TOWER_CENTER_Y);
+                    drawTowerArt(spriteCtx);
+                    towerSpriteKey = key;
+                }
+
+                targetCtx.drawImage(
+                    towerSprite,
+                    TOWER_CENTER_X - TOWER_SPRITE_REACH,
+                    TOWER_CENTER_Y - TOWER_SPRITE_REACH,
+                    TOWER_SPRITE_REACH * 2,
+                    TOWER_SPRITE_REACH * 2
+                );
+            }
+
+            function drawTowerArt(targetCtx) {
                 const cx = TOWER_CENTER_X;
                 const cy = TOWER_CENTER_Y;
                 const R = TOWER_RADIUS;
@@ -5582,13 +5706,43 @@
                 return spawnTerrainPatches;
             }
 
+            // A field's ground never changes: same disc, same gradient, same scatter of
+            // decor every frame of every session. Each one is drawn once into a sprite
+            // the size it appears at full zoom, and blitted after that.
+            function getTerrainSprite(patch) {
+                const reach = patch.r * TERRAIN_OVERHANG;
+                const size = Math.max(8, Math.ceil(reach * 2 * renderScale));
+                if (patch.sprite && patch.spriteSize === size) return patch.sprite;
+
+                const sprite = document.createElement("canvas");
+                sprite.width = size;
+                sprite.height = size;
+                const spriteCtx = sprite.getContext("2d");
+                spriteCtx.scale(renderScale, renderScale);
+                spriteCtx.translate(reach - patch.cx, reach - patch.cy);
+                drawTerrainPatch(spriteCtx, patch);
+                patch.sprite = sprite;
+                patch.spriteSize = size;
+                // The gradient was built against the old context; the sprite owns it now.
+                patch.ground = null;
+                patch.groundCtx = null;
+                return sprite;
+            }
+
             function drawSpawnTerrain(targetCtx) {
                 const patches = getSpawnTerrainPatches();
 
                 for (const patch of patches) {
+                    if (!patch.style) continue;
+                    const reach = patch.r * TERRAIN_OVERHANG;
+                    if (!circleInView(patch.cx, patch.cy, reach)) continue;
+                    targetCtx.drawImage(getTerrainSprite(patch), patch.cx - reach, patch.cy - reach, reach * 2, reach * 2);
+                }
+            }
+
+            function drawTerrainPatch(targetCtx, patch) {
+                {
                     const style = patch.style;
-                    if (!style) continue;
-                    if (!circleInView(patch.cx, patch.cy, patch.r * TERRAIN_OVERHANG)) continue;
 
                     targetCtx.save();
                     // The patch never moves, so its gradient is built once per context
@@ -6526,11 +6680,46 @@
                 return outline;
             }
 
-            function traceRiverBand(targetCtx, outline) {
-                targetCtx.beginPath();
-                targetCtx.moveTo(outline[0].x, outline[0].y);
-                for (let i = 1; i < outline.length; i += 1) targetCtx.lineTo(outline[i].x, outline[i].y);
-                targetCtx.closePath();
+            // Nothing about the river's shape changes between frames, so its outlines are
+            // Path2D objects built once rather than a couple of thousand lineTo calls
+            // every frame the water is on screen.
+            function bandPath(outline) {
+                const path = new Path2D();
+                path.moveTo(outline[0].x, outline[0].y);
+                for (let i = 1; i < outline.length; i += 1) path.lineTo(outline[i].x, outline[i].y);
+                path.closePath();
+                return path;
+            }
+
+            const riverLinePaths = new Map();
+
+            function riverLinePath(offset) {
+                const key = String(offset);
+                const cached = riverLinePaths.get(key);
+                if (cached) return cached;
+
+                const path = new Path2D();
+                for (let i = 0; i < RIVER_PATH.length; i += 1) {
+                    const point = RIVER_PATH[i];
+                    let x = point.x;
+                    let y = point.y;
+
+                    if (offset !== 0) {
+                        const from = RIVER_PATH[Math.max(0, i - 1)];
+                        const to = RIVER_PATH[Math.min(RIVER_PATH.length - 1, i + 1)];
+                        const dx = to.x - from.x;
+                        const dy = to.y - from.y;
+                        const length = Math.sqrt(dx * dx + dy * dy) || 1;
+                        x += (-dy / length) * offset;
+                        y += (dx / length) * offset;
+                    }
+
+                    if (i === 0) path.moveTo(x, y);
+                    else path.lineTo(x, y);
+                }
+
+                riverLinePaths.set(key, path);
+                return path;
             }
 
             // The centre line itself, optionally shifted sideways - the current lanes and
@@ -6687,10 +6876,10 @@
                 targetCtx.lineCap = "round";
 
                 for (const band of RIVER_BANDS) {
-                    traceRiverBand(targetCtx, band.outline);
+                    if (!band.path) band.path = bandPath(band.outline);
                     targetCtx.globalAlpha = band.alpha;
                     targetCtx.fillStyle = band.color;
-                    targetCtx.fill();
+                    targetCtx.fill(band.path);
                 }
                 targetCtx.globalAlpha = 1;
 
@@ -6735,12 +6924,10 @@
                 // middle, which is what gives the surface a direction.
                 targetCtx.strokeStyle = "#1a5a6d";
                 targetCtx.lineWidth = RIVER_HALF_WIDTH * 1.35;
-                traceRiver(targetCtx);
-                targetCtx.stroke();
+                targetCtx.stroke(riverLinePath(0));
                 targetCtx.strokeStyle = "#217585";
                 targetCtx.lineWidth = RIVER_HALF_WIDTH * 0.62;
-                traceRiver(targetCtx);
-                targetCtx.stroke();
+                targetCtx.stroke(riverLinePath(0));
 
                 // Foam where the water meets either bank.
                 targetCtx.globalAlpha = 0.26;
@@ -6749,8 +6936,7 @@
                 targetCtx.setLineDash([W(90), W(70)]);
                 for (const side of [-1, 1]) {
                     targetCtx.lineDashOffset = side * W(60);
-                    traceRiver(targetCtx, RIVER_HALF_WIDTH * 0.9 * side);
-                    targetCtx.stroke();
+                    targetCtx.stroke(riverLinePath(RIVER_HALF_WIDTH * 0.9 * side));
                 }
 
                 // Two lanes of current sliding downstream. The dash offset rides the day
@@ -6761,8 +6947,7 @@
                 targetCtx.setLineDash([W(110), W(260)]);
                 for (const lane of [-0.45, 0.3]) {
                     targetCtx.lineDashOffset = -game.dayTick * W(lane < 0 ? 1.5 : 1.1);
-                    traceRiver(targetCtx, RIVER_HALF_WIDTH * lane);
-                    targetCtx.stroke();
+                    targetCtx.stroke(riverLinePath(RIVER_HALF_WIDTH * lane));
                 }
 
                 targetCtx.setLineDash([]);
@@ -6981,6 +7166,10 @@
                     render();
                 } else {
                     if (rafId === null) {
+                        // The clock restarts with the run: whatever time passed while
+                        // paused is not simulation the world owes anyone.
+                        lastFrameMs = 0;
+                        simAccumulatorMs = 0;
                         rafId = requestAnimationFrame(loop);
                     }
                 }
@@ -7361,6 +7550,10 @@
                 return held;
             }
 
+            // Reused: this is called for every tribe field on every tick and the caller
+            // reads it immediately.
+            const fieldBodies = { friendly: 0, guards: 0 };
+
             function bodiesInField(spawner) {
                 const reachSq = TRIBE_CAPTURE_RADIUS * TRIBE_CAPTURE_RADIUS;
                 let friendly = 0;
@@ -7382,7 +7575,9 @@
                     if (dx * dx + dy * dy <= reachSq) guards += 1;
                 }
 
-                return { friendly, guards };
+                fieldBodies.friendly = friendly;
+                fieldBodies.guards = guards;
+                return fieldBodies;
             }
 
             const CHILL_RELEVANT_RADIUS = W(1400);
@@ -7688,13 +7883,20 @@
                 }
             }
 
+            // The home slots are a fixed grid inside the tower and never move, so they
+            // are worked out once instead of a fresh object per minion per tick.
+            const minionTowerPoints = [];
+
             function minionTowerPoint(index) {
-                const col = index % 5;
-                const row = Math.floor(index / 5);
-                return {
-                    x: tower.x + 16 + col * 16,
-                    y: tower.y + 38 + row * 16
-                };
+                const slot = Math.max(0, Math.floor(index) || 0);
+                let point = minionTowerPoints[slot];
+                if (!point) {
+                    const col = slot % 5;
+                    const row = Math.floor(slot / 5);
+                    point = { x: tower.x + 16 + col * 16, y: tower.y + 38 + row * 16 };
+                    minionTowerPoints[slot] = point;
+                }
+                return point;
             }
 
             function ensureMinionIdentityAndCounters() {
@@ -8572,19 +8774,19 @@
             function drawNode(node) {
                 const config = materialConfig[node.type];
 
-                ctx.save();
-                ctx.shadowColor = "rgba(4, 10, 18, 0.9)";
-                ctx.shadowBlur = node.size * 0.75;
-                ctx.shadowOffsetY = node.size * 0.14;
+                // A flat contact shadow under the node reads the same at this size as a
+                // blurred one and costs a fill instead of a blur pass.
+                ctx.fillStyle = "rgba(4, 10, 18, 0.55)";
+                ctx.beginPath();
+                ctx.ellipse(node.x, node.y + node.size * 0.22, node.size * 0.52, node.size * 0.3, 0, 0, Math.PI * 2);
+                ctx.fill();
+
                 ctx.fillStyle = config.color;
                 traceNodeShape(node, config.shape, 1);
                 ctx.fill();
-                ctx.restore();
 
-                ctx.save();
                 ctx.strokeStyle = "#07111c";
                 ctx.lineWidth = Math.max(1.5, node.size * 0.14);
-                ctx.lineJoin = "round";
                 traceNodeShape(node, config.shape, 1);
                 ctx.stroke();
 
@@ -8592,7 +8794,6 @@
                 ctx.lineWidth = Math.max(1, node.size * 0.07);
                 traceNodeShape(node, config.shape, 0.62);
                 ctx.stroke();
-                ctx.restore();
             }
 
             function canDeposit() {
@@ -9146,7 +9347,61 @@
                 refreshHud();
             }
 
+            // A uniform grid rebuilt once a tick. The closest-thing queries used to walk
+            // every minion and every enemy, once per asker, which is the shape that turns
+            // a busy map into a slow one.
+            const ENTITY_GRID_CELL = W(320);
+            const minionGrid = new Map();
+
+            function gridKey(x, y) {
+                return `${Math.floor(x / ENTITY_GRID_CELL)},${Math.floor(y / ENTITY_GRID_CELL)}`;
+            }
+
+            function rebuildMinionGrid() {
+                minionGrid.clear();
+                for (let i = 0; i < game.minionUnits.length; i += 1) {
+                    const minion = game.minionUnits[i];
+                    const key = gridKey(minion.x, minion.y);
+                    const bucket = minionGrid.get(key);
+                    if (bucket) bucket.push(i);
+                    else minionGrid.set(key, [i]);
+                }
+            }
+
+            // Walks the cells the range actually covers. Falls back to the plain scan
+            // when the range is wide enough that the grid would not save anything.
             function findClosestMinionIndexFrom(x, y, range) {
+                const cells = Math.ceil(range / ENTITY_GRID_CELL);
+                if (cells > 4) return findClosestMinionIndexScan(x, y, range);
+
+                const maxDistSq = range * range;
+                let bestIndex = -1;
+                let bestDistSq = maxDistSq;
+                const cx = Math.floor(x / ENTITY_GRID_CELL);
+                const cy = Math.floor(y / ENTITY_GRID_CELL);
+
+                for (let gx = cx - cells; gx <= cx + cells; gx += 1) {
+                    for (let gy = cy - cells; gy <= cy + cells; gy += 1) {
+                        const bucket = minionGrid.get(`${gx},${gy}`);
+                        if (!bucket) continue;
+                        for (let b = 0; b < bucket.length; b += 1) {
+                            const minion = game.minionUnits[bucket[b]];
+                            if (!minion) continue;
+                            const dx = minion.x - x;
+                            const dy = minion.y - y;
+                            const dSq = dx * dx + dy * dy;
+                            if (dSq <= bestDistSq) {
+                                bestDistSq = dSq;
+                                bestIndex = bucket[b];
+                            }
+                        }
+                    }
+                }
+
+                return bestIndex;
+            }
+
+            function findClosestMinionIndexScan(x, y, range) {
                 const maxDistSq = range * range;
                 let bestIndex = -1;
                 let bestDistSq = maxDistSq;
@@ -9591,6 +9846,7 @@
             function updateMinions() {
                 if (game.minionUnits.length === 0) return;
                 rebuildEnemyLookup();
+                rebuildMinionGrid();
 
                 for (let i = 0; i < game.minionUnits.length; i += 1) {
                     const minion = game.minionUnits[i];
@@ -9936,9 +10192,11 @@
 
             function render() {
                 clampCameraPosition();
-                ctx.clearRect(0, 0, viewport.w, viewport.h);
+                ctx.setTransform(1, 0, 0, 1, 0, 0);
+                ctx.clearRect(0, 0, canvas.width, canvas.height);
+                // World pass: world units in, device pixels out.
                 ctx.save();
-                ctx.scale(cameraState.zoom, cameraState.zoom);
+                ctx.scale(renderScale * cameraState.zoom, renderScale * cameraState.zoom);
                 ctx.translate(-cameraState.x, -cameraState.y);
                 drawBackdrop(ctx);
                 drawTowerHealthBorder(ctx);
@@ -9948,13 +10206,12 @@
 
                 for (let i = 0; i < game.minionUnits.length; i += 1) {
                     const minion = game.minionUnits[i];
+                    if (!circleInView(minion.x, minion.y, 24)) continue;
                     if (minion.role === "trader") {
                         ctx.save();
-                        ctx.shadowColor = minion.hitFlash > 0 ? "#ffd7c8dd" : "#ffd88aaa";
-                        ctx.shadowBlur = 10;
+                        drawGlow(ctx, minion.x, minion.y, 11, minion.hitFlash > 0 ? "#ffd7c8" : "#ffd88a", 0.5);
                         ctx.fillStyle = minion.hitFlash > 0 ? "#fff0d0" : "#ffd88a";
                         drawDiamond(minion.x, minion.y, 8, minion.hitFlash > 0 ? "#fff0d0" : "#ffd88a");
-                        ctx.shadowBlur = 0;
                         ctx.strokeStyle = "#5a4020";
                         ctx.lineWidth = 2;
                         ctx.beginPath();
@@ -9978,13 +10235,12 @@
                         }
                     } else if (minion.role === "defender") {
                         ctx.save();
-                        ctx.shadowColor = minion.hitFlash > 0 ? "#ffd1c0dd" : "#ffb08aaa";
-                        ctx.shadowBlur = minion.attackFlash > 0 ? 16 : 10;
+                        drawGlow(ctx, minion.x, minion.y, minion.attackFlash > 0 ? 14 : 10,
+                            minion.hitFlash > 0 ? "#ffd1c0" : "#ffb08a", minion.attackFlash > 0 ? 0.7 : 0.5);
                         ctx.fillStyle = minion.hitFlash > 0 ? "#ffd7c8" : "#ffb08a";
                         ctx.beginPath();
                         ctx.arc(minion.x, minion.y, 7, 0, Math.PI * 2);
                         ctx.fill();
-                        ctx.shadowBlur = 0;
                         ctx.strokeStyle = "#4a2520";
                         ctx.lineWidth = 2;
                         ctx.beginPath();
@@ -10003,8 +10259,7 @@
                         ctx.restore();
                     } else {
                         ctx.save();
-                        ctx.shadowColor = "#7fd7ffaa";
-                        ctx.shadowBlur = 10;
+                        drawGlow(ctx, minion.x, minion.y, 10, "#7fd7ff", 0.5);
                         ctx.fillStyle = "#7fd7ff";
                         ctx.fillRect(minion.x - 6, minion.y - 6, 12, 12);
                         ctx.shadowBlur = 0;
@@ -10030,10 +10285,16 @@
                     }
                 }
 
+                // Settings the nodes all share are set once for the run of them rather
+                // than per node, and nodes outside the frame are not drawn at all.
+                ctx.save();
+                ctx.lineJoin = "round";
                 for (const node of game.nodes) {
                     if (!node.active) continue;
+                    if (!circleInView(node.x, node.y, node.size)) continue;
                     drawNode(node);
                 }
+                ctx.restore();
 
                 for (const enemy of game.enemies) {
                     if (enemy.claimsSpawner) {
@@ -10065,8 +10326,7 @@
 
                     ctx.save();
                     const visualR = enemy.r * ENEMY_VISUAL_SCALE;
-                    ctx.shadowColor = `${enemy.color}aa`;
-                    ctx.shadowBlur = 12;
+                    drawGlow(ctx, enemy.x, enemy.y, visualR * 1.5, enemy.color, 0.5);
                     ctx.fillStyle = enemy.color;
                     if (enemy.shape === "square") {
                         const size = visualR * 2;
@@ -10218,6 +10478,11 @@
 
                 ctx.restore();
 
+                // Screen pass: everything below is laid out in viewport units, so it gets
+                // the same scale without the camera.
+                ctx.save();
+                ctx.scale(renderScale, renderScale);
+
                 drawOffscreenPlayerIndicator(ctx);
                 drawOffscreenBossIndicators(ctx);
 
@@ -10305,6 +10570,8 @@
                     ctx.fillText("Wood: green square | Stone: gray circle | Crystal: blue diamond | Amber: orange triangle | Aether: violet star", viewport.w / 2, viewport.h / 2 + 168);
                     ctx.fillText("Bump red enemies and place sentries where you want to defend TOWER.", viewport.w / 2, viewport.h / 2 + 196);
                 }
+
+                ctx.restore();
             }
 
             // ---------------------------------------------------------------
@@ -10744,8 +11011,34 @@
                 applyMusicVolume();
             }
 
-            function loop() {
-                tickGame();
+            // One simulation step is a sixtieth of a second, whatever the display is
+            // doing. Tying the step to the frame meant the whole game ran slow on a
+            // machine that could not keep up - which reads as lag but is the world
+            // itself dragging - and ran half again too fast on a 90Hz screen.
+            const SIM_STEP_MS = 1000 / 60;
+            // Past this many steps in one frame the machine is not keeping up, and
+            // catching up in full would only make the next frame later still.
+            const SIM_MAX_STEPS_PER_FRAME = 5;
+            let simAccumulatorMs = 0;
+            let lastFrameMs = 0;
+
+            function loop(nowMs) {
+                const now = Number.isFinite(nowMs) ? nowMs : performance.now();
+                if (!lastFrameMs) lastFrameMs = now;
+                // A tab that was in the background hands back a gap of minutes. Clamped,
+                // or the catch-up would run thousands of steps in one frame.
+                const elapsed = Math.min(now - lastFrameMs, SIM_STEP_MS * SIM_MAX_STEPS_PER_FRAME);
+                lastFrameMs = now;
+                simAccumulatorMs += elapsed;
+
+                let steps = 0;
+                while (simAccumulatorMs >= SIM_STEP_MS && steps < SIM_MAX_STEPS_PER_FRAME) {
+                    tickGame();
+                    simAccumulatorMs -= SIM_STEP_MS;
+                    steps += 1;
+                }
+                if (steps === SIM_MAX_STEPS_PER_FRAME) simAccumulatorMs = 0;
+
                 render();
                 if (game.running) {
                     rafId = requestAnimationFrame(loop);
@@ -11008,6 +11301,8 @@
                 applyMusicVolume();
                 refreshHud();
                 if (rafId === null) {
+                    lastFrameMs = 0;
+                    simAccumulatorMs = 0;
                     rafId = requestAnimationFrame(loop);
                 }
             }
@@ -11263,6 +11558,12 @@
                 if (!input) return;
                 commitDefenderName(input, true);
             });
+
+            // The lists are only built while their panel is open, so opening one has to
+            // ask for a refresh: while the game is paused nothing else will.
+            for (const panel of [gathererFocusPanelEl, farBankPanelEl, traderRoutePanelEl, defenderPostPanelEl, turretStockPanelEl]) {
+                if (panel) panel.addEventListener("toggle", () => { if (panel.open) refreshHud(); });
+            }
 
             farBankListEl.addEventListener("click", (event) => {
                 if (!canUseUpgrade("farBankAssign")) return;
