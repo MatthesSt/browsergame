@@ -235,6 +235,8 @@
         .ico.wave { background: #9be7ff; border-radius: 50%; }
         .ico.timer { background: #ffd166; border-radius: 50%; }
         .ico.field { background: #7fe0bb; border-radius: 3px; }
+        .ico.tribe { background: #d1603d; clip-path: polygon(50% 0, 100% 100%, 0 100%); }
+        .ico.tribe.roused { background: #ff7043; box-shadow: 0 0 8px #ff7043; }
         .ico.field.claimed { background: #ff4d4d; }
         .ico.tower.claimed { background: #ff4d4d; }
 
@@ -1200,6 +1202,11 @@
             clip-path: polygon(50% 0, 61% 35%, 100% 50%, 61% 65%, 50% 100%, 39% 65%, 0 50%, 39% 35%);
         }
 
+        .res-icon.ivory {
+            background: #ecdfae;
+            clip-path: polygon(50% 0, 78% 30%, 66% 100%, 34% 100%, 22% 30%);
+        }
+
         .res-icon.essence {
             background: #d7b7ff;
             border-radius: 50%;
@@ -1395,14 +1402,14 @@
             <div class="hud-bar overlay" aria-hidden="true">
                 <div class="hud-row">
                     <div class="hud-section hud-section-resources">
-                        <div class="chip resource-bundle bank-bundle" title="Banked materials: Wood / Stone / Crystal / Amber / Aether / Essence"><span class="ico bank"></span><span>Bank</span><span class="shop-btn-costs hud-bank-costs"><span class="cost-chip"><span class="res-icon wood"></span><strong id="bankWoodHud">0</strong></span><span class="cost-chip"><span class="res-icon stone"></span><strong id="bankStoneHud">0</strong></span><span class="cost-chip"><span class="res-icon crystal"></span><strong id="bankCrystalHud">0</strong></span><span class="cost-chip"><span class="res-icon amber"></span><strong id="bankAmberHud">0</strong></span><span class="cost-chip"><span class="res-icon aether"></span><strong id="bankAetherHud">0</strong></span><span class="cost-chip"><span class="res-icon essence"></span><strong id="essence">0</strong></span></span></div>
+                        <div class="chip resource-bundle bank-bundle" title="Banked materials: Wood / Stone / Crystal / Amber / Aether / Ivory / Essence"><span class="ico bank"></span><span>Bank</span><span class="shop-btn-costs hud-bank-costs"><span class="cost-chip"><span class="res-icon wood"></span><strong id="bankWoodHud">0</strong></span><span class="cost-chip"><span class="res-icon stone"></span><strong id="bankStoneHud">0</strong></span><span class="cost-chip"><span class="res-icon crystal"></span><strong id="bankCrystalHud">0</strong></span><span class="cost-chip"><span class="res-icon amber"></span><strong id="bankAmberHud">0</strong></span><span class="cost-chip"><span class="res-icon aether"></span><strong id="bankAetherHud">0</strong></span><span class="cost-chip"><span class="res-icon ivory"></span><strong id="bankIvoryHud">0</strong></span><span class="cost-chip"><span class="res-icon essence"></span><strong id="essence">0</strong></span></span></div>
                     </div>
                     <div class="hud-spacer" aria-hidden="true"></div>
                     <div class="hud-section hud-section-wave">
                         <div class="chip" id="towerHpChip" title="Tower health - the run ends when it reaches zero"><span class="ico tower" id="towerHpIco"></span><span>Tower</span><strong id="towerHpHud">100/100</strong></div>
                         <div class="chip" title="Current enemy wave"><span class="ico wave"></span><span>Wave</span><strong id="waveHud">0</strong></div>
                         <div class="chip" title="Time until next wave"><span class="ico timer"></span><span>Next</span><strong id="nextWaveHud">--:--</strong></div>
-                        <div class="chip" id="fieldsChip" title="Resource fields still producing - blights claim them until killed"><span class="ico field" id="fieldsIco"></span><span>Fields</span><strong id="fieldsHud">8/8</strong></div>
+                        <div class="chip" id="tribeChip" title="Tribe ground you hold across the river - hold all of it to provoke their war-chief"><span class="ico tribe" id="tribeIco"></span><span>Tribe</span><strong id="tribeHud">0/4</strong></div><div class="chip" id="fieldsChip" title="Resource fields still producing - blights claim them until killed"><span class="ico field" id="fieldsIco"></span><span>Fields</span><strong id="fieldsHud">8/8</strong></div>
                     </div>
                     <div class="hud-spacer" aria-hidden="true"></div>
                     <div class="hud-section hud-section-score">
@@ -1420,7 +1427,7 @@
         <section class="stage">
             <div class="map-frame">
                 <canvas id="game" width="1920" height="1080" aria-label="Meadow Gatherer game area"></canvas>
-                <div class="chip resource-bundle bag-bundle bag-overlay" aria-hidden="true" title="Bag materials: Wood / Stone / Crystal / Amber / Aether"><span class="ico bag"></span><span>Bag</span><span class="bag-cap-inline" title="Bag capacity used / maximum"><span>Cap</span><strong id="capacity">10</strong></span><span class="shop-btn-costs hud-bank-costs"><span class="cost-chip"><span class="res-icon wood"></span><strong id="bagWoodHud">0</strong></span><span class="cost-chip"><span class="res-icon stone"></span><strong id="bagStoneHud">0</strong></span><span class="cost-chip"><span class="res-icon crystal"></span><strong id="bagCrystalHud">0</strong></span><span class="cost-chip"><span class="res-icon amber"></span><strong id="bagAmberHud">0</strong></span><span class="cost-chip"><span class="res-icon aether"></span><strong id="bagAetherHud">0</strong></span></span></div>
+                <div class="chip resource-bundle bag-bundle bag-overlay" aria-hidden="true" title="Bag materials: Wood / Stone / Crystal / Amber / Aether / Ivory"><span class="ico bag"></span><span>Bag</span><span class="bag-cap-inline" title="Bag capacity used / maximum"><span>Cap</span><strong id="capacity">10</strong></span><span class="shop-btn-costs hud-bank-costs"><span class="cost-chip"><span class="res-icon wood"></span><strong id="bagWoodHud">0</strong></span><span class="cost-chip"><span class="res-icon stone"></span><strong id="bagStoneHud">0</strong></span><span class="cost-chip"><span class="res-icon crystal"></span><strong id="bagCrystalHud">0</strong></span><span class="cost-chip"><span class="res-icon amber"></span><strong id="bagAmberHud">0</strong></span><span class="cost-chip"><span class="res-icon aether"></span><strong id="bagAetherHud">0</strong></span><span class="cost-chip"><span class="res-icon ivory"></span><strong id="bagIvoryHud">0</strong></span></span></div>
             </div>
             <div class="shop-dock">
                 <aside class="shop" aria-label="Shop panel">
@@ -1468,6 +1475,10 @@
                                         <summary id="gathererFocusSummary" class="secondary shop-btn gatherer-focus-summary">Gatherer Focus</summary>
                                         <div id="gathererFocusList" class="gatherer-focus-list"></div>
                                     </details>
+                                    <details id="farBankPanel" class="gatherer-focus-panel">
+                                        <summary id="farBankSummary" class="secondary shop-btn gatherer-focus-summary">Far Bank</summary>
+                                        <div id="farBankList" class="gatherer-focus-list"></div>
+                                    </details>
                                     <button id="traderBtn" class="secondary shop-btn">Craft Trader</button>
                                     <details id="traderRoutePanel" class="gatherer-focus-panel">
                                         <summary id="traderRouteSummary" class="secondary shop-btn gatherer-focus-summary">Trade Routes</summary>
@@ -1487,6 +1498,7 @@
                                 <summary class="shop-group-title">Spells</summary>
                                 <div class="shop-controls">
                                     <button id="minionHasteBtn" class="secondary shop-btn">Haste Spell</button>
+                                    <button id="warPaintBtn" class="secondary shop-btn">War Paint</button>
                                     <button id="bloomSpellBtn" class="secondary shop-btn">Bloom</button>
                                     <button id="waygateSpellBtn" class="secondary shop-btn">Waygate</button>
                                     <button id="chillSpellBtn" class="secondary shop-btn">Chill</button>
@@ -1521,7 +1533,7 @@
         <div class="popover-card" role="dialog" aria-modal="true" aria-label="Skill Tree">
             <div class="popover-head">
                 <h3>SKILL TREE</h3>
-                <div class="chip resource-bundle bank-bundle skilltree-bank" title="Banked materials: Wood / Stone / Crystal / Amber / Aether / Essence"><span class="ico bank"></span><span>Bank</span><span class="shop-btn-costs hud-bank-costs"><span class="cost-chip"><span class="res-icon wood"></span><strong id="treeBankWood">0</strong></span><span class="cost-chip"><span class="res-icon stone"></span><strong id="treeBankStone">0</strong></span><span class="cost-chip"><span class="res-icon crystal"></span><strong id="treeBankCrystal">0</strong></span><span class="cost-chip"><span class="res-icon amber"></span><strong id="treeBankAmber">0</strong></span><span class="cost-chip"><span class="res-icon aether"></span><strong id="treeBankAether">0</strong></span><span class="cost-chip"><span class="res-icon essence"></span><strong id="treeBankEssence">0</strong></span></span></div>
+                <div class="chip resource-bundle bank-bundle skilltree-bank" title="Banked materials: Wood / Stone / Crystal / Amber / Aether / Ivory / Essence"><span class="ico bank"></span><span>Bank</span><span class="shop-btn-costs hud-bank-costs"><span class="cost-chip"><span class="res-icon wood"></span><strong id="treeBankWood">0</strong></span><span class="cost-chip"><span class="res-icon stone"></span><strong id="treeBankStone">0</strong></span><span class="cost-chip"><span class="res-icon crystal"></span><strong id="treeBankCrystal">0</strong></span><span class="cost-chip"><span class="res-icon amber"></span><strong id="treeBankAmber">0</strong></span><span class="cost-chip"><span class="res-icon aether"></span><strong id="treeBankAether">0</strong></span><span class="cost-chip"><span class="res-icon ivory"></span><strong id="treeBankIvory">0</strong></span><span class="cost-chip"><span class="res-icon essence"></span><strong id="treeBankEssence">0</strong></span></span></div>
                 <div class="popover-head-actions">
                     <div class="zoom-controls" aria-label="Skill tree zoom controls">
                         <button id="skillTreeZoomOutBtn" class="secondary" title="Zoom out">-</button>
@@ -1609,17 +1621,20 @@
             const bagCrystalHudEl = document.getElementById("bagCrystalHud");
             const bagAmberHudEl = document.getElementById("bagAmberHud");
             const bagAetherHudEl = document.getElementById("bagAetherHud");
+            const bagIvoryHudEl = document.getElementById("bagIvoryHud");
             const bankWoodHudEl = document.getElementById("bankWoodHud");
             const bankStoneHudEl = document.getElementById("bankStoneHud");
             const bankCrystalHudEl = document.getElementById("bankCrystalHud");
             const bankAmberHudEl = document.getElementById("bankAmberHud");
             const bankAetherHudEl = document.getElementById("bankAetherHud");
+            const bankIvoryHudEl = document.getElementById("bankIvoryHud");
             const treeBankEls = {
                 wood: document.getElementById("treeBankWood"),
                 stone: document.getElementById("treeBankStone"),
                 crystal: document.getElementById("treeBankCrystal"),
                 amber: document.getElementById("treeBankAmber"),
                 aether: document.getElementById("treeBankAether"),
+                ivory: document.getElementById("treeBankIvory"),
                 essence: document.getElementById("treeBankEssence")
             };
             const storedEl = document.getElementById("stored");
@@ -1632,6 +1647,9 @@
             const towerHpChipEl = document.getElementById("towerHpChip");
             const towerHpIcoEl = document.getElementById("towerHpIco");
             const towerHpHudEl = document.getElementById("towerHpHud");
+            const tribeChipEl = document.getElementById("tribeChip");
+            const tribeIcoEl = document.getElementById("tribeIco");
+            const tribeHudEl = document.getElementById("tribeHud");
             const fieldsChipEl = document.getElementById("fieldsChip");
             const fieldsIcoEl = document.getElementById("fieldsIco");
             const fieldsHudEl = document.getElementById("fieldsHud");
@@ -1656,6 +1674,9 @@
             const gathererFocusPanelEl = document.getElementById("gathererFocusPanel");
             const gathererFocusSummaryEl = document.getElementById("gathererFocusSummary");
             const gathererFocusListEl = document.getElementById("gathererFocusList");
+            const farBankPanelEl = document.getElementById("farBankPanel");
+            const farBankSummaryEl = document.getElementById("farBankSummary");
+            const farBankListEl = document.getElementById("farBankList");
             const traderBtn = document.getElementById("traderBtn");
             const traderRoutePanelEl = document.getElementById("traderRoutePanel");
             const traderRouteSummaryEl = document.getElementById("traderRouteSummary");
@@ -1666,6 +1687,7 @@
             const defenderPostListEl = document.getElementById("defenderPostList");
             const minionSpeedBtn = document.getElementById("minionSpeedBtn");
             const minionHasteBtn = document.getElementById("minionHasteBtn");
+            const warPaintBtn = document.getElementById("warPaintBtn");
             const bloomSpellBtn = document.getElementById("bloomSpellBtn");
             const waygateSpellBtn = document.getElementById("waygateSpellBtn");
             const chillSpellBtn = document.getElementById("chillSpellBtn");
@@ -1729,8 +1751,8 @@
             // The viewport follows the on-screen frame's aspect (see fitCanvasToStage) so the map
             // fills the stage without stretching. Vertical coverage stays fixed at BASE_VIEW_H.
             const viewport = { w: canvas.width, h: canvas.height };
-            const RESOURCE_TYPES = ["wood", "stone", "crystal", "amber", "aether", "essence"];
-            const GATHERER_PRIORITY_MODES = ["auto", "wood", "stone", "crystal", "amber", "aether"];
+            const RESOURCE_TYPES = ["wood", "stone", "crystal", "amber", "aether", "ivory", "essence"];
+            const GATHERER_PRIORITY_MODES = ["auto", "wood", "stone", "crystal", "amber", "aether", "ivory"];
             const SKILL_TREE_ORDER = [
                 "speed",
                 "bag",
@@ -1744,6 +1766,8 @@
                 "chillSpell",
                 "mendSpell",
                 "trader",
+                "boat",
+                "warPaint",
                 "defender",
                 "turret",
                 "sniperTurret",
@@ -1771,6 +1795,8 @@
                 slowTurret: { label: "Unlock Slow Field", cost: { crystal: 14, amber: 9, essence: 2 }, requires: ["sniperTurret"] },
                 turretCap: { label: "Unlock Turret Capacity", cost: { crystal: 18, amber: 10, essence: 3 }, requires: ["slowTurret"] },
                 trader: { label: "Unlock Traders", desc: "Caravans that carry bank goods to the village and trade them", cost: { wood: 26, stone: 22 }, requires: ["bag"] },
+                warPaint: { label: "Unlock War Paint", desc: "Grind ivory and mark a war party - three times the bite, half the harm", cost: { crystal: 140, aether: 70, ivory: 24, essence: 40 }, requires: ["boat"] },
+                boat: { label: "Unlock Boat", desc: "Builds a dock on each bank - your side can cross the river to the tribe's ground", cost: { stone: 120, crystal: 60, amber: 40, essence: 12 }, requires: ["trader"] },
                 minionHaste: { label: "Unlock Haste Spell", desc: "Cast to lift every minion's pace by half for a minute", cost: { wood: 24, stone: 18 }, requires: [] },
                 bloomSpell: { label: "Unlock Bloom", desc: "Cast to refill every field a blight is not sitting on", cost: { wood: 45, stone: 35, crystal: 12 }, requires: ["minionHaste"] },
                 waygateSpell: { label: "Unlock Waygate", desc: "Cast to snap every minion home, full bags banked on the way", cost: { stone: 60, crystal: 30, amber: 18 }, requires: ["bloomSpell"] },
@@ -1791,6 +1817,8 @@
                 gatherer: 3,
                 gathererFocus: 5,
                 trader: 3,
+                boat: 4,
+                warPaint: 5,
                 minionHaste: 1,
                 bloomSpell: 2,
                 waygateSpell: 3,
@@ -1823,6 +1851,8 @@
                 chillSpell: "spellDefense",
                 mendSpell: "spellDefense",
                 trader: "trade",
+                boat: "farBank",
+                warPaint: "warBand",
                 defender: "defense",
                 minionArmor: "towerArmor",
                 minionArmor2: "towerArmor",
@@ -1857,6 +1887,13 @@
                 spellEconomy: 82,
                 spellDefense: 118,
                 trade: 294,
+                // The far bank hangs off the trade line into the empty upper right: at
+                // tier 4 and 336 the node clears the trader by 60px and everything else
+                // by twice that, which is the only room left on the ring.
+                farBank: 336,
+                // One ring further out and swung back towards the trade line, because a
+                // second node straight out from the boat would sit inside its own parent.
+                warBand: 320,
                 towerArmor: 214,
                 minionSpeed: 280,
                 focusLine: 244,
@@ -1881,6 +1918,9 @@
                 minionHaste: "minionHaste",
                 trader: "trader",
                 traderRoute: "trader",
+                boat: "boat",
+                warPaint: "warPaint",
+                farBankAssign: "boat",
                 defender: "defender",
                 minionSpeed: "minionSpeed",
                 minionCapacity: "minionCapacity",
@@ -1942,7 +1982,12 @@
                 stone: { color: "#6c757d", shape: "circle", size: E(13) / WORLD_SCALE, value: 2, respawn: 320 },
                 crystal: { color: "#00b4d8", shape: "diamond", size: E(11) / WORLD_SCALE, value: 4, respawn: 460 },
                 amber: { color: "#f4a261", shape: "triangle", size: E(12) / WORLD_SCALE, value: 6, respawn: 540 },
-                aether: { color: "#b57bff", shape: "star", size: E(13) / WORLD_SCALE, value: 11, respawn: 1200}
+                aether: { color: "#b57bff", shape: "star", size: E(13) / WORLD_SCALE, value: 11, respawn: 1200},
+                // Only the tribe's ground grows this, and nothing you own makes it come
+                // faster or count for more - see scaledRespawnTicks and the two banking
+                // paths. Everything else in this list compounds; the point of this one
+                // is that it never does.
+                ivory: { color: "#ecdfae", shape: "shard", size: E(12) / WORLD_SCALE, value: 24, respawn: 1800 }
             };
 
             const enemyTypeConfig = {
@@ -1953,6 +1998,9 @@
                 // Walks past the tower without a glance: it wants a field, and once it
                 // has one that field stops producing until the blight is killed.
                 ghoul: { key: "ghoul", color: "#75855f", stroke: "#1e2616", r: E(11), hp: 3, speed: W(0.42) * ENEMY_SPEED_MULTIPLIER, damage: 0, shape: "circle", minionFocus: false, minionShotRange: 0, minionShotCooldown: 0, laserColor: "#c6e6a2", roams: true, melee: true },
+                // The tribe. It has no interest in the tower and never counts towards a
+                // wave: everything it does is about the ground it is standing on.
+                warden: { key: "warden", color: "#d1603d", stroke: "#4a1c10", r: E(11), hp: 5, speed: W(1.15) * ENEMY_SPEED_MULTIPLIER, damage: 0, shape: "square", minionFocus: false, minionShotRange: 0, minionShotCooldown: 0, laserColor: "#ffb08a", tribe: true, melee: true },
                 blight: { key: "blight", color: "#a06bd8", stroke: "#331a4d", r: E(12), hp: 4, speed: W(1.45) * ENEMY_SPEED_MULTIPLIER, damage: 0, shape: "diamond", minionFocus: false, minionShotRange: 0, minionShotCooldown: 0, laserColor: "#c9a2ff", claimsSpawner: true }
             };
 
@@ -1972,6 +2020,9 @@
             // Red is reserved for a field that is actually lost: violet marks a blight
             // still on its way, so the two states never read as the same thing.
             const CLAIM_ALERT_COLOR = "#ff4d4d";
+            // The tribe's own colour, kept well away from the blight red: one of these
+            // means a field is being choked, the other means it was never yours.
+            const TRIBE_COLOR = "#d1603d";
             const CLAIM_PING_TICKS = 110;
             // How long a settled blight takes to eat one node out of its field. Slow
             // enough that a claim is a warning rather than an instant loss, fast enough
@@ -2005,7 +2056,7 @@
 
             const tower = { x: -W(108) / 2, y: -W(88) / 2, w: W(108), h: W(88) };
             const TOWER_MAX_HP = 100;
-            const START_BUDGET = { wood: 4000, stone: 3000, crystal: 1000, amber: 1000, aether: 1000, essence: 1000 };
+            const START_BUDGET = { wood: 40, stone: 30, crystal: 0, amber: 0, aether: 0, essence: 0 };
             const START_WAVE_COUNT = 1;
             const WAVE_START_DELAY = 3600;
             const WAVE_BREAK_TICKS = 320;
@@ -2258,6 +2309,142 @@
                 return true;
             }
 
+            // ---- The crossing ------------------------------------------------------
+            //
+            // The river gets exactly one crossing, and it sits where the water passes
+            // closest to the tower - the only place a jetty is worth the walk. Both
+            // docks come off the path itself rather than being written down, so moving
+            // a control point moves the crossing with it instead of leaving one of them
+            // stranded in a field.
+            const FERRY_DOCK_OFFSET = RIVER_HALF_WIDTH + W(60);
+            const FERRY_DOCK_REACH = W(30);
+            // Wading in this close to a jetty is boarding; anywhere else along the bank
+            // is still just walking into a river.
+            const FERRY_BOARDING_RADIUS = W(150);
+            // Paddling is slower than walking. The crossing is a toll, not a shortcut.
+            const FERRY_SPEED_FACTOR = 0.55;
+
+            function buildFerryDocks() {
+                let bestIndex = 0;
+                let bestDistSq = Infinity;
+                for (let i = 0; i < RIVER_PATH.length; i += 1) {
+                    const point = RIVER_PATH[i];
+                    const distSq = point.x * point.x + point.y * point.y;
+                    if (distSq < bestDistSq) {
+                        bestDistSq = distSq;
+                        bestIndex = i;
+                    }
+                }
+
+                const point = RIVER_PATH[bestIndex];
+                const from = RIVER_PATH[Math.max(0, bestIndex - 1)];
+                const to = RIVER_PATH[Math.min(RIVER_PATH.length - 1, bestIndex + 1)];
+                const dx = to.x - from.x;
+                const dy = to.y - from.y;
+                const length = Math.sqrt(dx * dx + dy * dy) || 1;
+                // The same normal the water is drawn from, and it points at the side the
+                // tower stands on - so that end of the crossing is the home one.
+                const normalX = -dy / length;
+                const normalY = dx / length;
+
+                return {
+                    x: point.x,
+                    y: point.y,
+                    home: { x: point.x + normalX * FERRY_DOCK_OFFSET, y: point.y + normalY * FERRY_DOCK_OFFSET },
+                    far: { x: point.x - normalX * FERRY_DOCK_OFFSET, y: point.y - normalY * FERRY_DOCK_OFFSET }
+                };
+            }
+
+            const FERRY_DOCKS = buildFerryDocks();
+
+            // Which bank a point is on: 1 for the tower's side, -1 for the tribe's.
+            function bankOf(x, y) {
+                const near = nearestRiverPoint(x, y);
+                return ((x - near.x) * near.normalX + (y - near.y) * near.normalY) >= 0 ? 1 : -1;
+            }
+
+            // Nothing changes banks without going through the water, and it cannot reach
+            // the water without entering the river's own bounding box - so anywhere
+            // outside that box last tick's answer is still right, and a walk over every
+            // river segment is skipped. That box is most of a map eight screens wide.
+            function trackBank(entity) {
+                if ((entity.bank === 1 || entity.bank === -1)
+                    && !nearRiverBounds(entity.x, entity.y, 0)) {
+                    return entity.bank;
+                }
+                entity.bank = bankOf(entity.x, entity.y);
+                return entity.bank;
+            }
+
+            // The boat is the whole permission, and it works in both directions - a
+            // minion standing on the far bank when you change its orders has to be able
+            // to come back, or you have marooned it for the rest of the run. Where a
+            // minion goes is decided by what it is aiming at, not by this.
+            function minionMayCross(minion) {
+                return isSkillUnlocked("boat");
+            }
+
+            // The one exception to "walk at it and let the river shove you back". A
+            // minion that wants the other bank is put on a route rather than left to
+            // find one: walk to your own jetty, then cross. Returns true when it has
+            // taken the tick, which is also how the caller learns it has not arrived.
+            function ferryStep(entity, targetX, targetY, speed) {
+                if (entity.ferryState === "crossing") {
+                    const landing = entity.ferryLanding === 1 ? FERRY_DOCKS.home : FERRY_DOCKS.far;
+                    const step = speed * FERRY_SPEED_FACTOR;
+                    const dx = landing.x - entity.x;
+                    const dy = landing.y - entity.y;
+                    const distSq = dx * dx + dy * dy;
+
+                    if (distSq <= step * step) {
+                        entity.x = landing.x;
+                        entity.y = landing.y;
+                        entity.bank = entity.ferryLanding;
+                        entity.ferryState = null;
+                    } else {
+                        const invD = 1 / Math.sqrt(distSq);
+                        entity.x += dx * invD * step;
+                        entity.y += dy * invD * step;
+                    }
+                    // No push-out on the way over: this is the one entity, for these few
+                    // seconds, that the water is allowed to hold.
+                    return true;
+                }
+
+                if (!minionMayCross(entity)) return false;
+                const side = trackBank(entity);
+                if (side === bankOf(targetX, targetY)) return false;
+
+                const dock = side === 1 ? FERRY_DOCKS.home : FERRY_DOCKS.far;
+                const dx = dock.x - entity.x;
+                const dy = dock.y - entity.y;
+                const distSq = dx * dx + dy * dy;
+
+                if (distSq <= FERRY_DOCK_REACH * FERRY_DOCK_REACH) {
+                    entity.ferryState = "crossing";
+                    entity.ferryLanding = -side;
+                    return true;
+                }
+
+                // Getting to the jetty is an ordinary walk, push-out and all.
+                if (distSq <= speed * speed) {
+                    entity.x = dock.x;
+                    entity.y = dock.y;
+                } else {
+                    const invD = 1 / Math.sqrt(distSq);
+                    entity.x += dx * invD * speed;
+                    entity.y += dy * invD * speed;
+                }
+                keepOutOfRiver(entity, MINION_RIVER_RADIUS);
+                return true;
+            }
+
+            // Whatever is standing on the water right now, so the crossing draws a hull
+            // under it instead of a minion apparently walking on the river.
+            function isCrossing(entity) {
+                return Boolean(entity) && entity.ferryState === "crossing";
+            }
+
             // Curated routes rather than every pairing: each turns something you have in
             // bulk into something further from the tower. The village keeps a cut, so no
             // chain of trades can ever come out ahead of gathering.
@@ -2291,6 +2478,20 @@
                 { type: "aether", tier: 3, angle: -90 },
                 { type: "aether", tier: 3, angle: 90 }
             ];
+            // Four fields on the tribe's ground, at fixed points rather than on a ring
+            // around a tower that is not theirs. Every one keeps at least six hundred
+            // units between its disc and the bank, because a disc that overhangs the
+            // water would grow nodes in it - spawnRegionForSpawner clamps to the map's
+            // edges, and knows nothing about the river.
+            // Their camp, back from the water and roughly central to their four fields.
+            const tribeCamp = { x: W(-4667), y: W(-2400), r: W(150) };
+            const TRIBE_FIELD_LAYOUT = [
+                { x: W(-4200), y: W(-1500) },   // the beachhead, first one off the boat
+                { x: W(-3967), y: W(-3167) },
+                { x: W(-5733), y: W(-1667) },
+                { x: W(-5600), y: W(-3333) }    // deepest, hardest to hold
+            ];
+
             const spawners = SPAWNER_LAYOUT.map((entry) => {
                 const distance = SPAWNER_TIER_DISTANCE[entry.tier];
                 const bearing = (entry.angle * Math.PI) / 180;
@@ -2300,11 +2501,34 @@
                     x: Math.cos(bearing) * distance,
                     y: Math.sin(bearing) * distance,
                     timer: 0,
+                    // Fields never move, so which side of the water this one grows on is
+                    // settled here rather than asked again every time a node lands.
+                    bank: bankOf(Math.cos(bearing) * distance, Math.sin(bearing) * distance),
+                    // Whose ground it is. The meadow's fields are yours from the start;
+                    // the tribe's have to be taken off them and can be lost again.
+                    owner: "meadow",
+                    capture: 0,
                     // Id of the blight sitting on this field, or null while it is free.
                     claimedBy: null
                 };
-            });
-            const BASE_ACTIVE_NODES_PER_SPAWNER = Math.max(1, Math.floor(MAX_ACTIVE_NODES / spawners.length));
+            }).concat(TRIBE_FIELD_LAYOUT.map((entry) => ({
+                type: "ivory",
+                // Tier only decides how wide the disc is, and the tribe's are the wide
+                // kind - there is no ring out here for it to mean anything else.
+                tier: 2,
+                x: entry.x,
+                y: entry.y,
+                timer: 0,
+                bank: -1,
+                owner: "tribe",
+                capture: 0,
+                claimedBy: null
+            })));
+
+            // The meadow's own fields, which is what the node budget and the HUD count.
+            // Ground you have not taken yet is not ground you have lost.
+            const MEADOW_SPAWNER_COUNT = SPAWNER_LAYOUT.length;
+            const BASE_ACTIVE_NODES_PER_SPAWNER = Math.max(1, Math.floor(MAX_ACTIVE_NODES / MEADOW_SPAWNER_COUNT));
             const INITIAL_WAVE_NUMBER = Math.max(0, Math.floor(START_WAVE_COUNT) - 1);
 
             const save = loadSave();
@@ -2324,6 +2548,7 @@
                 waveIntroPendingType: null,
                 towerHp: TOWER_MAX_HP,
                 minionHasteTicks: 0,
+                warPaintTicks: 0,
                 chillTicks: 0,
                 spellCooldowns: { mend: 0, waygate: 0, chill: 0, bloom: 0 },
                 player: {
@@ -2333,7 +2558,7 @@
                     speed: BASE_PLAYER_SPEED + save.speedLevel * PLAYER_SPEED_LEVEL_STEP,
                     stamina: PLAYER_STAMINA_MAX
                 },
-                inventory: { wood: 0, stone: 0, crystal: 0, amber: 0, aether: 0 },
+                inventory: { wood: 0, stone: 0, crystal: 0, amber: 0, aether: 0, ivory: 0 },
                 nodes: [],
                 enemies: [],
                 turrets: [],
@@ -2367,6 +2592,10 @@
                 // moment the caravan gets home.
                 selectedTurretType: null,
                 ghoulTimer: GHOUL_FIRST_TICKS,
+                tribeReinforceTimer: 0,
+                tribeRetakeTimer: 0,
+                warChiefProvoke: 0,
+                warChiefMourning: 0,
                 runOver: false,
                 runSummary: null,
                 // Essence is meta, so a run's haul is the difference from where it began.
@@ -2497,6 +2726,7 @@
                     bankCrystal: START_BUDGET.crystal,
                     bankAmber: START_BUDGET.amber,
                     bankAether: START_BUDGET.aether,
+                    bankIvory: 0,
                     minions: 0,
                     defenderMinions: 0,
                     traderMinions: 0,
@@ -2519,6 +2749,7 @@
                     bagLevel: 0,
                     gathererFocusBySlot: {},
                     gathererFocusCursor: 0,
+                    farBankBySlot: {},
                     traderRouteBySlot: {},
                     defenderPostBySlot: {}
                 };
@@ -2553,6 +2784,9 @@
                     const traderRouteBySlot = data.traderRouteBySlot && typeof data.traderRouteBySlot === "object"
                         ? data.traderRouteBySlot
                         : {};
+                    const farBankBySlot = data.farBankBySlot && typeof data.farBankBySlot === "object"
+                        ? data.farBankBySlot
+                        : {};
                     const defenderPostBySlot = data.defenderPostBySlot && typeof data.defenderPostBySlot === "object"
                         ? data.defenderPostBySlot
                         : {};
@@ -2568,6 +2802,7 @@
                         bestRunScore: Number.isFinite(data.bestRunScore) ? Math.max(0, Math.floor(data.bestRunScore)) : 0,
                         bestRunWave: Number.isFinite(data.bestRunWave) ? Math.max(0, Math.floor(data.bestRunWave)) : 0,
                         runsPlayed: Number.isFinite(data.runsPlayed) ? Math.max(0, Math.floor(data.runsPlayed)) : 0,
+                        warChiefKills: Number.isFinite(data.warChiefKills) ? Math.max(0, Math.floor(data.warChiefKills)) : 0,
                         essence: Number.isFinite(data.essence) ? Math.max(0, Math.floor(data.essence)) : START_BUDGET.essence,
                         globalMultiplierLevel: Number.isFinite(data.globalMultiplierLevel) ? Math.max(0, Math.floor(data.globalMultiplierLevel)) : fresh.globalMultiplierLevel,
                         worldAge: Number.isFinite(data.worldAge) ? data.worldAge : fresh.worldAge,
@@ -2576,6 +2811,7 @@
                         bankCrystal: Number.isFinite(data.bankCrystal) ? data.bankCrystal : fresh.bankCrystal,
                         bankAmber: Number.isFinite(data.bankAmber) ? data.bankAmber : fresh.bankAmber,
                         bankAether: Number.isFinite(data.bankAether) ? data.bankAether : fresh.bankAether,
+                        bankIvory: Number.isFinite(data.bankIvory) ? data.bankIvory : fresh.bankIvory,
                         minions: Number.isFinite(data.minions) ? data.minions : fresh.minions,
                         defenderMinions: Number.isFinite(data.defenderMinions) ? data.defenderMinions : fresh.defenderMinions,
                         traderMinions: Number.isFinite(data.traderMinions) ? Math.max(0, Math.floor(data.traderMinions)) : fresh.traderMinions,
@@ -2597,6 +2833,7 @@
                         bagLevel: Number.isFinite(data.bagLevel) ? data.bagLevel : fresh.bagLevel,
                         gathererFocusBySlot,
                         gathererFocusCursor,
+                        farBankBySlot,
                         traderRouteBySlot,
                         defenderPostBySlot,
                         unlockedSkills,
@@ -2614,6 +2851,7 @@
                         bestRunScore: 0,
                         bestRunWave: 0,
                         runsPlayed: 0,
+                        warChiefKills: 0,
                         essence: 0,
                         unlockedSkills: normalizeUnlockedSkills(null),
                         musicMuted: true,
@@ -3001,6 +3239,7 @@
                     waveIntroPendingType: game.waveIntroPendingType,
                     towerHp: game.towerHp,
                     minionHasteTicks: game.minionHasteTicks,
+                    warPaintTicks: game.warPaintTicks,
                     chillTicks: game.chillTicks,
                     spellCooldowns: {
                         mend: game.spellCooldowns.mend,
@@ -3009,6 +3248,12 @@
                         bloom: game.spellCooldowns.bloom
                     },
                     ghoulTimer: game.ghoulTimer,
+                    tribeReinforceTimer: game.tribeReinforceTimer,
+                    tribeRetakeTimer: game.tribeRetakeTimer,
+                    warChiefProvoke: game.warChiefProvoke,
+                    warChiefMourning: game.warChiefMourning,
+                    tribeFieldOwners: spawners.map((spawner) => spawner.owner),
+                    tribeFieldCaptures: spawners.map((spawner) => spawner.capture),
                     runEssenceStart: game.runEssenceStart,
                     runBestAtStart: game.runBestAtStart,
                     player: {
@@ -3021,7 +3266,8 @@
                         stone: game.inventory.stone,
                         crystal: game.inventory.crystal,
                         amber: game.inventory.amber,
-                        aether: game.inventory.aether
+                        aether: game.inventory.aether,
+                        ivory: game.inventory.ivory
                     },
                     nodes: game.nodes,
                     enemies: game.enemies,
@@ -3066,6 +3312,7 @@
                 game.waveInProgress = Boolean(snapshot.waveInProgress);
                 game.waveIntroPendingType = typeof snapshot.waveIntroPendingType === "string" ? snapshot.waveIntroPendingType : null;
                 game.towerHp = Number.isFinite(snapshot.towerHp) ? clamp(snapshot.towerHp, 0, TOWER_MAX_HP) : TOWER_MAX_HP;
+                game.warPaintTicks = Number.isFinite(snapshot.warPaintTicks) ? Math.max(0, Math.floor(snapshot.warPaintTicks)) : 0;
                 game.minionHasteTicks = Number.isFinite(snapshot.minionHasteTicks)
                     ? Math.max(0, Math.floor(snapshot.minionHasteTicks))
                     : 0;
@@ -3079,6 +3326,21 @@
                 }
                 // A snapshot is always a run in progress - a finished one is cleared.
                 game.ghoulTimer = Number.isFinite(snapshot.ghoulTimer) ? Math.max(1, Math.floor(snapshot.ghoulTimer)) : GHOUL_FIRST_TICKS;
+                game.tribeReinforceTimer = Number.isFinite(snapshot.tribeReinforceTimer) ? snapshot.tribeReinforceTimer : 0;
+                game.tribeRetakeTimer = Number.isFinite(snapshot.tribeRetakeTimer) ? snapshot.tribeRetakeTimer : 0;
+                game.warChiefProvoke = Number.isFinite(snapshot.warChiefProvoke) ? snapshot.warChiefProvoke : 0;
+                game.warChiefMourning = Number.isFinite(snapshot.warChiefMourning) ? snapshot.warChiefMourning : 0;
+                // A run saved before the tribe existed has none of this, and correctly
+                // resumes with them holding everything.
+                const savedOwners = Array.isArray(snapshot.tribeFieldOwners) ? snapshot.tribeFieldOwners : [];
+                const savedCaptures = Array.isArray(snapshot.tribeFieldCaptures) ? snapshot.tribeFieldCaptures : [];
+                for (let i = 0; i < spawners.length; i += 1) {
+                    const owner = savedOwners[i];
+                    spawners[i].owner = owner === "player" || owner === "tribe" || owner === "meadow"
+                        ? owner
+                        : (i < MEADOW_SPAWNER_COUNT ? "meadow" : "tribe");
+                    spawners[i].capture = Number.isFinite(savedCaptures[i]) ? savedCaptures[i] : 0;
+                }
                 game.runEssenceStart = Number.isFinite(snapshot.runEssenceStart) ? Math.max(0, snapshot.runEssenceStart) : save.essence;
                 game.runBestAtStart = Number.isFinite(snapshot.runBestAtStart) ? Math.max(0, snapshot.runBestAtStart) : save.bestRunScore;
                 game.runOver = false;
@@ -3151,7 +3413,7 @@
 
             function inventoryCount() {
                 return game.inventory.wood + game.inventory.stone + game.inventory.crystal
-                    + game.inventory.amber + game.inventory.aether;
+                    + game.inventory.amber + game.inventory.aether + game.inventory.ivory;
             }
 
             function minionRecipe() {
@@ -3203,6 +3465,10 @@
             }
 
             function spawnerLevelFor(type) {
+                // Ivory first, because the fall-through at the bottom of this function
+                // hands anything it does not recognise the amber level - which would
+                // quietly speed up the one field that is meant never to speed up.
+                if (type === "ivory") return 0;
                 if (type === "wood") return save.spawnerWoodLevel;
                 if (type === "stone") return save.spawnerStoneLevel;
                 if (type === "crystal") return save.spawnerCrystalLevel;
@@ -3526,6 +3792,7 @@
                 if (priority === "crystal") return "Crystal";
                 if (priority === "amber") return "Amber";
                 if (priority === "aether") return "Aether";
+                if (priority === "ivory") return "Ivory";
                 return "Auto";
             }
 
@@ -3611,6 +3878,49 @@
                     .join("");
             }
 
+            function farBankSummaryText() {
+                const sent = workerMinionsSortedBySlot().filter((minion) => minion.farBank).length;
+                return sent > 0 ? `Far Bank (${sent})` : "Far Bank";
+            }
+
+            // Which side of the water each gatherer works. Kept apart from Gatherer Focus
+            // on purpose: focus is what it picks up, this is where it goes, and a minion
+            // sent over stays over until it is called back.
+            function renderFarBankList() {
+                if (!farBankListEl) return;
+                const workers = workerMinionsSortedBySlot();
+                if (workers.length === 0) {
+                    if (farBankListEl.dataset.renderKey !== "empty") {
+                        farBankListEl.dataset.renderKey = "empty";
+                        farBankListEl.innerHTML = '<div class="gatherer-focus-empty">No gatherers to send yet.</div>';
+                    }
+                    return;
+                }
+
+                const renderKey = workers
+                    .map((minion, index) => `${index}:${minion.slotIndex}:${minion.farBank ? 1 : 0}:${minion.ferryState || "-"}`)
+                    .join("|") + `|open:${game.openMinionPicker}`;
+                if (farBankListEl.dataset.renderKey === renderKey) return;
+                farBankListEl.dataset.renderKey = renderKey;
+
+                const options = [
+                    { value: "home", label: "Home bank - the meadow" },
+                    { value: "far", label: "Far bank - across the river" }
+                ];
+
+                farBankListEl.innerHTML = workers
+                    .map((minion, index) => {
+                        const slot = Number.isFinite(minion.slotIndex) ? minion.slotIndex : index;
+                        const open = isMinionPickerOpen("farBank", slot);
+                        const crossing = minion.ferryState === "crossing";
+                        const label = crossing ? "Crossing" : (minion.farBank ? "Far bank" : "Home bank");
+                        const idle = minion.farBank ? "" : " route-idle";
+                        return `<button class="secondary shop-btn gatherer-focus-row${open ? " picker-open" : ""}${idle}" data-far-bank-slot="${slot}"><span class="shop-btn-title"><span>Gatherer ${index + 1}</span><span class="shop-btn-level">${label} ${open ? "&#9652;" : "&#9662;"}</span></span></button>`
+                            + minionPickerMarkup("farBank", slot, options, minion.farBank ? "far" : "home");
+                    })
+                    .join("");
+            }
+
             function formatSkillRequirement(skillId) {
                 const def = SKILL_TREE_DEFS[skillId];
                 if (!def || !def.requires || def.requires.length === 0) return "Locked";
@@ -3656,6 +3966,42 @@
                 refreshHud();
             }
 
+            // Paint is the only thing in the game bought with ivory alone, and the only
+            // reason a war party survives the chief. It stacks the way haste does.
+            const WAR_PAINT_DURATION_TICKS = 2700;
+            const WAR_PAINT_BASE_COST = 12;
+            const WAR_PAINT_DAMAGE = 3;
+
+            function warPaintActive() {
+                return game.warPaintTicks > 0;
+            }
+
+            function warPaintRecipe() {
+                const banked = Math.floor(game.warPaintTicks / WAR_PAINT_DURATION_TICKS);
+                return { ivory: WAR_PAINT_BASE_COST + save.warChiefKills * 6 + banked * 4 };
+            }
+
+            function castWarPaint() {
+                if (!canUseUpgrade("warPaint")) return;
+                const recipe = warPaintRecipe();
+                if (!hasBankForCost(recipe)) return;
+
+                spendBankForCost(recipe);
+                game.warPaintTicks += WAR_PAINT_DURATION_TICKS;
+                saveGame();
+                refreshHud();
+            }
+
+            // What a painted minion hits for. Everything on your side does one damage a
+            // swing otherwise, which is the number the chief's regeneration is set against.
+            function minionStrikeDamage() {
+                return warPaintActive() ? WAR_PAINT_DAMAGE : 1;
+            }
+
+            function incomingDamageMultiplier() {
+                return warPaintActive() ? 0.5 : 1;
+            }
+
             const SPELL_KEYS = ["mend", "waygate", "chill", "bloom"];
 
             // Every spell but haste settles in a single cast: what it costs, how long it
@@ -3684,7 +4030,7 @@
                     // Priced against the clock as it stands, before this cast extends it.
                     cost: () => CHILL_SPELL_BASE_COST + Math.floor(game.chillTicks / CHILL_SPELL_DURATION_TICKS),
                     cooldown: 0,
-                    ready: () => game.enemies.length > 0,
+                    ready: () => countChillTargets() > 0,
                     apply: () => {
                         // Casting again while it runs stacks another ten seconds onto the
                         // clock rather than restarting it.
@@ -3723,7 +4069,7 @@
                 }
                 if (key === "chill") {
                     if (chillSpellActive()) return `Active ${formatWaveCountdown(game.chillTicks)}`;
-                    if (game.enemies.length === 0) return "No enemies";
+                    if (countChillTargets() === 0) return "No enemies";
                     return `x${CHILL_SPELL_SPEED_MULTIPLIER} for ${formatWaveCountdown(CHILL_SPELL_DURATION_TICKS)}`;
                 }
                 return "Refill fields";
@@ -3776,11 +4122,16 @@
                 for (let i = 0; i < game.minionUnits.length; i += 1) {
                     const minion = game.minionUnits[i];
                     const slotIndex = Number.isFinite(minion.slotIndex) ? minion.slotIndex : i;
+                    // A waygate already moves minions across the whole map, so it may as
+                    // well move them across the water: the crossing is simply abandoned,
+                    // and whatever bank it lands on is the one it is standing on.
+                    minion.ferryState = null;
 
                     if (minion.role === "defender") {
                         const post = defenderPostFor(minion);
                         minion.x = post.x;
                         minion.y = post.y;
+                        minion.bank = post.bank;
                         minion.targetEnemyId = null;
                         minion.patrolIdleTicks = 0;
                         const patrolPoint = randomDefenderPatrolPoint(post);
@@ -3794,6 +4145,7 @@
                     const home = minionTowerPoint(slotIndex);
                     minion.x = home.x;
                     minion.y = home.y;
+                    minion.bank = 1;
                     if (minion.role === "trader") {
                         minion.tradeDwell = 0;
                         settleTraderArrival(minion);
@@ -3820,6 +4172,9 @@
                 for (let i = 0; i < spawners.length; i += 1) {
                     const spawner = spawners[i];
                     if (spawner.claimedBy !== null) continue;
+                    // Bloom is cast over your own fields. It has no reach into ground the
+                    // tribe still holds, and no way to make ivory come faster.
+                    if (!spawnerProduces(spawner) || spawner.type === "ivory") continue;
 
                     const cap = activeNodeCapForSpawner(i);
                     let attempts = 0;
@@ -3979,11 +4334,13 @@
                 setHudNumber("bagCrystal", bagCrystalHudEl, game.inventory.crystal);
                 setHudNumber("bagAmber", bagAmberHudEl, game.inventory.amber);
                 setHudNumber("bagAether", bagAetherHudEl, game.inventory.aether);
+                setHudNumber("bagIvory", bagIvoryHudEl, game.inventory.ivory);
                 setHudNumber("bankWood", bankWoodHudEl, save.bankWood);
                 setHudNumber("bankStone", bankStoneHudEl, save.bankStone);
                 setHudNumber("bankCrystal", bankCrystalHudEl, save.bankCrystal);
                 setHudNumber("bankAmber", bankAmberHudEl, save.bankAmber);
                 setHudNumber("bankAether", bankAetherHudEl, save.bankAether);
+                setHudNumber("bankIvory", bankIvoryHudEl, save.bankIvory);
                 refreshSkillTreeBank();
                 // Damage to the tower used to show up only as a bar on the tower itself,
                 // which is off screen as often as not. Mend prices itself against this
@@ -3996,9 +4353,23 @@
                 towerHpChipEl.classList.toggle("alert", towerHurt);
                 towerHpIcoEl.classList.toggle("claimed", towerHurt);
 
+                // The far bank in one line: what you hold, and what that has woken up.
+                const tribeFieldCount = spawners.length - MEADOW_SPAWNER_COUNT;
+                const tribeHeld = countTribeFieldsHeld();
+                const chiefUp = warChiefAlive();
+                const tribeText = chiefUp
+                    ? "WAR-CHIEF"
+                    : (tribeHeld >= tribeFieldCount && game.warChiefMourning <= 0
+                        ? `${tribeHeld}/${tribeFieldCount} drums`
+                        : `${tribeHeld}/${tribeFieldCount}`);
+                if (tribeHudEl.textContent !== tribeText) tribeHudEl.textContent = tribeText;
+                tribeChipEl.classList.toggle("alert", chiefUp);
+                tribeIcoEl.classList.toggle("roused", chiefUp || tribeHeld >= tribeFieldCount);
+                setButtonVisible(tribeChipEl, isSkillUnlocked("boat"));
+
                 const claimedFields = countClaimedSpawners();
-                const freeFields = spawners.length - claimedFields;
-                fieldsHudEl.textContent = `${freeFields}/${spawners.length}`;
+                const freeFields = MEADOW_SPAWNER_COUNT - claimedFields;
+                fieldsHudEl.textContent = `${freeFields}/${MEADOW_SPAWNER_COUNT}`;
                 fieldsChipEl.classList.toggle("alert", claimedFields > 0);
                 fieldsIcoEl.classList.toggle("claimed", claimedFields > 0);
 
@@ -4021,11 +4392,13 @@
                 const globalMultUnlocked = canUseUpgrade("globalMultiplier");
                 const gathererUnlocked = canUseUpgrade("gatherer");
                 const gathererFocusUnlocked = canUseUpgrade("gathererFocus");
+                const farBankUnlocked = canUseUpgrade("farBankAssign");
                 const defenderUnlocked = canUseUpgrade("defender");
                 const traderUnlocked = canUseUpgrade("trader");
                 const minionSpeedUnlocked = canUseUpgrade("minionSpeed");
                 const minionCapacityUnlocked = canUseUpgrade("minionCapacity");
                 const minionHasteUnlocked = canUseUpgrade("minionHaste");
+                const warPaintUnlocked = canUseUpgrade("warPaint");
 
                 const speedCost = speedRecipe();
                 const bagCost = bagRecipe();
@@ -4067,6 +4440,13 @@
                     }
                 }
                 renderGathererFocusList();
+                if (farBankSummaryEl) {
+                    const nextFarBankSummary = farBankSummaryText();
+                    if (farBankSummaryEl.textContent !== nextFarBankSummary) {
+                        farBankSummaryEl.textContent = nextFarBankSummary;
+                    }
+                }
+                renderFarBankList();
                 const traderRecipe = traderMinionRecipe();
                 setShopButtonContent(traderBtn, "Craft Trader", `Owned ${save.traderMinions}`, traderRecipe);
                 if (traderRouteSummaryEl) {
@@ -4093,9 +4473,18 @@
                 const hasteRunning = minionHasteActive();
                 setShopButtonContent(
                     minionHasteBtn,
+                    warPaintBtn,
                     "Haste Spell",
                     hasteRunning ? `Active ${formatWaveCountdown(game.minionHasteTicks)}` : `x${MINION_HASTE_MULTIPLIER} for 1:00`,
                     minionHasteRecipe()
+                );
+
+                const paintRunning = warPaintActive();
+                setShopButtonContent(
+                    warPaintBtn,
+                    "War Paint",
+                    paintRunning ? `Active ${formatWaveCountdown(game.warPaintTicks)}` : `x${WAR_PAINT_DAMAGE} damage, half taken`,
+                    warPaintRecipe()
                 );
 
                 // Every spell button reads the same way: what it would do, or how long
@@ -4125,6 +4514,7 @@
                 setButtonVisible(globalMultBtn, globalMultUnlocked);
                 setButtonVisible(craftBtn, gathererUnlocked);
                 setButtonVisible(gathererFocusPanelEl, gathererFocusUnlocked);
+                setButtonVisible(farBankPanelEl, farBankUnlocked);
                 setButtonVisible(traderBtn, traderUnlocked);
                 setButtonVisible(traderRoutePanelEl, traderUnlocked);
                 setButtonVisible(defenderBtn, defenderUnlocked);
@@ -4132,6 +4522,7 @@
                 setButtonVisible(minionSpeedBtn, minionSpeedUnlocked);
                 setButtonVisible(minionCapBtn, minionCapacityUnlocked);
                 setButtonVisible(minionHasteBtn, minionHasteUnlocked);
+                setButtonVisible(warPaintBtn, warPaintUnlocked);
 
                 setButtonDisabled(speedBtn, !speedUnlocked);
                 setButtonDisabled(bagBtn, !bagUnlocked);
@@ -4147,6 +4538,7 @@
                 setButtonDisabled(minionSpeedBtn, !minionSpeedUnlocked);
                 setButtonDisabled(minionCapBtn, !minionCapacityUnlocked);
                 setButtonDisabled(minionHasteBtn, !minionHasteUnlocked || !hasBankForCost(minionHasteRecipe()));
+                setButtonDisabled(warPaintBtn, !warPaintUnlocked || !hasBankForCost(warPaintRecipe()));
 
                 refreshShopGroupVisibility();
 
@@ -4864,7 +5256,8 @@
                 stone: { inner: "#2f3945", outer: "#232a34", speck: "#4d5765", accent: "#6b7683", decor: "pebble" },
                 crystal: { inner: "#11384a", outer: "#0c2634", speck: "#256f8a", accent: "#4a9cb8", decor: "shard" },
                 amber: { inner: "#443019", outer: "#2e2112", speck: "#8a6634", accent: "#ab8348", decor: "fleck" },
-                aether: { inner: "#3a2a5c", outer: "#241a3c", speck: "#6b4fa8", accent: "#a184d6", decor: "shard" }
+                aether: { inner: "#3a2a5c", outer: "#241a3c", speck: "#6b4fa8", accent: "#a184d6", decor: "shard" },
+                ivory: { inner: "#3d3524", outer: "#241f14", speck: "#7d7053", accent: "#b3a67f", decor: "shard" }
             };
             const TERRAIN_EDGE_STEPS = 56;
             const TERRAIN_OVERHANG = 1.18;   // keeps the smoothed edge outside the rect
@@ -5484,9 +5877,12 @@
                 for (const spawner of spawners) {
                     const config = materialConfig[spawner.type];
                     const claimed = spawner.claimedBy !== null;
+                    const tribeHeld = spawner.owner === "tribe";
                     // A claimed field trades its own colour for the blight's, and
-                    // breathes, so it reads as choked from across the map.
-                    const ringColor = claimed ? CLAIM_ALERT_COLOR : config.color;
+                    // breathes, so it reads as choked from across the map. Ground the
+                    // tribe still holds gets their colour instead - it is not lost, it
+                    // was never yours.
+                    const ringColor = claimed ? CLAIM_ALERT_COLOR : (tribeHeld ? TRIBE_COLOR : config.color);
                     const pulse = claimed ? 0.72 + 0.28 * Math.sin(game.dayTick * 0.08) : 1;
 
                     targetCtx.globalAlpha = pulse;
@@ -5499,14 +5895,14 @@
 
                     targetCtx.shadowBlur = 0;
                     targetCtx.strokeStyle = ringColor;
-                    targetCtx.setLineDash(claimed ? [6, 5] : []);
+                    targetCtx.setLineDash(claimed || tribeHeld ? [6, 5] : []);
                     targetCtx.beginPath();
                     targetCtx.arc(spawner.x, spawner.y, 28, 0, Math.PI * 2);
                     targetCtx.stroke();
                     targetCtx.setLineDash([]);
                     targetCtx.globalAlpha = 1;
 
-                    targetCtx.fillStyle = claimed ? "#ffd3d3" : "#f4f8ffcc";
+                    targetCtx.fillStyle = claimed ? "#ffd3d3" : (tribeHeld ? "#ffd8c4" : "#f4f8ffcc");
                     targetCtx.font = "700 9px Space Grotesk, sans-serif";
                     targetCtx.textAlign = "center";
                     targetCtx.textBaseline = "alphabetic";
@@ -5514,6 +5910,22 @@
                     if (claimed) {
                         targetCtx.fillStyle = CLAIM_ALERT_COLOR;
                         targetCtx.fillText("CLAIMED", spawner.x, spawner.y + 53);
+                    } else if (tribeHeld) {
+                        targetCtx.fillStyle = TRIBE_COLOR;
+                        targetCtx.fillText("TRIBE", spawner.x, spawner.y + 53);
+                    }
+
+                    // The meter, drawn as the ring filling round: a field being taken and
+                    // a field being taken back are the same bar running opposite ways, so
+                    // one arc says both without a legend.
+                    if (spawner.capture > 0 && spawner.capture < TRIBE_CAPTURE_TICKS) {
+                        const sweep = (spawner.capture / TRIBE_CAPTURE_TICKS) * Math.PI * 2;
+                        targetCtx.strokeStyle = spawner.contested ? "#ffd166" : materialConfig.ivory.color;
+                        targetCtx.lineWidth = 4;
+                        targetCtx.beginPath();
+                        targetCtx.arc(spawner.x, spawner.y, 34, -Math.PI * 0.5, -Math.PI * 0.5 + sweep);
+                        targetCtx.stroke();
+                        targetCtx.lineWidth = 2;
                     }
                 }
 
@@ -6050,17 +6462,199 @@
                 targetCtx.restore();
             }
 
+            // Both jetties, and the hull of whatever is on the water. The docks only
+            // appear once the skill is bought - the unlock is a thing you can see on the
+            // map rather than a line in a menu.
+            function drawFerryDock(targetCtx, dock, angle) {
+                targetCtx.save();
+                targetCtx.translate(dock.x, dock.y);
+                targetCtx.rotate(angle);
+
+                targetCtx.fillStyle = "#2b2317";
+                targetCtx.fillRect(-W(34), -W(15), W(76), W(30));
+                targetCtx.fillStyle = "#4a3b25";
+                for (let plank = 0; plank < 5; plank += 1) {
+                    targetCtx.fillRect(-W(31) + plank * W(14), -W(13), W(10), W(26));
+                }
+
+                targetCtx.fillStyle = "#1c1710";
+                for (const piling of [[-W(30), -W(15)], [-W(30), W(15)], [W(38), -W(15)], [W(38), W(15)]]) {
+                    targetCtx.beginPath();
+                    targetCtx.arc(piling[0], piling[1], W(5), 0, Math.PI * 2);
+                    targetCtx.fill();
+                }
+                targetCtx.restore();
+            }
+
+            function drawDocks(targetCtx) {
+                if (!isSkillUnlocked("boat") || !riverInView()) return;
+                // Both decks run along the crossing, so they read as one route rather
+                // than as two sheds that happen to face each other.
+                const angle = Math.atan2(FERRY_DOCKS.far.y - FERRY_DOCKS.home.y, FERRY_DOCKS.far.x - FERRY_DOCKS.home.x);
+                drawFerryDock(targetCtx, FERRY_DOCKS.home, angle);
+                drawFerryDock(targetCtx, FERRY_DOCKS.far, angle + Math.PI);
+            }
+
+            function drawFerryHull(targetCtx, entity) {
+                const angle = Math.atan2(
+                    (entity.ferryLanding === 1 ? FERRY_DOCKS.home.y : FERRY_DOCKS.far.y) - entity.y,
+                    (entity.ferryLanding === 1 ? FERRY_DOCKS.home.x : FERRY_DOCKS.far.x) - entity.x
+                );
+
+                targetCtx.save();
+                targetCtx.translate(entity.x, entity.y);
+                targetCtx.rotate(angle);
+
+                // A wake first, so the hull sits on top of its own wash.
+                targetCtx.strokeStyle = "#cfeef5";
+                targetCtx.globalAlpha = 0.25;
+                targetCtx.lineWidth = W(2);
+                targetCtx.beginPath();
+                targetCtx.moveTo(-W(16), -W(9));
+                targetCtx.lineTo(-W(30), -W(13));
+                targetCtx.moveTo(-W(16), W(9));
+                targetCtx.lineTo(-W(30), W(13));
+                targetCtx.stroke();
+                targetCtx.globalAlpha = 1;
+
+                targetCtx.fillStyle = "#6b4a2c";
+                targetCtx.beginPath();
+                targetCtx.moveTo(W(20), 0);
+                targetCtx.quadraticCurveTo(W(4), -W(11), -W(16), -W(8));
+                targetCtx.lineTo(-W(16), W(8));
+                targetCtx.quadraticCurveTo(W(4), W(11), W(20), 0);
+                targetCtx.closePath();
+                targetCtx.fill();
+                targetCtx.strokeStyle = "#2a1a0e";
+                targetCtx.lineWidth = W(1.6);
+                targetCtx.stroke();
+                targetCtx.restore();
+            }
+
+            function drawFerryHulls(targetCtx) {
+                if (!isSkillUnlocked("boat")) return;
+                for (const minion of game.minionUnits) {
+                    if (isCrossing(minion)) drawFerryHull(targetCtx, minion);
+                }
+                if (isCrossing(game.player)) drawFerryHull(targetCtx, game.player);
+            }
+
+            let tribeCampLayout = null;
+
+            // Built once, from the same noise the meadow's own ground uses, so the camp
+            // is in the same place every session and costs nothing to draw twice.
+            function getTribeCampLayout() {
+                if (tribeCampLayout) return tribeCampLayout;
+
+                const tents = [];
+                const count = 7;
+                for (let i = 0; i < count; i += 1) {
+                    const angle = (i / count) * Math.PI * 2 + terrainNoise(401.7, i) * 0.5;
+                    const reach = tribeCamp.r * (0.52 + terrainNoise(409.3, i) * 0.34);
+                    tents.push({
+                        x: tribeCamp.x + Math.cos(angle) * reach,
+                        y: tribeCamp.y + Math.sin(angle) * reach,
+                        size: tribeCamp.r * (0.2 + terrainNoise(419.1, i) * 0.1),
+                        // Every doorway faces the fire, which is what makes a ring of
+                        // tents read as a camp instead of as seven sheds.
+                        facing: angle + Math.PI
+                    });
+                }
+
+                const rim = new Path2D();
+                const steps = 44;
+                for (let i = 0; i <= steps; i += 1) {
+                    const angle = (i / steps) * Math.PI * 2;
+                    const reach = tribeCamp.r * (1.02 + terrainNoise(431.9, i % steps) * 0.16);
+                    const x = tribeCamp.x + Math.cos(angle) * reach;
+                    const y = tribeCamp.y + Math.sin(angle) * reach;
+                    if (i === 0) rim.moveTo(x, y);
+                    else rim.lineTo(x, y);
+                }
+                rim.closePath();
+
+                tribeCampLayout = { tents, rim };
+                return tribeCampLayout;
+            }
+
+            function drawTribeCamp(targetCtx) {
+                const layout = getTribeCampLayout();
+
+                targetCtx.save();
+                const ground = targetCtx.createRadialGradient(tribeCamp.x, tribeCamp.y, tribeCamp.r * 0.1, tribeCamp.x, tribeCamp.y, tribeCamp.r * 1.2);
+                ground.addColorStop(0, "#3b2c1d");
+                ground.addColorStop(1, "#241c12cc");
+                targetCtx.fillStyle = ground;
+                targetCtx.fill(layout.rim);
+
+                // The fire, breathing on the same clock the rest of the map animates on.
+                const flicker = 0.72 + 0.28 * Math.sin(game.dayTick * 0.11);
+                const fire = targetCtx.createRadialGradient(tribeCamp.x, tribeCamp.y, 0, tribeCamp.x, tribeCamp.y, tribeCamp.r * 0.6);
+                fire.addColorStop(0, `rgba(255, 176, 96, ${0.5 * flicker})`);
+                fire.addColorStop(1, "rgba(255, 140, 70, 0)");
+                targetCtx.fillStyle = fire;
+                targetCtx.beginPath();
+                targetCtx.arc(tribeCamp.x, tribeCamp.y, tribeCamp.r * 0.6, 0, Math.PI * 2);
+                targetCtx.fill();
+
+                for (const tent of layout.tents) {
+                    targetCtx.save();
+                    targetCtx.translate(tent.x, tent.y);
+                    targetCtx.rotate(tent.facing);
+                    targetCtx.fillStyle = "#6b4a2c";
+                    targetCtx.beginPath();
+                    targetCtx.moveTo(0, -tent.size);
+                    targetCtx.lineTo(tent.size * 0.82, tent.size * 0.7);
+                    targetCtx.lineTo(-tent.size * 0.82, tent.size * 0.7);
+                    targetCtx.closePath();
+                    targetCtx.fill();
+                    targetCtx.strokeStyle = "#2a1a0e";
+                    targetCtx.lineWidth = 2;
+                    targetCtx.stroke();
+                    targetCtx.fillStyle = "#2a1a0e";
+                    targetCtx.beginPath();
+                    targetCtx.moveTo(0, tent.size * 0.7);
+                    targetCtx.lineTo(tent.size * 0.26, -tent.size * 0.1);
+                    targetCtx.lineTo(-tent.size * 0.26, -tent.size * 0.1);
+                    targetCtx.closePath();
+                    targetCtx.fill();
+                    targetCtx.restore();
+                }
+
+                // The totem at the fire: the thing the war-chief rises beside.
+                targetCtx.strokeStyle = "#8a5a34";
+                targetCtx.lineWidth = 6;
+                targetCtx.beginPath();
+                targetCtx.moveTo(tribeCamp.x, tribeCamp.y + tribeCamp.r * 0.12);
+                targetCtx.lineTo(tribeCamp.x, tribeCamp.y - tribeCamp.r * 0.34);
+                targetCtx.stroke();
+                targetCtx.strokeStyle = TRIBE_COLOR;
+                targetCtx.lineWidth = 4;
+                targetCtx.beginPath();
+                targetCtx.moveTo(tribeCamp.x - tribeCamp.r * 0.14, tribeCamp.y - tribeCamp.r * 0.22);
+                targetCtx.lineTo(tribeCamp.x + tribeCamp.r * 0.14, tribeCamp.y - tribeCamp.r * 0.22);
+                targetCtx.stroke();
+
+                targetCtx.fillStyle = "#ffd8c4";
+                targetCtx.font = "700 11px Space Grotesk, sans-serif";
+                targetCtx.textAlign = "center";
+                targetCtx.fillText("TRIBE CAMP", tribeCamp.x, tribeCamp.y + tribeCamp.r + 18);
+                targetCtx.restore();
+            }
+
             function drawBackdrop(targetCtx) {
                 targetCtx.fillStyle = getWorldGroundPattern(targetCtx) || GROUND_BASE_COLOR;
                 targetCtx.fillRect(cameraState.x, cameraState.y, viewWorldW(), viewWorldH());
                 drawGroundMacro(targetCtx);
                 drawRiver(targetCtx);
+                drawDocks(targetCtx);
 
                 drawSpawnTerrain(targetCtx);
                 drawClaimedFields(targetCtx);
                 drawSpawners(targetCtx);
                 drawVillage(targetCtx);
                 drawCity(targetCtx);
+                drawTribeCamp(targetCtx);
                 drawTower(targetCtx);
             }
 
@@ -6268,6 +6862,10 @@
                     x: random(world.minX + W(26), world.maxX - W(150)),
                     y: random(world.minY + W(26), world.maxY - W(26)),
                     size: config.size,
+                    // Carried on the node rather than worked out when a gatherer looks at
+                    // it: this is read once per node per minion per tick, and the answer
+                    // is a walk over every segment of the river.
+                    bank: 1,
                     active: true
                 };
             }
@@ -6378,6 +6976,7 @@
                 node.sourceSpawnerIndex = spawnerIndex;
                 node.x = point.x;
                 node.y = point.y;
+                node.bank = spawner.bank;
                 node.size = materialConfig[spawner.type].size;
                 node.active = true;
                 spawner.timer = scaledRespawnTicks(spawner.type);
@@ -6415,6 +7014,7 @@
                 node.sourceSpawnerIndex = spawnerIndex;
                 node.x = point.x;
                 node.y = point.y;
+                node.bank = spawner.bank;
                 node.size = materialConfig[spawner.type].size;
                 node.active = true;
                 spawner.timer = scaledRespawnTicks(spawner.type);
@@ -6423,6 +7023,10 @@
 
             function scaledRespawnTicks(type) {
                 const baseRespawn = materialConfig[type].respawn;
+                // Age speeds every other field up by half over a long run. Ivory grows at
+                // the same rate in hour ten as in hour one: that, and the flat banking,
+                // are what keep it scarce once the multiplier has made aether cheap.
+                if (type === "ivory") return baseRespawn;
                 const ageSteps = Math.floor(save.worldAge / 1800);
                 const ageSpeedup = Math.min(0.55, ageSteps * 0.04);
                 const upgradeSpeedup = Math.min(0.4, spawnerLevelFor(type) * 0.04);
@@ -6431,10 +7035,282 @@
                 return Math.max(14, scaled);
             }
 
+            // Ground the tribe still holds grows nothing you can pick up: taking it is
+            // what starts it producing, which is the whole reason to go over there.
+            // Taking a field is standing in it. A guard standing in it with you stops
+            // the meter dead however many of you there are - the tribe has to be killed
+            // off the ground, not out-numbered on it - and drives it back down if you
+            // are not there at all.
+            const TRIBE_CAPTURE_RADIUS = W(150);
+            const TRIBE_CAPTURE_TICKS = 900;
+            const TRIBE_CAPTURE_MAX_BODIES = 3;
+            const TRIBE_CAPTURE_CONTEST = 2;
+            const TRIBE_CAPTURE_BLEED = 1;
+
+            function tribeFieldIndices() {
+                const indices = [];
+                for (let i = MEADOW_SPAWNER_COUNT; i < spawners.length; i += 1) indices.push(i);
+                return indices;
+            }
+
+            function countTribeFieldsHeld() {
+                let held = 0;
+                for (let i = MEADOW_SPAWNER_COUNT; i < spawners.length; i += 1) {
+                    if (spawners[i].owner === "player") held += 1;
+                }
+                return held;
+            }
+
+            function bodiesInField(spawner) {
+                const reachSq = TRIBE_CAPTURE_RADIUS * TRIBE_CAPTURE_RADIUS;
+                let friendly = 0;
+                let guards = 0;
+
+                for (const minion of game.minionUnits) {
+                    const dx = minion.x - spawner.x;
+                    const dy = minion.y - spawner.y;
+                    if (dx * dx + dy * dy <= reachSq) friendly += 1;
+                }
+                const px = game.player.x - spawner.x;
+                const py = game.player.y - spawner.y;
+                if (px * px + py * py <= reachSq) friendly += 1;
+
+                for (const enemy of game.enemies) {
+                    if (!enemy.tribe) continue;
+                    const dx = enemy.x - spawner.x;
+                    const dy = enemy.y - spawner.y;
+                    if (dx * dx + dy * dy <= reachSq) guards += 1;
+                }
+
+                return { friendly, guards };
+            }
+
+            const CHILL_RELEVANT_RADIUS = W(1400);
+            const TRIBE_LEASH_RADIUS = W(520);
+            const TRIBE_GARRISON_PER_FIELD = 2;
+            const TRIBE_MAX_ALIVE = 16;
+            const TRIBE_RETAKE_INTERVAL_TICKS = 2400;
+            const TRIBE_REINFORCE_TICKS = 260;
+
+            // Where a warden belongs: the field it was raised to hold, or the camp for
+            // one with no field left to guard.
+            function tribeGuardPost(enemy) {
+                const index = enemy.tribeFieldIndex;
+                if (Number.isFinite(index) && spawners[index]) return spawners[index];
+                return tribeCamp;
+            }
+
+            function countTribeEnemies() {
+                let count = 0;
+                for (const enemy of game.enemies) {
+                    if (enemy.tribe) count += 1;
+                }
+                return count;
+            }
+
+            function countGuardsForField(index) {
+                let count = 0;
+                for (const enemy of game.enemies) {
+                    if (enemy.tribe && enemy.tribeFieldIndex === index) count += 1;
+                }
+                return count;
+            }
+
+            // Wardens rise in the camp and walk out, the way the ghoul hordes do: on a
+            // map this wide, anything that spawned at the rim would take a minute to
+            // arrive and would read as coming from nowhere.
+            function spawnWarden(fieldIndex) {
+                const enemy = spawnEnemyOfType("warden");
+                const bearing = Math.random() * Math.PI * 2;
+                const reach = tribeCamp.r * (0.4 + Math.random() * 0.8);
+                enemy.x = tribeCamp.x + Math.cos(bearing) * reach;
+                enemy.y = tribeCamp.y + Math.sin(bearing) * reach;
+                enemy.shotTargetX = enemy.x;
+                enemy.shotTargetY = enemy.y;
+                enemy.tribeFieldIndex = fieldIndex;
+                game.enemies.push(enemy);
+                return enemy;
+            }
+
+            function updateTribeGuards() {
+                if (countTribeEnemies() >= TRIBE_MAX_ALIVE) return;
+
+                // A standing garrison on every field they still hold. This is what makes
+                // taking one a fight rather than a walk.
+                game.tribeReinforceTimer -= 1;
+                if (game.tribeReinforceTimer <= 0) {
+                    game.tribeReinforceTimer = TRIBE_REINFORCE_TICKS;
+                    for (let i = MEADOW_SPAWNER_COUNT; i < spawners.length; i += 1) {
+                        if (spawners[i].owner !== "tribe") continue;
+                        if (countGuardsForField(i) >= TRIBE_GARRISON_PER_FIELD) continue;
+                        spawnWarden(i);
+                        break;
+                    }
+                }
+
+                // And a party for whatever you have taken off them, garrisoned or not.
+                game.tribeRetakeTimer -= 1;
+                if (game.tribeRetakeTimer > 0) return;
+                game.tribeRetakeTimer = TRIBE_RETAKE_INTERVAL_TICKS;
+
+                let target = -1;
+                let bestDistSq = Infinity;
+                for (let i = MEADOW_SPAWNER_COUNT; i < spawners.length; i += 1) {
+                    if (spawners[i].owner !== "player") continue;
+                    const dx = spawners[i].x - tribeCamp.x;
+                    const dy = spawners[i].y - tribeCamp.y;
+                    const distSq = dx * dx + dy * dy;
+                    if (distSq < bestDistSq) {
+                        bestDistSq = distSq;
+                        target = i;
+                    }
+                }
+                if (target === -1) return;
+
+                const party = 2 + Math.floor(save.warChiefKills * 0.5) + Math.floor(countTribeFieldsHeld() / 2);
+                for (let i = 0; i < party && countTribeEnemies() < TRIBE_MAX_ALIVE; i += 1) {
+                    spawnWarden(target);
+                }
+            }
+
+            // Hold every field at once and the tribe stops sending parties and sends the
+            // chief instead. It regenerates faster than an unpainted war party can cut it
+            // down, which is the whole reason ivory is worth hauling.
+            const WARCHIEF_PROVOKE_TICKS = 1800;
+            const WARCHIEF_BASE_HP = 400;
+            // Tuned against one unpainted swing a second from a war party: six unpainted
+            // defenders land 0.25 a tick and lose ground, the same six painted land 0.75
+            // and take it back. Those two numbers are the whole difficulty of the fight.
+            const WARCHIEF_REGEN_PER_TICK = 0.35;
+            const WARCHIEF_LEASH_RADIUS = W(900);
+            const WARCHIEF_MOURNING_TICKS = 3600;
+            const WARCHIEF_TROPHY_SCORE = 500;
+
+            function warChiefAlive() {
+                for (const enemy of game.enemies) {
+                    if (enemy.type === "warchief") return true;
+                }
+                return false;
+            }
+
+            function spawnWarChief(tier) {
+                const enemy = spawnEnemyOfType("warden");
+                enemy.type = "warchief";
+                enemy.color = "#ff7043";
+                enemy.stroke = "#3a1005";
+                enemy.shape = "diamond";
+                enemy.r = E(22);
+                enemy.hp = WARCHIEF_BASE_HP + tier * 200;
+                enemy.maxHp = enemy.hp;
+                enemy.regen = WARCHIEF_REGEN_PER_TICK + tier * 0.12;
+                enemy.speed = W(1.05) * ENEMY_SPEED_MULTIPLIER;
+                enemy.baseSpeed = enemy.speed;
+                enemy.minionShotRange = W(120);
+                // Slower than a hunter's: a minion has a handful of health, and a boss
+                // that fired at hunter pace would clear a war party before it landed a
+                // blow. Armour is what a party is expected to bring.
+                enemy.minionShotCooldownMax = 48;
+                enemy.tribeFieldIndex = null;
+                enemy.x = tribeCamp.x;
+                enemy.y = tribeCamp.y;
+                enemy.shotTargetX = enemy.x;
+                enemy.shotTargetY = enemy.y;
+                game.enemies.push(enemy);
+                return enemy;
+            }
+
+            function updateWarChief() {
+                if (game.warChiefMourning > 0) {
+                    game.warChiefMourning -= 1;
+                    game.warChiefProvoke = 0;
+                    return;
+                }
+                if (warChiefAlive()) return;
+
+                const fields = spawners.length - MEADOW_SPAWNER_COUNT;
+                if (countTribeFieldsHeld() < fields) {
+                    // Lose one and the drums stop: it has to be every field at once.
+                    game.warChiefProvoke = 0;
+                    return;
+                }
+
+                game.warChiefProvoke += 1;
+                if (game.warChiefProvoke < WARCHIEF_PROVOKE_TICKS) return;
+                game.warChiefProvoke = 0;
+                spawnWarChief(save.warChiefKills);
+                playTowerHitSfx(2);
+            }
+
+            // What a kill is worth. The run does not end here and never can - the chief is
+            // one of the tribe, so it cannot reach the tower, and endRun only ever fires
+            // when the tower falls.
+            function bankWarChiefKill(enemy) {
+                save.warChiefKills += 1;
+                save.essence += 40 + save.warChiefKills * 20;
+                save.stored += WARCHIEF_TROPHY_SCORE * save.warChiefKills;
+                if (save.stored > save.bestRunScore) save.bestRunScore = save.stored;
+                // The fields stay yours: wiping them would mean recapturing everything
+                // before the next one could be provoked, which is busywork, not a fight.
+                game.warChiefMourning = WARCHIEF_MOURNING_TICKS;
+                game.warChiefProvoke = 0;
+                game.depositPulse = WARCHIEF_TROPHY_SCORE * save.warChiefKills;
+                saveGame();
+                refreshHud();
+            }
+
+            function updateTribeFields() {
+                for (let i = MEADOW_SPAWNER_COUNT; i < spawners.length; i += 1) {
+                    const field = spawners[i];
+                    const bodies = bodiesInField(field);
+
+                    let delta;
+                    if (bodies.guards > 0) {
+                        // One guard on the ground stops it however many of you are there.
+                        // The tribe has to be killed off a field, not out-numbered on it.
+                        delta = -TRIBE_CAPTURE_CONTEST;
+                    } else if (bodies.friendly > 0) {
+                        delta = Math.min(bodies.friendly, TRIBE_CAPTURE_MAX_BODIES);
+                    } else if (field.owner === "player") {
+                        // Ground you hold stays held until the tribe walks back onto it.
+                        // A field that decayed on its own would mean never being able to
+                        // haul anything home from it, which is the only reason to take it.
+                        delta = 0;
+                    } else {
+                        // A capture you walked away from half way does not keep.
+                        delta = -TRIBE_CAPTURE_BLEED;
+                    }
+
+                    field.capture = clamp(field.capture + delta, 0, TRIBE_CAPTURE_TICKS);
+                    field.contested = bodies.guards > 0 && bodies.friendly > 0;
+
+                    if (field.capture >= TRIBE_CAPTURE_TICKS && field.owner !== "player") {
+                        field.owner = "player";
+                        // Nothing grows the instant it changes hands: the field has to
+                        // come back into season like any other.
+                        field.timer = Math.max(field.timer, 90);
+                    } else if (field.capture <= 0 && field.owner === "player") {
+                        field.owner = "tribe";
+                        releaseFieldNodes(i);
+                    }
+                }
+            }
+
+            // What the tribe does the moment it has a field back: the ivory still lying
+            // on it goes with them, so ground lost is a haul lost too.
+            function releaseFieldNodes(spawnerIndex) {
+                for (const node of game.nodes) {
+                    if (node.sourceSpawnerIndex === spawnerIndex) node.active = false;
+                }
+            }
+
+            function spawnerProduces(spawner) {
+                return spawner.owner !== "tribe";
+            }
+
             function countClaimedSpawners() {
                 let claimed = 0;
-                for (const spawner of spawners) {
-                    if (spawner.claimedBy !== null) claimed += 1;
+                for (let i = 0; i < MEADOW_SPAWNER_COUNT; i += 1) {
+                    if (spawners[i].claimedBy !== null) claimed += 1;
                 }
                 return claimed;
             }
@@ -6442,6 +7318,10 @@
             // Free-and-unspoken-for: a field nothing has claimed and nothing is already
             // walking towards, so two blights never race for the same one.
             function spawnerIsAvailable(index) {
+                // A blight walks in from the meadow's edge and claims meadow ground. The
+                // far bank is the tribe's problem, and a blight sat on a field you have
+                // not taken yet would be a fight over nothing.
+                if (index >= MEADOW_SPAWNER_COUNT) return false;
                 if (spawners[index].claimedBy !== null) return false;
                 for (const enemy of game.enemies) {
                     if (enemy.claimTargetIndex === index) return false;
@@ -6488,6 +7368,7 @@
                     // A claimed field grows nothing new, and the blight sitting on it
                     // eats through what is already there - see consumeClaimedNode.
                     if (spawner.claimedBy !== null) continue;
+                    if (!spawnerProduces(spawner)) continue;
                     spawner.timer -= 1;
                     if (spawner.timer > 0) continue;
                     activeNodes = spawnFromSpawnerWithActiveCount(spawner, i, activeNodes);
@@ -6502,7 +7383,7 @@
                 }
 
                 for (let i = 0; i < 16; i += 1) {
-                    const spawnerIndex = i % spawners.length;
+                    const spawnerIndex = i % MEADOW_SPAWNER_COUNT;
                     spawnFromSpawner(spawners[spawnerIndex], spawnerIndex);
                 }
             }
@@ -6582,6 +7463,14 @@
                                 save.gathererFocusBySlot[slotKey] = minion.gathererPriority;
                             }
                         }
+
+                        const savedFarBank = slotKey && save.farBankBySlot
+                            ? save.farBankBySlot[slotKey]
+                            : undefined;
+                        minion.farBank = Boolean(savedFarBank !== undefined ? savedFarBank : minion.farBank);
+                        if (save.farBankBySlot && slotKey !== null && save.farBankBySlot[slotKey] === undefined) {
+                            save.farBankBySlot[slotKey] = minion.farBank;
+                        }
                     }
                 }
 
@@ -6637,9 +7526,9 @@
                         y: clamp(stored.y, world.minY + 16, world.maxY - 16)
                     };
                     keepOutOfRiver(point, MINION_RIVER_RADIUS);
-                    return { x: point.x, y: point.y, custom: true };
+                    return { x: point.x, y: point.y, bank: bankOf(point.x, point.y), custom: true };
                 }
-                return { x: TOWER_CENTER_X, y: TOWER_CENTER_Y, custom: false };
+                return { x: TOWER_CENTER_X, y: TOWER_CENTER_Y, bank: 1, custom: false };
             }
 
             function hasCustomDefenderPost(slot) {
@@ -6716,6 +7605,9 @@
                 const savedRoute = role === "trader" && save.traderRouteBySlot
                     ? save.traderRouteBySlot[String(resolvedSlot)]
                     : null;
+                const savedFarBank = role === "worker" && save.farBankBySlot
+                    ? save.farBankBySlot[String(resolvedSlot)]
+                    : false;
                 const unit = {
                     id: game.nextMinionId,
                     slotIndex: resolvedSlot,
@@ -6736,8 +7628,14 @@
                     targetEnemyId: null,
                     carryType: null,
                     carryLoad: 0,
-                    carry: { wood: 0, stone: 0, crystal: 0, amber: 0, aether: 0 },
+                    carry: { wood: 0, stone: 0, crystal: 0, amber: 0, aether: 0, ivory: 0 },
                     gathererPriority: role === "worker" ? normalizedGathererPriority(savedPriority) : "auto",
+                    // A minion is born at the tower, so it starts on the home bank with
+                    // no business across the water until it is told otherwise.
+                    farBank: Boolean(savedFarBank),
+                    bank: 1,
+                    ferryState: null,
+                    ferryLanding: 1,
                     tradeRoute: normalizedTradeRoute(savedRoute),
                     tradeDwell: 0,
                     tradeCarryRoute: null,
@@ -6756,6 +7654,8 @@
                     x: point.x,
                     y: point.y,
                     type,
+                    // Settled at placement, which is rare, rather than asked every shot.
+                    bank: bankOf(point.x, point.y),
                     cooldown: 0,
                     flash: 0,
                     targetX: point.x,
@@ -7129,6 +8029,8 @@
                         minion.isRegenerating = false;
                         minion.targetEnemyId = null;
                         minion.hp = minion.maxHp;
+                        minion.ferryState = null;
+                        minion.bank = 1;
                         if (minion.role === "defender") {
                             const patrolPoint = randomDefenderPatrolPoint(defenderPostFor(minion));
                             minion.patrolTargetX = patrolPoint.x;
@@ -7142,6 +8044,7 @@
                         minion.carry.crystal = 0;
                         minion.carry.amber = 0;
                         minion.carry.aether = 0;
+                        minion.carry.ivory = 0;
                     }
                 }
             }
@@ -7170,6 +8073,7 @@
                 game.inventory.crystal = 0;
                 game.inventory.amber = 0;
                 game.inventory.aether = 0;
+                game.inventory.ivory = 0;
                 game.dayTick = 0;
                 game.depositPulse = 0;
                 game.minionPulse = 0;
@@ -7182,9 +8086,18 @@
                 game.waveIntroPendingType = null;
                 game.towerHp = TOWER_MAX_HP;
                 game.minionHasteTicks = 0;
+                game.warPaintTicks = 0;
                 game.chillTicks = 0;
                 for (const spellKey of SPELL_KEYS) game.spellCooldowns[spellKey] = 0;
                 game.ghoulTimer = GHOUL_FIRST_TICKS;
+                game.tribeReinforceTimer = 0;
+                game.tribeRetakeTimer = 0;
+                game.warChiefProvoke = 0;
+                game.warChiefMourning = 0;
+                for (let i = MEADOW_SPAWNER_COUNT; i < spawners.length; i += 1) {
+                    spawners[i].owner = "tribe";
+                    spawners[i].capture = 0;
+                }
                 game.enemies = [];
                 game.turrets = [];
                 game.pendingBasicTurretPlacements = 0;
@@ -7242,7 +8155,43 @@
 
                 game.player.x = clamp(game.player.x, world.minX + game.player.r, world.maxX - game.player.r);
                 game.player.y = clamp(game.player.y, world.minY + game.player.r, world.maxY - game.player.r);
+
+                // Push into the water from a jetty and the boat takes you: it carries
+                // you the whole way rather than handing you the tiller, because a
+                // half-crossing you can back out of is a way to end up in the river.
+                if (game.player.ferryState === "crossing") {
+                    const landing = game.player.ferryLanding === 1 ? FERRY_DOCKS.home : FERRY_DOCKS.far;
+                    const step = game.player.speed * FERRY_SPEED_FACTOR;
+                    const dx = landing.x - game.player.x;
+                    const dy = landing.y - game.player.y;
+                    const distSq = dx * dx + dy * dy;
+                    if (distSq <= step * step) {
+                        game.player.x = landing.x;
+                        game.player.y = landing.y;
+                        game.player.bank = game.player.ferryLanding;
+                        game.player.ferryState = null;
+                    } else {
+                        const invD = 1 / Math.sqrt(distSq);
+                        game.player.x += dx * invD * step;
+                        game.player.y += dy * invD * step;
+                    }
+                    return;
+                }
+
+                if (isSkillUnlocked("boat") && isInRiver(game.player.x, game.player.y, game.player.r)) {
+                    const side = trackBank(game.player);
+                    const dock = side === 1 ? FERRY_DOCKS.home : FERRY_DOCKS.far;
+                    const dx = game.player.x - dock.x;
+                    const dy = game.player.y - dock.y;
+                    if (dx * dx + dy * dy <= FERRY_BOARDING_RADIUS * FERRY_BOARDING_RADIUS) {
+                        game.player.ferryState = "crossing";
+                        game.player.ferryLanding = -side;
+                        return;
+                    }
+                }
+
                 keepOutOfRiver(game.player, game.player.r);
+                trackBank(game.player);
             }
 
             function drawDiamond(x, y, size, color) {
@@ -7278,6 +8227,14 @@
                     ctx.moveTo(node.x, node.y - size);
                     ctx.lineTo(node.x + size * 0.9, node.y + size * 0.8);
                     ctx.lineTo(node.x - size * 0.9, node.y + size * 0.8);
+                    ctx.closePath();
+                } else if (shape === "shard") {
+                    const size = node.size * 0.78 * scale;
+                    ctx.moveTo(node.x, node.y - size);
+                    ctx.lineTo(node.x + size * 0.56, node.y - size * 0.4);
+                    ctx.lineTo(node.x + size * 0.32, node.y + size * 0.86);
+                    ctx.lineTo(node.x - size * 0.32, node.y + size * 0.86);
+                    ctx.lineTo(node.x - size * 0.56, node.y - size * 0.4);
                     ctx.closePath();
                 } else if (shape === "star") {
                     const size = node.size * 0.72 * scale;
@@ -7345,12 +8302,17 @@
                 const gainedCrystal = Math.max(game.inventory.crystal, Math.round(game.inventory.crystal * mult));
                 const gainedAmber = Math.max(game.inventory.amber, Math.round(game.inventory.amber * mult));
                 const gainedAether = Math.max(game.inventory.aether, Math.round(game.inventory.aether * mult));
+                // Ivory is counted, never scaled. Every other material compounds with the
+                // global multiplier until a long run has more than it can spend; this one
+                // is worth exactly what was carried, so it stays the thing you are short of.
+                const gainedIvory = game.inventory.ivory;
 
                 const gained = gainedWood * materialConfig.wood.value
                     + gainedStone * materialConfig.stone.value
                     + gainedCrystal * materialConfig.crystal.value
                     + gainedAmber * materialConfig.amber.value
-                    + gainedAether * materialConfig.aether.value;
+                    + gainedAether * materialConfig.aether.value
+                    + gainedIvory * materialConfig.ivory.value;
                 save.stored += gained;
                 if (save.stored > save.bestRunScore) save.bestRunScore = save.stored;
                 save.bankWood += gainedWood;
@@ -7358,6 +8320,7 @@
                 save.bankCrystal += gainedCrystal;
                 save.bankAmber += gainedAmber;
                 save.bankAether += gainedAether;
+                save.bankIvory += gainedIvory;
                 game.depositPulse = gained;
 
                 game.inventory.wood = 0;
@@ -7365,11 +8328,17 @@
                 game.inventory.crystal = 0;
                 game.inventory.amber = 0;
                 game.inventory.aether = 0;
+                game.inventory.ivory = 0;
 
                 saveGame();
             }
 
             function moveEntityTowards(entity, targetX, targetY, speed) {
+                // Your side goes by the dock when its business is on the other bank.
+                // The ferry takes the whole step when it applies, and the caller is
+                // told the target was not reached - because it was not.
+                if (entity.role && ferryStep(entity, targetX, targetY, speed)) return false;
+
                 const dx = targetX - entity.x;
                 const dy = targetY - entity.y;
                 const dSq = dx * dx + dy * dy;
@@ -7383,8 +8352,10 @@
                 entity.x += dx * invD * speed;
                 entity.y += dy * invD * speed;
                 // Minions carry a role and the wave does not: the river stops your side
-                // at the bank and lets theirs wade straight through.
-                if (entity.role) {
+                // at the bank and lets theirs wade straight through. The tribe is held
+                // by it as well, from the other side - keepOutOfRiver puts an entity back
+                // on the bank it came from, so their own water pens them in.
+                if (entity.role || entity.tribe) {
                     keepOutOfRiver(entity, MINION_RIVER_RADIUS);
                 }
                 return false;
@@ -7504,6 +8475,8 @@
                     shotTargetX: x,
                     shotTargetY: y,
                     claimsSpawner: enemyType.claimsSpawner === true,
+                    tribe: enemyType.tribe === true,
+                    tribeFieldIndex: null,
                     claimTargetIndex: null,
                     consumeCooldown: 0,
                     roams: enemyType.roams === true,
@@ -7578,7 +8551,9 @@
                 let spawner = null;
                 if (Math.random() < 0.8) {
                     let bestDistSq = Infinity;
-                    for (const candidate of spawners) {
+                    // Only the meadow's fields: a horde that wandered over the river
+                    // would be camping ground the player cannot even reach yet.
+                    for (const candidate of spawners.slice(0, MEADOW_SPAWNER_COUNT)) {
                         const dx = candidate.x - enemy.x;
                         const dy = candidate.y - enemy.y;
                         const distSq = dx * dx + dy * dy;
@@ -7609,10 +8584,29 @@
             // schedules, so they must not count against the wave: a horde loitering
             // in the fields would otherwise hold the wave open for ever and eat the
             // on-screen budget the wave spawns from.
+            // What Chill is worth casting at: everything the wave has sent, plus any of
+            // the tribe that has come close enough to matter. The spell still slows the
+            // lot - this is only the "is it worth it" test the button reads.
+            function countChillTargets() {
+                let count = 0;
+                for (const enemy of game.enemies) {
+                    if (!enemy.tribe) {
+                        count += 1;
+                        continue;
+                    }
+                    const dx = enemy.x - game.player.x;
+                    const dy = enemy.y - game.player.y;
+                    if (dx * dx + dy * dy <= CHILL_RELEVANT_RADIUS * CHILL_RELEVANT_RADIUS) count += 1;
+                }
+                return count;
+            }
+
             function countWaveEnemies() {
                 let count = 0;
                 for (const enemy of game.enemies) {
-                    if (!enemy.roams && !enemy.claimsSpawner) count += 1;
+                    // The tribe is not the wave. Counting them would hold every wave open
+                    // for ever and spend the on-screen budget the wave spawns from.
+                    if (!enemy.roams && !enemy.claimsSpawner && !enemy.tribe) count += 1;
                 }
                 return count;
             }
@@ -7622,7 +8616,7 @@
 
                 // The horde crawls up together, out in the fields rather than at the
                 // map edge: they are far too slow to walk in from the rim.
-                const anchor = spawners[Math.floor(Math.random() * spawners.length)];
+                const anchor = spawners[Math.floor(Math.random() * MEADOW_SPAWNER_COUNT)];
                 const bearing = Math.random() * Math.PI * 2;
                 const originX = anchor.x + Math.cos(bearing) * GHOUL_SPAWN_DISTANCE;
                 const originY = anchor.y + Math.sin(bearing) * GHOUL_SPAWN_DISTANCE;
@@ -7782,7 +8776,9 @@
             function essenceFromEnemy(enemy) {
                 if (!enemy) return 0;
                 if (enemy.type === "boss") return 8;
+                if (enemy.type === "warchief") return 0;   // paid out by bankWarChiefKill
                 if (enemy.claimsSpawner) return CLAIM_ESSENCE;
+                if (enemy.tribe) return 2;
                 if (enemy.roams) return GHOUL_ESSENCE;
                 if (enemy.type === "hunter") return 2;
                 return 1;
@@ -7792,6 +8788,7 @@
                 const enemy = game.enemies[index];
                 if (!enemy) return;
                 save.essence += essenceFromEnemy(enemy);
+                if (enemy.type === "warchief") bankWarChiefKill(enemy);
                 releaseSpawnerClaims(enemy.id);
                 game.enemies.splice(index, 1);
             }
@@ -7871,6 +8868,7 @@
             }
 
             function updateEnemies() {
+                updateTribeGuards();
                 game.ghoulTimer -= 1;
                 if (game.ghoulTimer <= 0) {
                     game.ghoulTimer = GHOUL_INTERVAL_TICKS;
@@ -7907,7 +8905,34 @@
                     let moveTargetX = towerCenterX;
                     let moveTargetY = towerCenterY;
                     const claimTarget = claimTargetFor(enemy);
-                    if (claimTarget) {
+                    if (enemy.regen > 0 && enemy.hp < enemy.maxHp) {
+                        // It closes its wounds faster than one unpainted swing a second
+                        // can open them. Nothing here is immune - it just heals.
+                        enemy.hp = Math.min(enemy.maxHp, enemy.hp + enemy.regen);
+                    }
+
+                    if (enemy.tribe) {
+                        const post = tribeGuardPost(enemy);
+                        // It fights whatever walks onto its ground and goes no further
+                        // than the leash: a guard that followed a gatherer to the bank
+                        // would leave the field it is there to hold standing empty.
+                        const leash = enemy.type === "warchief" ? WARCHIEF_LEASH_RADIUS : TRIBE_LEASH_RADIUS;
+                        const preyIndex = findClosestMinionIndexFrom(post.x, post.y, leash);
+                        const prey = preyIndex === -1 ? null : game.minionUnits[preyIndex];
+                        const playerDx = game.player.x - post.x;
+                        const playerDy = game.player.y - post.y;
+                        const playerInside = playerDx * playerDx + playerDy * playerDy <= leash * leash;
+                        if (prey) {
+                            moveTargetX = prey.x;
+                            moveTargetY = prey.y;
+                        } else if (playerInside) {
+                            moveTargetX = game.player.x;
+                            moveTargetY = game.player.y;
+                        } else {
+                            moveTargetX = post.x;
+                            moveTargetY = post.y;
+                        }
+                    } else if (claimTarget) {
                         moveTargetX = claimTarget.x;
                         moveTargetY = claimTarget.y;
                     } else if (enemy.roams) {
@@ -7972,7 +8997,7 @@
                             const invD = dSq > 0 ? (1 / Math.sqrt(dSq)) : 0;
                             enemy.x += dx * invD * W(18);
                             enemy.y += dy * invD * W(18);
-                            enemy.hp -= 1;
+                            enemy.hp -= minionStrikeDamage();
                             if (enemy.hp <= 0) {
                                 defeatEnemyAt(i);
                                 continue;
@@ -7995,7 +9020,7 @@
                             enemy.shotFlash = 6;
                             enemy.shotTargetX = struck.x;
                             enemy.shotTargetY = struck.y;
-                            struck.hp = Math.max(0, (Number.isFinite(struck.hp) ? struck.hp : 1) - 1);
+                            struck.hp = Math.max(0, (Number.isFinite(struck.hp) ? struck.hp : 1) - incomingDamageMultiplier());
                             struck.hitFlash = 8;
 
                             if (struck.hp <= 0) {
@@ -8006,7 +9031,9 @@
                         }
                     }
 
-                    const canAttackMinions = enemy.type === "hunter" || enemy.type === "boss";
+                    // Read off the enemy rather than a list of type names, so anything
+                    // given a shot range can use it - the war-chief included.
+                    const canAttackMinions = enemy.minionShotRange > 0 && (enemy.type === "hunter" || enemy.type === "boss" || enemy.tribe);
                     if (canAttackMinions && enemy.minionShotCooldown > 0) {
                         enemy.minionShotCooldown -= 1;
                     }
@@ -8019,7 +9046,7 @@
                             enemy.shotTargetY = minion.y;
                             enemy.shotFlash = 5;
 
-                            const shotDamage = enemy.type === "boss" ? 2 : 1;
+                            const shotDamage = (enemy.type === "boss" ? 2 : 1) * incomingDamageMultiplier();
                             minion.hp = Math.max(0, (Number.isFinite(minion.hp) ? minion.hp : 1) - shotDamage);
                             minion.hitFlash = 6;
 
@@ -8036,7 +9063,7 @@
                         }
                     }
 
-                    const hitTower = !enemy.claimsSpawner && !enemy.roams
+                    const hitTower = !enemy.claimsSpawner && !enemy.roams && !enemy.tribe
                         && enemy.x > tower.x && enemy.x < tower.x + tower.w
                         && enemy.y > tower.y && enemy.y < tower.y + tower.h;
                     if (hitTower) {
@@ -8058,13 +9085,17 @@
                 }
             }
 
-            function findClosestEnemyIndexFrom(x, y, range) {
+            function findClosestEnemyIndexFrom(x, y, range, bank = null) {
                 const maxDistSq = range * range;
                 let bestIndex = -1;
                 let bestDistSq = maxDistSq;
 
                 for (let i = 0; i < game.enemies.length; i += 1) {
                     const enemy = game.enemies[i];
+                    // Passing a bank keeps a shooter to its own side of the water: a
+                    // turret in the meadow has no business picking a fight with the
+                    // tribe, and could never be reached by what it started.
+                    if (bank !== null && enemy.tribe && trackBank(enemy) !== bank) continue;
                     const dx = enemy.x - x;
                     const dy = enemy.y - y;
                     const dSq = dx * dx + dy * dy;
@@ -8124,7 +9155,7 @@
                     const range = isSniper ? SNIPER_TURRET_RANGE : BASIC_TURRET_RANGE;
                     const shotDamage = isSniper ? 3 : 1;
 
-                    const enemyIndex = findClosestEnemyIndexFrom(turret.x, turret.y, range);
+                    const enemyIndex = findClosestEnemyIndexFrom(turret.x, turret.y, range, turret.bank === -1 ? -1 : 1);
                     if (enemyIndex === -1) continue;
 
                     const enemy = game.enemies[enemyIndex];
@@ -8156,12 +9187,16 @@
                 return slowMultiplier;
             }
 
-            function pickClosestActiveNodeIndex(origin, preferredType = null) {
+            function pickClosestActiveNodeIndex(origin, preferredType = null, bank = 1) {
                 let bestIndex = -1;
                 let bestDistSq = Infinity;
                 for (let i = 0; i < game.nodes.length; i += 1) {
                     const node = game.nodes[i];
                     if (!node.active) continue;
+                    // Nearest is not the same as reachable. Nothing here paths around
+                    // anything, so a gatherer offered the node across the water would
+                    // walk at the bank and stay there until the run ended.
+                    if (node.bank !== bank) continue;
                     if (preferredType && node.type !== preferredType) continue;
                     const distSq = distanceSq(origin, node);
                     if (distSq < bestDistSq) {
@@ -8209,6 +9244,8 @@
                 const gainedCrystal = minion.carry.crystal;
                 const gainedAmber = minion.carry.amber;
                 const gainedAether = minion.carry.aether;
+                // Same rule as the player's own deposit: the multiplier never touches it.
+                const bankIvoryGain = minion.carry.ivory;
                 const mult = resourceMultiplier();
                 const bankWoodGain = Math.max(gainedWood, Math.round(gainedWood * mult));
                 const bankStoneGain = Math.max(gainedStone, Math.round(gainedStone * mult));
@@ -8220,12 +9257,14 @@
                 save.bankCrystal += bankCrystalGain;
                 save.bankAmber += bankAmberGain;
                 save.bankAether += bankAetherGain;
+                save.bankIvory += bankIvoryGain;
 
                 const gainedValue = bankWoodGain * materialConfig.wood.value
                     + bankStoneGain * materialConfig.stone.value
                     + bankCrystalGain * materialConfig.crystal.value
                     + bankAmberGain * materialConfig.amber.value
-                    + bankAetherGain * materialConfig.aether.value;
+                    + bankAetherGain * materialConfig.aether.value
+                    + bankIvoryGain * materialConfig.ivory.value;
                 save.stored += gainedValue;
                 if (save.stored > save.bestRunScore) save.bestRunScore = save.stored;
                 game.minionPulse = Math.min(999, game.minionPulse + gainedValue);
@@ -8237,6 +9276,7 @@
                 minion.carry.crystal = 0;
                 minion.carry.amber = 0;
                 minion.carry.aether = 0;
+                minion.carry.ivory = 0;
                 return gainedValue;
             }
 
@@ -8265,9 +9305,9 @@
                         let enemy = findEnemyById(minion.targetEnemyId);
                         if (!enemy) {
                             minion.targetEnemyId = null;
-                            let enemyIndex = findClosestEnemyIndexFrom(minion.x, minion.y, DEFENDER_AGGRO_RADIUS);
+                            let enemyIndex = findClosestEnemyIndexFrom(minion.x, minion.y, DEFENDER_AGGRO_RADIUS, post.bank);
                             if (enemyIndex === -1) {
-                                enemyIndex = findClosestEnemyIndexFrom(post.x, post.y, DEFENDER_TOWER_ALERT_RADIUS);
+                                enemyIndex = findClosestEnemyIndexFrom(post.x, post.y, DEFENDER_TOWER_ALERT_RADIUS, post.bank);
                             }
                             if (enemyIndex !== -1) {
                                 enemy = game.enemies[enemyIndex];
@@ -8275,8 +9315,20 @@
                             }
                         }
 
+                        // A defender guards a bank, not a map. Chasing something over the
+                        // water would take it away from its post for a minute at a time
+                        // and hand the wave the ground it was standing on.
+                        if (enemy && trackBank(enemy) !== post.bank) {
+                            enemy = null;
+                            minion.targetEnemyId = null;
+                        }
+
                         const currentTarget = enemy;
-                        const defendingAgainstHunter = currentTarget && currentTarget.type === "hunter";
+                        // You cannot walk away from something standing on the ground you
+                        // are holding, any more than you can from a hunter. Without this a
+                        // defender drops below half on the first hit and spends the whole
+                        // fight walking back to its post to heal.
+                        const defendingAgainstHunter = currentTarget && (currentTarget.type === "hunter" || currentTarget.tribe);
                         const shouldKeepRegenerating = minion.isRegenerating && minion.hp < minion.maxHp;
                         const shouldStartRegenerating = minion.hp <= minion.maxHp * 0.5 && !defendingAgainstHunter;
 
@@ -8331,7 +9383,7 @@
                         moveEntityTowards(minion, enemy.x, enemy.y, minionTravelSpeed(minion, 1, DEFENDER_CHASE_SPEED_BONUS));
                         const strikeRange = W(12) + enemy.r;
                         if (distanceSq(minion, enemy) <= strikeRange * strikeRange && minion.attackCooldown <= 0) {
-                            enemy.hp -= 1;
+                            enemy.hp -= minionStrikeDamage();
                             minion.attackCooldown = 24;
                             minion.attackFlash = 5;
 
@@ -8435,9 +9487,15 @@
 
                     if (minion.state === "idle") {
                         const preferredType = minion.carryLoad > 0 ? minion.carryType : gathererPreferredTypeFor(minion);
-                        let nodeIndex = pickClosestActiveNodeIndex(minion, preferredType);
+                        // A gatherer works the bank it was sent to and nothing else. One
+                        // sent across keeps working over there until it is called back,
+                        // rather than paying for the crossing twice over one node - and
+                        // one called back walks to the dock, because home has the only
+                        // nodes it can now see.
+                        const workBank = isSkillUnlocked("boat") && minion.farBank ? -1 : 1;
+                        let nodeIndex = pickClosestActiveNodeIndex(minion, preferredType, workBank);
                         if (nodeIndex === -1 && preferredType && minion.carryLoad <= 0) {
-                            nodeIndex = pickClosestActiveNodeIndex(minion, null);
+                            nodeIndex = pickClosestActiveNodeIndex(minion, null, workBank);
                         }
                         if (nodeIndex === -1) {
                             if (minion.carryLoad > 0) {
@@ -8499,6 +9557,8 @@
                 save.worldAge += 1;
 
                 updateSpawners();
+                updateTribeFields();
+                updateWarChief();
                 movePlayer();
                 depositInventory();
                 updateMinions();
@@ -8533,6 +9593,9 @@
                 }
                 if (game.towerPulse < 0) game.towerPulse = Math.min(0, game.towerPulse + 0.12);
 
+                if (game.warPaintTicks > 0) {
+                    game.warPaintTicks -= 1;
+                }
                 if (game.minionHasteTicks > 0) {
                     game.minionHasteTicks -= 1;
                     if (game.minionHasteTicks === 0) refreshHud();   // the spell just lapsed
@@ -8572,6 +9635,8 @@
                 drawBackdrop(ctx);
                 drawTowerHealthBorder(ctx);
                 drawSpawnerNodeCounts(ctx);
+                // Hulls before the minions, so a rider draws on top of its own boat.
+                drawFerryHulls(ctx);
 
                 for (let i = 0; i < game.minionUnits.length; i += 1) {
                     const minion = game.minionUnits[i];
@@ -8714,6 +9779,22 @@
                         ctx.fill();
                     }
                     ctx.shadowBlur = 0;
+                    // The chief is the only thing in the game with a health bar, because
+                    // it is the only fight where you cannot tell whether you are winning:
+                    // without the bar, regeneration just looks like nothing happening.
+                    if (enemy.type === "warchief" && enemy.maxHp > 0) {
+                        const barW = 90;
+                        const ratio = clamp(enemy.hp / enemy.maxHp, 0, 1);
+                        ctx.fillStyle = "#1a0e08cc";
+                        ctx.fillRect(enemy.x - barW * 0.5, enemy.y - enemy.r - 22, barW, 8);
+                        ctx.fillStyle = ratio > 0.35 ? "#ff7043" : "#ffd166";
+                        ctx.fillRect(enemy.x - barW * 0.5, enemy.y - enemy.r - 22, barW * ratio, 8);
+                        ctx.fillStyle = "#ffd8c4";
+                        ctx.font = "700 10px Space Grotesk, sans-serif";
+                        ctx.textAlign = "center";
+                        ctx.fillText("WAR-CHIEF", enemy.x, enemy.y - enemy.r - 27);
+                    }
+
                     ctx.strokeStyle = enemy.stroke;
                     ctx.lineWidth = 2;
                     if (enemy.shape === "square") {
@@ -9631,7 +10712,7 @@
                 for (const line of [
                     `Wave ${game.waveNumber}, ${save.stored} progress banked`,
                     `${turrets} turret${turrets === 1 ? "" : "s"}, ${minions} minion${minions === 1 ? "" : "s"}`,
-                    `Bank ${save.bankWood}W / ${save.bankStone}S / ${save.bankCrystal}C / ${save.bankAmber}A / ${save.bankAether}Ae`
+                    `Bank ${save.bankWood}W / ${save.bankStone}S / ${save.bankCrystal}C / ${save.bankAmber}A / ${save.bankAether}Ae / ${save.bankIvory}Iv`
                 ]) {
                     const li = document.createElement("li");
                     li.textContent = line;
@@ -9843,6 +10924,39 @@
                 refreshHud();
             });
 
+            farBankListEl.addEventListener("click", (event) => {
+                if (!canUseUpgrade("farBankAssign")) return;
+
+                const optionBtn = event.target.closest("button[data-picker-value]");
+                if (optionBtn) {
+                    const slot = Number.parseInt(optionBtn.dataset.pickerSlot, 10);
+                    const farBank = optionBtn.dataset.pickerValue === "far";
+                    const workers = workerMinionsSortedBySlot();
+                    const selected = workers.find((minion) => minion.slotIndex === slot);
+                    if (!selected) return;
+
+                    selected.farBank = farBank;
+                    if (!save.farBankBySlot || typeof save.farBankBySlot !== "object") {
+                        save.farBankBySlot = {};
+                    }
+                    save.farBankBySlot[String(slot)] = farBank;
+                    // Re-pointed mid-river it rides the crossing out and turns round on
+                    // the far jetty: there is no stepping off half way.
+                    closeMinionPicker();
+                    saveGame();
+                    refreshHud();
+                    return;
+                }
+
+                const rowBtn = event.target.closest("button[data-far-bank-slot]");
+                if (!rowBtn) return;
+                const slot = Number.parseInt(rowBtn.dataset.farBankSlot, 10);
+                if (!Number.isFinite(slot)) return;
+
+                toggleMinionPicker("farBank", slot);
+                refreshHud();
+            });
+
             traderBtn.addEventListener("click", () => {
                 if (!canUseUpgrade("trader")) return;
                 const recipe = traderMinionRecipe();
@@ -9975,6 +11089,10 @@
                 refreshHud();
             });
 
+            warPaintBtn.addEventListener("click", () => {
+                castWarPaint();
+            });
+
             minionHasteBtn.addEventListener("click", () => {
                 castMinionHaste();
             });
@@ -10019,7 +11137,7 @@
                         `Run progress ${save.stored} (best run ${save.bestRunScore})`,
                         `${unlockedSkillCount()} of ${SKILL_TREE_ORDER.length} skills unlocked`,
                         `${turrets} turret${turrets === 1 ? "" : "s"}, ${minions} minion${minions === 1 ? "" : "s"}`,
-                        `Bank ${save.bankWood}W / ${save.bankStone}S / ${save.bankCrystal}C / ${save.bankAmber}A / ${save.bankAether}Ae`,
+                        `Bank ${save.bankWood}W / ${save.bankStone}S / ${save.bankCrystal}C / ${save.bankAmber}A / ${save.bankAether}Ae / ${save.bankIvory}Iv`,
                         `${save.essence} essence`
                     ]) {
                         const li = document.createElement("li");
