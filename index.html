@@ -9922,6 +9922,34 @@
                         }
 
                         if (!enemy) {
+                            // Nothing to fight and not whole: walk the damage off at the
+                            // post rather than carry it into the next wave. Patrolling
+                            // hurt bought nothing - the wander is idling either way, and
+                            // idling on full health is worth more than idling on half.
+                            //
+                            // Unlike the retreat above this makes no commitment: it sits
+                            // behind `!enemy`, which is re-read every tick, so anything
+                            // coming into range pulls the defender straight back out at
+                            // whatever health it has by then. Only the below-half case
+                            // above is allowed to ignore a fight to finish healing.
+                            if (minion.hp < minion.maxHp) {
+                                const reachedPost = moveEntityTowards(minion, post.x, post.y, minionTravelSpeed(minion));
+                                if (reachedPost) {
+                                    minion.hp = Math.min(minion.maxHp, minion.hp + DEFENDER_REGEN_PER_TICK);
+                                    if (minion.hp >= minion.maxHp) {
+                                        minion.hp = minion.maxHp;
+                                        // Back to full at the post, so the next patrol
+                                        // starts from a fresh wander target rather than
+                                        // resuming a leg picked before the fight.
+                                        minion.patrolIdleTicks = Math.floor(random(DEFENDER_PATROL_IDLE_MIN_TICKS, DEFENDER_PATROL_IDLE_MAX_TICKS + 1));
+                                        const patrolPoint = randomDefenderPatrolPoint(post);
+                                        minion.patrolTargetX = patrolPoint.x;
+                                        minion.patrolTargetY = patrolPoint.y;
+                                    }
+                                }
+                                continue;
+                            }
+
                             if (minion.patrolIdleTicks > 0) {
                                 minion.patrolIdleTicks -= 1;
                                 continue;
