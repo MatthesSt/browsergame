@@ -79,7 +79,12 @@
             width: min(99vw, 1940px);
             height: calc(100vh - 16px);
             max-height: calc(100vh - 16px);
-            backdrop-filter: blur(7px);
+            /* No backdrop-filter here. This element is the whole window, so a blur on
+               it is a full-window blur pass, and the ambient blobs drifting behind it
+               invalidate the result every frame for the life of the page - a fixed
+               per-frame cost that has nothing to do with how much is on the map. The
+               blobs already carry their own blur(6px) and sit under a panel that is
+               72% opaque, so blurring them a second time was never visible anyway. */
             background: var(--card);
             border: 1px solid #3a5676;
             border-radius: 22px;
@@ -658,13 +663,8 @@
             display: flex;
         }
 
-        /* An open popover covers the app, but the drifting ambient blobs behind the
-           shell keep moving, so the shell's full-window backdrop blur is recomputed
-           every frame for pixels nobody can see. Park both while one is open. */
-        body:has(.popover-backdrop.open) .shell {
-            backdrop-filter: none;
-        }
-
+        /* An open popover covers the app, so the blobs are drifting where nobody can
+           see them. Park them while one is open. */
         body:has(.popover-backdrop.open) .ambient {
             display: none;
         }
@@ -1217,9 +1217,13 @@
             top: 10px;
             left: 10px;
             z-index: 2;
-            background: #08141fcc;
+            /* Opacity, not a blur. This chip sits over the canvas, so a
+               backdrop-filter here re-blurs a region of a surface that repaints every
+               frame - the one case the compositor can never cache. The blur was only
+               ever buying legibility over busy ground, and the extra alpha buys more
+               of it for nothing. */
+            background: #08141fe6;
             border-color: #35527299;
-            backdrop-filter: blur(3px);
             box-shadow: 0 4px 14px #02060d66;
             /* Placing a turret and dragging the camera both begin with a press on
                the map, so this must never be the thing that receives it. */
@@ -2159,7 +2163,7 @@
 
             const tower = { x: -W(108) / 2, y: -W(88) / 2, w: W(108), h: W(88) };
             const TOWER_MAX_HP = 100;
-            const START_BUDGET = { wood: 4000, stone: 3000, crystal: 1000, amber: 1000, aether: 1000, essence: 0 };
+            const START_BUDGET = { wood: 40, stone: 30, crystal: 0, amber: 0, aether: 0, essence: 0 };
             const START_WAVE_COUNT = 1;
             const WAVE_START_DELAY = 3600;
             const WAVE_BREAK_TICKS = 320;
