@@ -12253,31 +12253,11 @@
                 drawOffscreenPlayerIndicator(ctx);
                 drawOffscreenBossIndicators(ctx);
 
-                const pendingTurretTotal = game.pendingBasicTurretPlacements
-                    + game.pendingSniperTurretPlacements
-                    + game.pendingSlowTurretPlacements;
-                if (pendingTurretTotal > 0) {
-                    ctx.save();
-                    ctx.fillStyle = "#9be7ff";
-                    ctx.font = mapFont(16, 700);
-                    ctx.textAlign = "center";
-                    ctx.textBaseline = "alphabetic";
-                    // Named rather than initialled: Sling and Slow Field both start with
-                    // an S, so the old B/S/F shorthand stopped telling them apart. Only
-                    // the kinds actually waiting are listed.
-                    const waiting = [
-                        [game.pendingBasicTurretPlacements, "Sling"],
-                        [game.pendingSniperTurretPlacements, "Catapult"],
-                        [game.pendingSlowTurretPlacements, "Slow Field"]
-                    ].filter(([count]) => count > 0)
-                        .map(([count, name]) => `${name} x${count}`)
-                        .join("   ");
-                    ctx.fillText(`Place turret: ${waiting}`, viewport.w / 2, 34);
-                    ctx.fillStyle = "#9be7ffaa";
-                    ctx.font = mapFont(13, 500);
-                    ctx.fillText("Right-click to cancel and refund", viewport.w / 2, 54);
-                    ctx.restore();
-                }
+                // No banner for turrets waiting to be placed. It was on screen for as long
+                // as you were holding any stock at all, which is most of a run, and it
+                // said what the Turret Store panel in the shop already says. What you
+                // actually need while placing one - the ghost turret under the cursor -
+                // is drawn by drawTurretPlacementPreview and is still there.
 
                 if (!game.running && game.runSummary) {
                     const summary = game.runSummary;
