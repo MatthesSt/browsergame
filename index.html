@@ -5324,15 +5324,23 @@
                 for (const group of groups) {
                     const controls = group.querySelector(".shop-controls");
                     if (!controls) continue;
-                    const buttons = controls.querySelectorAll("button");
-                    let hasVisibleButton = false;
-                    for (const button of buttons) {
-                        if (button.style.display !== "none" && !button.hidden) {
-                            hasVisibleButton = true;
+                    // Direct children only, and panels count as well as buttons. Two
+                    // reasons for each half: a <details> panel is a control in its own
+                    // right - the Turret Store is one, and looking only for buttons meant
+                    // the Turrets group lived or died by whether the Turret Capacity
+                    // upgrade was unlocked, hiding the store the player needed to place
+                    // turrets they already owned. And ":scope >" keeps the rows rendered
+                    // inside an open panel from voting, which would otherwise make a group
+                    // visible only after you managed to open the panel inside it.
+                    const items = controls.querySelectorAll(":scope > button, :scope > details");
+                    let hasVisibleItem = false;
+                    for (const item of items) {
+                        if (item.style.display !== "none" && !item.hidden) {
+                            hasVisibleItem = true;
                             break;
                         }
                     }
-                    group.style.display = hasVisibleButton ? "" : "none";
+                    group.style.display = hasVisibleItem ? "" : "none";
                 }
             }
 
@@ -5528,7 +5536,11 @@
                 setButtonVisible(spawnerStoneBtn, spawnerStoneUnlocked);
                 setButtonVisible(spawnerCrystalBtn, spawnerCrystalUnlocked);
                 setButtonVisible(spawnerAmberBtn, spawnerAmberUnlocked);
-                setButtonVisible(turretStockPanelEl, true);
+                // Unconditionally visible was not right either: it advertised an empty
+                // store before turrets existed for this run. It shows once you can own
+                // one, and always while you are actually holding stock - including stock
+                // carried over into a run whose skills have since been reset.
+                setButtonVisible(turretStockPanelEl, canUseUpgrade("turret") || totalStoredTurrets() > 0);
                 setButtonVisible(turretCapBtn, turretCapUnlocked);
                 setButtonVisible(globalMultBtn, globalMultUnlocked);
                 setButtonVisible(craftBtn, gathererUnlocked);
