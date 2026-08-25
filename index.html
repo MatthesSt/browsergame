@@ -160,8 +160,45 @@
             box-shadow: 0 8px 20px #02060d66;
         }
 
-        /* Wrap onto a second line when the chips do not fit, rather than sliding them
-           out of view behind a horizontal scrollbar. */
+        /* The header is meant to be one line. Below this width it stops being one, so
+           the word labels are the first thing to go: every chip keeps its icon, its
+           number and its title tooltip, which is enough to read it, and the row holds
+           a single line down to a laptop screen. Wrapping is still the backstop
+           underneath that. */
+        @media (max-width: 1810px) {
+            .hud-row .chip > span:not([class]) {
+                display: none;
+            }
+        }
+
+        /* A second tier for laptop widths: the labels are already gone by here, so what
+           is left to give is the padding around the numbers and a step of type size.
+           The bank's seven readouts are most of the row, so they give the most. */
+        @media (max-width: 1520px) {
+            .hud-row .chip {
+                font-size: 0.75rem;
+                padding: 4px 6px;
+                gap: 4px;
+            }
+
+            .hud-bank-costs .cost-chip {
+                min-width: 38px;
+                padding: 2px 5px;
+                font-size: 0.66rem;
+            }
+
+            .chip.bank-bundle .hud-bank-costs {
+                min-width: 0;
+            }
+
+            .chip.resource-bundle {
+                gap: 5px;
+                padding-right: 6px;
+            }
+        }
+
+        /* Wrap onto a second line when the chips still do not fit, rather than sliding
+           them out of view behind a horizontal scrollbar. */
         .hud-row {
             display: flex;
             flex-wrap: wrap;
@@ -191,8 +228,8 @@
         .chip {
             display: inline-flex;
             align-items: center;
-            gap: 6px;
-            padding: 5px 8px;
+            gap: 5px;
+            padding: 5px 7px;
             border-radius: 8px;
             background: #1a3048cc;
             border: 1px solid #355272;
@@ -668,6 +705,38 @@
         body:has(.popover-backdrop.open) .ambient {
             display: none;
         }
+
+
+        .compact-btn {
+            padding-left: 9px;
+            padding-right: 9px;
+            min-width: 34px;
+        }
+
+        .draft-card { max-width: 720px; }
+
+        .draft-options {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
+            gap: 10px;
+            margin-top: 6px;
+        }
+
+        .draft-option {
+            display: flex;
+            flex-direction: column;
+            align-items: flex-start;
+            gap: 6px;
+            text-align: left;
+            padding: 12px 14px;
+            border-radius: 12px;
+            line-height: 1.35;
+            white-space: normal;
+            height: 100%;
+        }
+
+        .draft-option strong { font-size: 15px; }
+        .draft-option span { font-weight: 400; opacity: 0.82; font-size: 13px; }
 
         .leaderboard-identity {
             display: flex;
@@ -1207,7 +1276,7 @@
         }
 
         .chip.bank-bundle .hud-bank-costs {
-            min-width: 314px;
+            min-width: 268px;
         }
 
         /* The bag rides on the map rather than in the header: it is the one readout
@@ -1251,7 +1320,7 @@
         }
 
         .hud-bank-costs .cost-chip {
-            min-width: 58px;
+            min-width: 48px;
             justify-content: center;
             padding: 2px 7px;
             font-size: 0.7rem;
@@ -1483,6 +1552,7 @@
             <div class="controls">
                 <button id="startBtn">Start Run</button>
                 <button id="pauseBtn" class="secondary">Pause</button>
+                <button id="gameSpeedBtn" class="secondary" title="Game speed (F to cycle)">1x</button>
                 <div class="audio-menu">
                     <button id="musicBtn" class="secondary" title="Audio (M mutes, +/- volume)" aria-haspopup="true" aria-expanded="false">♪</button>
                     <div id="audioPanel" class="audio-panel" hidden>
@@ -1510,12 +1580,12 @@
                     <div class="hud-section hud-section-wave">
                         <div class="chip" id="towerHpChip" title="Tower health - the run ends when it reaches zero"><span class="ico tower" id="towerHpIco"></span><span>Tower</span><strong id="towerHpHud">100/100</strong></div>
                         <div class="chip" title="Current enemy wave"><span class="ico wave"></span><span>Wave</span><strong id="waveHud">0</strong></div>
-                        <div class="chip" title="Time until next wave"><span class="ico timer"></span><span>Next</span><strong id="nextWaveHud">--:--</strong></div>
+                        <div class="chip" id="nextWaveChip" title="Time until the next wave, and what it brings"><span class="ico timer"></span><strong id="nextWaveHud">--:--</strong></div>
                         <div class="chip" id="tribeChip" title="Tribe ground you hold across the river - hold all of it to provoke their war-chief"><span class="ico tribe" id="tribeIco"></span><span>Tribe</span><strong id="tribeHud">0/4</strong></div><div class="chip" id="fieldsChip" title="Resource fields still producing - blights claim them until killed"><span class="ico field" id="fieldsIco"></span><span>Fields</span><strong id="fieldsHud">8/8</strong></div>
                     </div>
                     <div class="hud-spacer" aria-hidden="true"></div>
                     <div class="hud-section hud-section-score">
-                        <div class="chip" title="Stored progress points"><span class="ico progress"></span><span>Prog</span><strong id="stored">0</strong></div>
+                        <div class="chip" title="Progress you are holding - banking adds to it, spending takes it away"><span class="ico progress"></span><span>Prog</span><strong id="stored">0</strong></div>
                         <div class="chip" title="Best progress banked in a single run"><span class="ico best"></span><span>Best run</span><strong id="bestRunScore">0</strong></div>
                     </div>
                 </div>
@@ -1682,6 +1752,34 @@
         </div>
     </div>
 
+    <div id="draftPopover" class="popover-backdrop" aria-hidden="true">
+        <div class="popover-card confirm-card draft-card" role="dialog" aria-modal="true" aria-labelledby="draftTitle">
+            <div class="popover-head">
+                <h3 id="draftTitle">WAVE CLEARED</h3>
+            </div>
+            <div class="confirm-body">
+                <p id="draftSubtitle">Choose one. It lasts the rest of the run.</p>
+                <div id="draftOptions" class="draft-options"></div>
+            </div>
+        </div>
+    </div>
+
+    <div id="eventPopover" class="popover-backdrop" aria-hidden="true">
+        <div class="popover-card confirm-card" role="dialog" aria-modal="true" aria-labelledby="eventTitle">
+            <div class="popover-head">
+                <h3 id="eventTitle">AN OFFER</h3>
+            </div>
+            <div class="confirm-body">
+                <p id="eventDesc"></p>
+                <p class="confirm-note">Turning it down costs nothing.</p>
+            </div>
+            <div class="confirm-actions">
+                <button id="eventDeclineBtn" class="secondary">Leave it</button>
+                <button id="eventAcceptBtn">Accept</button>
+            </div>
+        </div>
+    </div>
+
     <div id="undoToast" class="undo-toast" role="status" hidden>
         <span id="undoToastText">Save reset.</span>
         <button id="undoResetBtn" class="secondary">Undo</button>
@@ -1801,7 +1899,17 @@
             };
             const minionCapBtn = document.getElementById("minionCapBtn");
             const resetBtn = document.getElementById("resetBtn");
+            const gameSpeedBtn = document.getElementById("gameSpeedBtn");
+            const nextWaveChipEl = document.getElementById("nextWaveChip");
             const resetPopoverEl = document.getElementById("resetPopover");
+            const draftPopoverEl = document.getElementById("draftPopover");
+            const draftOptionsEl = document.getElementById("draftOptions");
+            const draftSubtitleEl = document.getElementById("draftSubtitle");
+            const eventPopoverEl = document.getElementById("eventPopover");
+            const eventTitleEl = document.getElementById("eventTitle");
+            const eventDescEl = document.getElementById("eventDesc");
+            const eventAcceptBtn = document.getElementById("eventAcceptBtn");
+            const eventDeclineBtn = document.getElementById("eventDeclineBtn");
             const resetSummaryEl = document.getElementById("resetSummary");
             const resetCancelBtn = document.getElementById("resetCancelBtn");
             const resetConfirmBtn = document.getElementById("resetConfirmBtn");
@@ -2168,8 +2276,219 @@
             const WAVE_START_DELAY = 3600;
             const WAVE_BREAK_TICKS = 320;
             const WAVE_SPAWN_INTERVAL_BASE = 72;
-            const WAVE_SPAWN_INTERVAL_MIN = 44;
+            const WAVE_SPAWN_INTERVAL_MIN = 24;
+            // The count caps stay - a map with a hundred enemies on it is unreadable, and
+            // the grid queries are what keep a busy map cheap - but they sat low enough
+            // that they were the whole difficulty curve. Health carries that job now, so
+            // these only have to keep the screen legible.
+            // One modifier is rolled per run and named on the start screen. Every run used
+            // to open identically - same eight meadows, same budget, same first five
+            // waves - which for a roguelite is the missing pillar: run twelve differed
+            // from run three only by which skills you already owned. A modifier plus a
+            // reshuffled meadow is enough to make the opening a fresh read every time.
+            //
+            // Anything a modifier does not name falls back to RUN_MODIFIER_DEFAULTS, so
+            // adding a knob here does not mean editing every entry.
+            // ---- Draft boons and events ------------------------------------------
+            //
+            // The run used to present no choices at all: waves, blights and ghouls each
+            // arrived on a fixed timer and nothing was ever offered to you. A draft every
+            // few waves gives the run a spine of decisions, and events put a price on
+            // some of them so the answer is not always yes.
+            // The last few runs, kept so a run reads as one of a series rather than a
+            // number that flashes past on the summary card and is gone.
+            // ---- Day and night ---------------------------------------------------
+            //
+            // Driven straight off save.worldAge, which already counts the ticks this run
+            // has been running and is already saved and restored. Deriving the clock from
+            // it rather than storing a second one means the cycle cannot drift out of step
+            // with the run across a pause, a reload or a snapshot restore.
+            const DAY_TICKS = 3600;                      // sixty seconds of working light
+            const NIGHT_TICKS = 2400;                    // forty seconds of dark
+            const DAY_CYCLE_TICKS = DAY_TICKS + NIGHT_TICKS;
+            // How long dusk and dawn take to fade. Only the tint eases; the gameplay
+            // boundary is a hard edge, so "can I trade" never has an ambiguous answer.
+            const DUSK_TICKS = 300;
+            const NIGHT_TINT_MAX = 0.46;
+            const NIGHT_TINT_COLOR = "12, 22, 48";
+            // What the dark does to whatever walks out of it. Night is the dangerous half
+            // of the cycle and the markets are shut, so it also pays better.
+            const NIGHT_ENEMY_HP_SCALE = 1.35;
+            const NIGHT_ENEMY_SPEED_SCALE = 1.12;
+            const NIGHT_GHOUL_INTERVAL_SCALE = 0.5;
+            const NIGHT_ESSENCE_SCALE = 2;
+
+            function dayPhaseTick() {
+                return save.worldAge % DAY_CYCLE_TICKS;
+            }
+
+            function isNight() {
+                return dayPhaseTick() >= DAY_TICKS;
+            }
+
+            function dayNumber() {
+                return Math.floor(save.worldAge / DAY_CYCLE_TICKS) + 1;
+            }
+
+            function ticksUntilPhaseEnd() {
+                const phase = dayPhaseTick();
+                return phase < DAY_TICKS ? DAY_TICKS - phase : DAY_CYCLE_TICKS - phase;
+            }
+
+            // Eases in over dusk and back out over dawn, so the map darkens rather than
+            // switching. Returns 0 through 1; the tint scales this by NIGHT_TINT_MAX.
+            function nightTintFactor() {
+                const phase = dayPhaseTick();
+                if (phase < DAY_TICKS - DUSK_TICKS) return 0;
+                if (phase < DAY_TICKS) return (phase - (DAY_TICKS - DUSK_TICKS)) / DUSK_TICKS;
+                const intoNight = phase - DAY_TICKS;
+                if (intoNight > NIGHT_TICKS - DUSK_TICKS) {
+                    return Math.max(0, 1 - (intoNight - (NIGHT_TICKS - DUSK_TICKS)) / DUSK_TICKS);
+                }
+                return 1;
+            }
+
+            const RUN_HISTORY_MAX = 8;
+
+            // ---- First-run guidance ----------------------------------------------
+            //
+            // There was no onboarding at all: the start screen listed seven key bindings
+            // and then the game began, leaving 27 skills, six resources, three minion
+            // roles, nine trade routes, five spells, a ferry and a tribe war to be
+            // inferred. These are one line at a time, in the order they matter, and each
+            // one retires itself the moment its condition is met. It is meta state, so
+            // the game only ever teaches this once.
+            const TUTORIAL_STEPS = [
+                { id: "gather", text: "Walk over resources to pick them up. Fill your bag." },
+                { id: "bank", text: "Carry them into the TOWER at the centre to bank them." },
+                { id: "skills", text: "Open the Skill Tree - banked resources buy permanent unlocks that outlive the run." },
+                { id: "gatherer", text: "Unlock Gatherers in the Skill Tree, then craft one: they gather while you do." },
+                { id: "defend", text: "Unlock Defenders and Sentries. The tower falling ends the run." },
+                { id: "wave", text: "Survive the first wave. Watch Incoming for what the next one brings." }
+            ];
+
+            function tutorialStepDone(id) {
+                if (id === "gather") return inventoryCount() > 0;
+                if (id === "bank") return save.stored > 0;
+                if (id === "skills") return unlockedSkillCount() > 0;
+                if (id === "gatherer") return save.minions > 0;
+                if (id === "defend") return save.defenderMinions > 0 || save.turrets > 0;
+                if (id === "wave") return game.waveNumber >= 2;
+                return true;
+            }
+
+            function currentTutorialStep() {
+                if (!game.started || game.runOver) return null;
+                const index = Number.isFinite(save.tutorialStep) ? save.tutorialStep : 0;
+                if (index >= TUTORIAL_STEPS.length) return null;
+                return TUTORIAL_STEPS[index];
+            }
+
+            // Called from the tick. Steps can be satisfied out of order - banking before
+            // the hint to bank has even appeared is normal - so this walks forward past
+            // everything already true rather than advancing one at a time.
+            function updateTutorial() {
+                if (!Number.isFinite(save.tutorialStep)) save.tutorialStep = 0;
+                if (save.tutorialStep >= TUTORIAL_STEPS.length) return;
+
+                let index = save.tutorialStep;
+                while (index < TUTORIAL_STEPS.length && tutorialStepDone(TUTORIAL_STEPS[index].id)) {
+                    index += 1;
+                }
+                if (index !== save.tutorialStep) {
+                    save.tutorialStep = index;
+                    saveGame();
+                }
+            }
+            const DRAFT_EVERY_WAVES = 5;
+            const DRAFT_OPTION_COUNT = 3;
+            // Offset from the draft so a break never asks two questions at once.
+            const EVENT_EVERY_WAVES = 7;
+
+            const DRAFT_BOONS = [
+                { id: "rich-harvest", label: "Rich Harvest", desc: "Every load banks 15% more." },
+                { id: "keen-edge", label: "Keen Edge", desc: "Minions and defenders hit for 1 more." },
+                { id: "iron-posts", label: "Iron Posts", desc: "Half again as much health on every minion." },
+                { id: "deep-bags", label: "Deep Bags", desc: "Carry 4 more before you have to walk back." },
+                { id: "fleet-foot", label: "Fleet Foot", desc: "You move noticeably faster." },
+                { id: "sharp-sentries", label: "Sharp Sentries", desc: "Turrets fire 20% faster." },
+                { id: "warded-fields", label: "Warded Fields", desc: "Blights eat through a field far more slowly." },
+                { id: "bounty", label: "Bounty", desc: "30 essence, right now." }
+            ];
+
+            // Every event is a trade. `accept` runs the whole thing - the gift and the
+            // price - so declining is always simply nothing happening.
+            const RUN_EVENTS = [
+                {
+                    id: "blight-surge",
+                    label: "A Surge in the Rot",
+                    desc: "Three blights rise for your fields now - but the aether in them pays triple essence for a minute.",
+                    acceptLabel: "Let them come"
+                },
+                {
+                    id: "war-drums",
+                    label: "War Drums",
+                    desc: "The next wave comes six deeper. Take 50 essence for standing in its way.",
+                    acceptLabel: "Take the essence"
+                },
+                {
+                    id: "forced-march",
+                    label: "Forced March",
+                    desc: "Work the fields twice as hard for 45 seconds. The tower gives up 12 health for it.",
+                    acceptLabel: "Drive them on"
+                },
+                {
+                    id: "old-bones",
+                    label: "Old Bones Stir",
+                    desc: "A ghoul horde crawls out now - and every field on your ground comes back full.",
+                    acceptLabel: "Wake them"
+                }
+            ];
+
+            const RUN_MODIFIER_DEFAULTS = {
+                nodeCapScale: 1,
+                respawnScale: 1,
+                resourceBonus: 0,
+                waveSizeBonus: 0,
+                waveBreakScale: 1,
+                enemyHpScale: 1,
+                enemySpeedScale: 1,
+                ghoulIntervalScale: 1,
+                ghoulHordeBonus: 0,
+                claimIntervalScale: 1,
+                essenceScale: 1
+            };
+            const RUN_MODIFIERS = [
+                { id: "fair-weather", label: "Fair Weather", desc: "Nothing out of the ordinary." },
+                { id: "lean-soil", label: "Lean Soil", desc: "Fields carry less, but every load banks half again as much.", nodeCapScale: 0.6, resourceBonus: 0.5 },
+                { id: "restless-dead", label: "Restless Dead", desc: "Ghoul hordes come twice as often and larger - and every kill pays double essence.", ghoulIntervalScale: 0.5, ghoulHordeBonus: 2, essenceScale: 2 },
+                { id: "long-summer", label: "Long Summer", desc: "Longer between waves, but blights come for your fields twice as fast.", waveBreakScale: 1.5, claimIntervalScale: 0.5 },
+                { id: "hard-frost", label: "Hard Frost", desc: "Everything that walks is slower, and everything that walks is tougher.", enemySpeedScale: 0.75, enemyHpScale: 1.35 },
+                { id: "rich-veins", label: "Rich Veins", desc: "Fields regrow quickly; the waves are bigger for it.", respawnScale: 0.65, waveSizeBonus: 3 },
+                { id: "thin-ranks", label: "Thin Ranks", desc: "Fewer enemies in each wave, and every one of them far harder to put down.", waveSizeBonus: -3, enemyHpScale: 1.7 }
+            ];
+
+            const WAVE_SIZE_MAX = 34;
+            const ACTIVE_ENEMY_MAX = 24;
             const WAVE_SIZE_BASE = 2;
+            // How a wave gets harder. Before this, every knob that made a wave worse was
+            // capped - size at 18, concurrent at 12, the spawn gap at 44 ticks - and enemy
+            // health was a constant per type, so a scout on wave 300 had the same 1 HP as
+            // a scout on wave 3. Player power has no such ceiling, so past some crossover
+            // the tower simply could not fall and the score became a measure of patience.
+            // Health is the lever that has no cap: a linear term for the early waves and a
+            // compounding term that eventually outruns anything the player can stack.
+            const ENEMY_HP_LINEAR_PER_WAVE = 0.08;
+            const ENEMY_HP_COMPOUND_PER_WAVE = 1.015;
+            // Damage grows far more slowly. It decides how much a leak costs, not whether
+            // the wave can be held, and a tower that dies to one breakthrough is a worse
+            // game than one that dies to a wave it could not clear.
+            const ENEMY_DAMAGE_LINEAR_PER_WAVE = 0.03;
+            // Ghouls, blights and wardens keep their own clocks and are pressure on the
+            // economy rather than on the tower, so they follow the curve at its root:
+            // enough that a late-game blight is still worth walking over to kill, never
+            // enough to make one a wall.
+            const OFFWAVE_HP_SCALE_ROOT = 0.5;
             const HUD_REFRESH_INTERVAL_TICKS = 4;
             const EARLY_SPAWN_GRACE_TICKS = 1800;
             const EARLY_SPAWN_GRACE_BONUS = 160;
@@ -2695,6 +3014,15 @@
                 waveBreakTimer: WAVE_START_DELAY,
                 waveInProgress: false,
                 waveIntroPendingType: null,
+                // A draft or an event waiting to be answered, and the temporary effects
+                // an accepted event leaves behind. All of it is run state, not save state.
+                pendingDraft: null,
+                pendingEvent: null,
+                floaters: [],
+                runPeakStored: 0,
+                eventEssenceTicks: 0,
+                eventYieldTicks: 0,
+                nextWaveSizeBonus: 0,
                 towerHp: TOWER_MAX_HP,
                 minionHasteTicks: 0,
                 warPaintTicks: 0,
@@ -2704,7 +3032,7 @@
                     x: 0,
                     y: 0,
                     r: E(14) / WORLD_SCALE,
-                    speed: BASE_PLAYER_SPEED + save.speedLevel * PLAYER_SPEED_LEVEL_STEP,
+                    speed: playerSpeedValue(),
                     stamina: PLAYER_STAMINA_MAX
                 },
                 inventory: { wood: 0, stone: 0, crystal: 0, amber: 0, aether: 0, ivory: 0 },
@@ -2783,7 +3111,10 @@
                 if (Array.isArray(rawPlacements)) {
                     for (const entry of rawPlacements) {
                         if (!entry || !Number.isFinite(entry.x) || !Number.isFinite(entry.y)) continue;
-                        normalized.push(clampTurretPoint(entry.x, entry.y));
+                        const point = clampTurretPoint(entry.x, entry.y);
+                        point.level = Number.isFinite(entry.level) ? clamp(Math.floor(entry.level), 0, TURRET_MAX_LEVEL) : 0;
+                        point.priority = TURRET_PRIORITIES.indexOf(entry.priority) === -1 ? "closest" : entry.priority;
+                        normalized.push(point);
                         if (normalized.length >= maxCount) break;
                     }
                 }
@@ -2903,6 +3234,9 @@
                     spawnerAetherLevel: 0,
                     speedLevel: 0,
                     bagLevel: 0,
+                    runModifier: null,
+                    fieldTypes: null,
+                    draftBoons: {},
                     gathererFocusBySlot: {},
                     gathererFocusCursor: 0,
                     farBankBySlot: {},
@@ -2989,6 +3323,11 @@
                         spawnerCrystalLevel: Number.isFinite(data.spawnerCrystalLevel) ? data.spawnerCrystalLevel : legacySpawnerLevel,
                         spawnerAmberLevel: Number.isFinite(data.spawnerAmberLevel) ? data.spawnerAmberLevel : legacySpawnerLevel,
                         spawnerAetherLevel: Number.isFinite(data.spawnerAetherLevel) ? data.spawnerAetherLevel : fresh.spawnerAetherLevel,
+                        runHistory: Array.isArray(data.runHistory) ? data.runHistory.slice(-RUN_HISTORY_MAX) : [],
+                        tutorialStep: Number.isFinite(data.tutorialStep) ? Math.max(0, Math.floor(data.tutorialStep)) : 0,
+                        runModifier: typeof data.runModifier === "string" ? data.runModifier : fresh.runModifier,
+                        draftBoons: data.draftBoons && typeof data.draftBoons === "object" ? data.draftBoons : {},
+                        fieldTypes: Array.isArray(data.fieldTypes) ? data.fieldTypes : fresh.fieldTypes,
                         speedLevel: Number.isFinite(data.speedLevel) ? data.speedLevel : fresh.speedLevel,
                         bagLevel: Number.isFinite(data.bagLevel) ? data.bagLevel : fresh.bagLevel,
                         gathererFocusBySlot,
@@ -3002,6 +3341,7 @@
                         musicMuted: data.musicMuted !== false,
                         musicVolume: Number.isFinite(data.musicVolume) ? clamp(data.musicVolume, 0, 1) : 1,
                         sfxMuted: Boolean(data.sfxMuted),
+                        gameSpeed: GAME_SPEEDS.indexOf(data.gameSpeed) === -1 ? 1 : data.gameSpeed,
                         mapZoom: Number.isFinite(data.mapZoom) ? clamp(data.mapZoom, MIN_MAP_ZOOM, MAX_MAP_ZOOM) : 1,
                         coordOrigin: "tower",
                         runtimeState: data.runtimeState && typeof data.runtimeState === "object" ? data.runtimeState : null
@@ -3012,12 +3352,15 @@
                         bestRunScore: 0,
                         bestRunWave: 0,
                         runsPlayed: 0,
+                        runHistory: [],
+                        tutorialStep: 0,
                         warChiefKills: 0,
                         essence: 0,
                         unlockedSkills: normalizeUnlockedSkills(null),
                         musicMuted: true,
                         musicVolume: 1,
                         sfxMuted: true,
+                        gameSpeed: 1,
                         mapZoom: 1,
                         coordOrigin: "tower",
                         runtimeState: null
@@ -3322,8 +3665,25 @@
                 return positions;
             }
 
+            // Storage can refuse a write - a full quota, or a browser with site data
+            // switched off - and this is called from inside the tick. An exception here
+            // used to take the whole run down over a save that could be retried two
+            // seconds later, so it is reported once and then swallowed.
+            let saveFailureReported = false;
+
             function saveGame() {
-                localStorage.setItem(STORAGE_KEY, JSON.stringify(save));
+                try {
+                    localStorage.setItem(STORAGE_KEY, JSON.stringify(save));
+                    saveFailureReported = false;
+                } catch (err) {
+                    if (!saveFailureReported) {
+                        saveFailureReported = true;
+                        console.warn("Progress could not be saved:", err);
+                        if (typeof showUndoToast === "function") {
+                            showUndoToast("Progress cannot be saved - storage is full or blocked.");
+                        }
+                    }
+                }
             }
 
             function clearRuntimeSnapshot() {
@@ -3398,6 +3758,11 @@
                     waveBreakTimer: game.waveBreakTimer,
                     waveInProgress: game.waveInProgress,
                     waveIntroPendingType: game.waveIntroPendingType,
+                    pendingDraft: game.pendingDraft,
+                    pendingEvent: game.pendingEvent,
+                    eventEssenceTicks: game.eventEssenceTicks,
+                    eventYieldTicks: game.eventYieldTicks,
+                    nextWaveSizeBonus: game.nextWaveSizeBonus,
                     towerHp: game.towerHp,
                     minionHasteTicks: game.minionHasteTicks,
                     warPaintTicks: game.warPaintTicks,
@@ -3457,6 +3822,10 @@
                 game.started = true;
                 game.running = false;
                 keys.clear();
+                // This path skips resetSession, so the run's rolled field layout has to be
+                // put back here too - otherwise a reload keeps the snapshot's nodes but
+                // grows every replacement as the default layout's resource.
+                applyFieldTypes();
 
                 game.dayTick = Number.isFinite(snapshot.dayTick) ? Math.max(0, Math.floor(snapshot.dayTick)) : 0;
                 game.depositPulse = Number.isFinite(snapshot.depositPulse) ? snapshot.depositPulse : 0;
@@ -3472,6 +3841,11 @@
                     : WAVE_START_DELAY;
                 game.waveInProgress = Boolean(snapshot.waveInProgress);
                 game.waveIntroPendingType = typeof snapshot.waveIntroPendingType === "string" ? snapshot.waveIntroPendingType : null;
+                game.pendingDraft = Array.isArray(snapshot.pendingDraft) ? snapshot.pendingDraft : null;
+                game.pendingEvent = typeof snapshot.pendingEvent === "string" ? snapshot.pendingEvent : null;
+                game.eventEssenceTicks = Number.isFinite(snapshot.eventEssenceTicks) ? Math.max(0, snapshot.eventEssenceTicks) : 0;
+                game.eventYieldTicks = Number.isFinite(snapshot.eventYieldTicks) ? Math.max(0, snapshot.eventYieldTicks) : 0;
+                game.nextWaveSizeBonus = Number.isFinite(snapshot.nextWaveSizeBonus) ? Math.max(0, snapshot.nextWaveSizeBonus) : 0;
                 game.towerHp = Number.isFinite(snapshot.towerHp) ? clamp(snapshot.towerHp, 0, TOWER_MAX_HP) : TOWER_MAX_HP;
                 game.warPaintTicks = Number.isFinite(snapshot.warPaintTicks) ? Math.max(0, Math.floor(snapshot.warPaintTicks)) : 0;
                 game.minionHasteTicks = Number.isFinite(snapshot.minionHasteTicks)
@@ -3508,7 +3882,7 @@
                 game.runSummary = null;
 
                 const player = snapshot.player && typeof snapshot.player === "object" ? snapshot.player : {};
-                game.player.speed = BASE_PLAYER_SPEED + save.speedLevel * PLAYER_SPEED_LEVEL_STEP;
+                game.player.speed = playerSpeedValue();
                 game.player.x = Number.isFinite(player.x) ? clamp(player.x, world.minX + game.player.r, world.maxX - game.player.r) : 0;
                 game.player.y = Number.isFinite(player.y) ? clamp(player.y, world.minY + game.player.r, world.maxY - game.player.r) : 0;
                 // A run saved standing where the river now runs resumes on the bank.
@@ -3568,8 +3942,16 @@
                 return true;
             }
 
+            // One place the player's pace is worked out. It used to be the same expression
+            // written at four call sites, which is fine until something other than the
+            // speed upgrade needs to move it.
+            function playerSpeedValue() {
+                return BASE_PLAYER_SPEED + save.speedLevel * PLAYER_SPEED_LEVEL_STEP
+                    + boonCount("fleet-foot") * 0.5;
+            }
+
             function bagCapacity() {
-                return 10 + save.bagLevel * 4;
+                return 10 + save.bagLevel * 4 + boonCount("deep-bags") * 4;
             }
 
             function inventoryCount() {
@@ -3701,7 +4083,9 @@
             }
 
             function resourceMultiplier() {
-                return 1 + save.globalMultiplierLevel * 0.1;
+                const base = 1 + save.globalMultiplierLevel * 0.1 + modValue("resourceBonus")
+                    + boonCount("rich-harvest") * 0.15;
+                return base * eventYieldMultiplier();
             }
 
             function costAmount(cost, type) {
@@ -3714,6 +4098,35 @@
                 return save[`bank${type[0].toUpperCase()}${type.slice(1)}`];
             }
 
+            // Progress is what you are holding, not what you have ever held. Banking adds
+            // it, spending takes it away again, and `bestRunScore` remembers the highest
+            // it ever stood. The old counter only ever went up, which meant investing in
+            // the run cost nothing on the board and the only optimal line was to gather
+            // for as long as you could stand it.
+            //
+            // Essence is deliberately outside this: it is meta currency, it survives the
+            // run, and pricing it as run progress would let a death bank a score.
+            function bankValueOfCost(cost) {
+                let value = 0;
+                for (const type of RESOURCE_TYPES) {
+                    const config = materialConfig[type];
+                    if (!config) continue;   // essence has no material value
+                    value += costAmount(cost, type) * config.value;
+                }
+                return value;
+            }
+
+            // The one place progress moves. Clamped at zero because a refund quoted at a
+            // different tier than the purchase could otherwise walk it negative.
+            function addStoredValue(delta) {
+                if (!Number.isFinite(delta) || delta === 0) return;
+                save.stored = Math.max(0, save.stored + delta);
+                // Two different peaks: the one this run reached, shown on its summary, and
+                // the all-time best that the board ranks.
+                if (save.stored > game.runPeakStored) game.runPeakStored = save.stored;
+                if (save.stored > save.bestRunScore) save.bestRunScore = save.stored;
+            }
+
             function hasBankForCost(cost) {
                 for (const type of RESOURCE_TYPES) {
                     if (bankAmount(type) < costAmount(cost, type)) {
@@ -3724,6 +4137,7 @@
             }
 
             function spendBankForCost(cost) {
+                addStoredValue(-bankValueOfCost(cost));
                 for (const type of RESOURCE_TYPES) {
                     const amount = costAmount(cost, type);
                     if (amount <= 0) continue;
@@ -3737,6 +4151,7 @@
             }
 
             function refundBankForCost(cost) {
+                addStoredValue(bankValueOfCost(cost));
                 for (const type of RESOURCE_TYPES) {
                     const amount = costAmount(cost, type);
                     if (amount <= 0) continue;
@@ -4260,7 +4675,7 @@
             // What a painted minion hits for. Everything on your side does one damage a
             // swing otherwise, which is the number the chief's regeneration is set against.
             function minionStrikeDamage() {
-                return warPaintActive() ? WAR_PAINT_DAMAGE : 1;
+                return (warPaintActive() ? WAR_PAINT_DAMAGE : 1) + boonCount("keen-edge");
             }
 
             function incomingDamageMultiplier() {
@@ -4643,7 +5058,12 @@
                 setCapacityHud(currentInventoryCount, currentBagCapacity);
                 setHudNumber("essence", essenceEl, save.essence, (value) => String(value));
                 setHudNumber("wave", waveHudEl, Math.max(0, game.waveNumber), (value) => String(value));
-                const nextWaveText = formatWaveCountdown(game.waveBreakTimer);
+                const nextWaveText = game.waveInProgress
+                    ? "in progress"
+                    : `${formatWaveCountdown(game.waveBreakTimer)} \u00b7 ${nextWaveSummary()}`;
+                if (nextWaveChipEl) {
+                    nextWaveChipEl.classList.toggle("alert", !game.waveInProgress && (game.waveNumber + 1) % 10 === 0);
+                }
                 if (nextWaveHudEl.textContent !== nextWaveText) {
                     nextWaveHudEl.textContent = nextWaveText;
                 }
@@ -5340,21 +5760,213 @@
                 targetCtx.stroke();
                 targetCtx.setLineDash([]);
 
-                const label = `Sell +${formatCostShort(refund)}`;
-                targetCtx.font = mapFont(20, 700);
+                // Everything you can do to this turret, on the turret. Three short lines
+                // beat a legend somewhere else on the screen.
+                const level = turret.level || 0;
+                const upgrade = turretUpgradeCost(turret);
+                const lines = [
+                    level >= TURRET_MAX_LEVEL
+                        ? `Level ${level} - fully upgraded`
+                        : (upgrade && hasBankForCost(upgrade)
+                            ? `Level ${level} - click to upgrade (${formatCostShort(upgrade)})`
+                            : `Level ${level} - upgrade needs ${upgrade ? formatCostShort(upgrade) : "-"}`),
+                    `Shift-click: ${TURRET_PRIORITY_LABEL[turret.priority || "closest"]}`,
+                    `Right-click: sell +${formatCostShort(refund)}`
+                ];
+
+                targetCtx.font = mapFont(17, 700);
                 targetCtx.textAlign = "center";
                 targetCtx.textBaseline = "alphabetic";
-                const width = targetCtx.measureText(label).width + 21;
-                // Scales with the text, or a bigger label would sit outside its plate.
-                const boxHeight = Math.round(30 * MAP_TEXT_SCALE);
+                let width = 0;
+                for (const line of lines) width = Math.max(width, targetCtx.measureText(line).width + 21);
+                const lineHeight = Math.round(23 * MAP_TEXT_SCALE);
+                const boxHeight = lineHeight * lines.length + 10;
                 const boxTop = turret.y - 66 - (boxHeight - 30);
-                targetCtx.fillStyle = "#0b1422dd";
+                targetCtx.fillStyle = "#0b1422ee";
                 targetCtx.fillRect(turret.x - width / 2, boxTop, width, boxHeight);
                 targetCtx.strokeStyle = "#ffd16688";
                 targetCtx.lineWidth = 1.5;
                 targetCtx.strokeRect(turret.x - width / 2, boxTop, width, boxHeight);
                 targetCtx.fillStyle = "#ffd166";
-                targetCtx.fillText(label, turret.x, boxTop + 21);
+                lines.forEach((line, i) => {
+                    targetCtx.fillText(line, turret.x, boxTop + 20 + i * lineHeight);
+                });
+                targetCtx.restore();
+            }
+
+            // Only for enemies that have actually been hit: a bar over every full-health
+            // scout is noise, and the wave is mostly full-health scouts.
+            function drawEnemyHealthBars(targetCtx) {
+                targetCtx.save();
+                for (const enemy of game.enemies) {
+                    if (!enemy.maxHp || enemy.hp >= enemy.maxHp) continue;
+                    if (!circleInView(enemy.x, enemy.y, enemy.r + 20)) continue;
+
+                    const ratio = clamp(enemy.hp / enemy.maxHp, 0, 1);
+                    const barW = Math.max(18, enemy.r * 2.4);
+                    const barH = 4;
+                    const barX = enemy.x - barW * 0.5;
+                    const barY = enemy.y - enemy.r - 10;
+                    targetCtx.fillStyle = "#0b1422cc";
+                    targetCtx.fillRect(barX, barY, barW, barH);
+                    targetCtx.fillStyle = ratio > 0.5 ? "#8de969" : (ratio > 0.25 ? "#ffb366" : "#ff7f7f");
+                    targetCtx.fillRect(barX, barY, Math.max(0, barW * ratio), barH);
+                }
+                targetCtx.restore();
+            }
+
+            // Drawn in world space with the rest of the map layer, pinned above the tower
+            // so it is wherever the player is looking at the start of a run.
+            function drawTutorialBanner(targetCtx) {
+                const step = currentTutorialStep();
+                if (!step) return;
+
+                const text = step.text;
+                targetCtx.save();
+                targetCtx.font = mapFont(15, 700);
+                targetCtx.textAlign = "center";
+                targetCtx.textBaseline = "alphabetic";
+                const width = targetCtx.measureText(text).width + 30;
+                const height = Math.round(30 * MAP_TEXT_SCALE);
+                const x = cameraState.x + viewWorldW() / 2;
+                const y = cameraState.y + viewWorldH() * 0.14;
+                targetCtx.fillStyle = "#0b1422e6";
+                targetCtx.fillRect(x - width / 2, y, width, height);
+                targetCtx.strokeStyle = "#9be7ff66";
+                targetCtx.lineWidth = 1.5;
+                targetCtx.strokeRect(x - width / 2, y, width, height);
+                targetCtx.fillStyle = "#9be7ff";
+                targetCtx.fillText(text, x, y + height * 0.66);
+                targetCtx.restore();
+            }
+
+            // One rectangle over the camera's own view. Laid over the world but under the
+            // health bars and numbers, so the map darkens without the readouts going with
+            // it - a number you cannot read is not atmosphere, it is a bug.
+            // Drawn on the map rather than added to the header: that row had about forty
+            // spare pixels across it at 1080p and this is the kind of readout that belongs
+            // over the world anyway. Screen space, so it stays put as the camera moves.
+            function drawDayNightIndicator(targetCtx) {
+                if (!game.started) return;
+
+                const night = isNight();
+                const seconds = Math.ceil(ticksUntilPhaseEnd() / 60);
+                const clock = `${String(Math.floor(seconds / 60)).padStart(2, "0")}:${String(seconds % 60).padStart(2, "0")}`;
+                const label = `${night ? "Night" : "Day"} ${dayNumber()}`;
+
+                targetCtx.save();
+                targetCtx.font = mapFont(13, 700);
+                targetCtx.textBaseline = "alphabetic";
+                const text = `${label}  ${clock}`;
+                const width = targetCtx.measureText(text).width + 34;
+                const height = Math.round(26 * MAP_TEXT_SCALE);
+                const x = viewport.w - width - 10;
+                const y = 10;
+
+                targetCtx.fillStyle = night ? "#0c1630e6" : "#12243be6";
+                targetCtx.fillRect(x, y, width, height);
+                targetCtx.strokeStyle = night ? "#8fb6ff66" : "#ffd88a66";
+                targetCtx.lineWidth = 1.5;
+                targetCtx.strokeRect(x, y, width, height);
+
+                // Sun or moon, drawn rather than typed: an emoji here renders differently
+                // on every platform and would not match the rest of the map.
+                const orbX = x + 15;
+                const orbY = y + height / 2;
+                targetCtx.fillStyle = night ? "#cfe0ff" : "#ffd166";
+                targetCtx.beginPath();
+                targetCtx.arc(orbX, orbY, 6, 0, Math.PI * 2);
+                targetCtx.fill();
+                if (night) {
+                    // Bite a crescent out of it with the panel's own colour.
+                    targetCtx.fillStyle = "#0c1630";
+                    targetCtx.beginPath();
+                    targetCtx.arc(orbX + 3, orbY - 2, 5.4, 0, Math.PI * 2);
+                    targetCtx.fill();
+                }
+
+                targetCtx.textAlign = "left";
+                targetCtx.fillStyle = night ? "#cfe0ff" : "#ffe3ac";
+                targetCtx.fillText(text, x + 26, y + height * 0.66);
+                targetCtx.restore();
+            }
+
+            function drawNightTint(targetCtx) {
+                const factor = nightTintFactor();
+                if (factor <= 0) return;
+
+                targetCtx.save();
+                targetCtx.fillStyle = `rgba(${NIGHT_TINT_COLOR}, ${(factor * NIGHT_TINT_MAX).toFixed(3)})`;
+                targetCtx.fillRect(cameraState.x, cameraState.y, viewWorldW(), viewWorldH());
+
+                // The tower keeps its own light: a pool of warm ground around it that the
+                // dark does not take, so home always reads as home.
+                const glow = targetCtx.createRadialGradient(
+                    TOWER_CENTER_X, TOWER_CENTER_Y, 0,
+                    TOWER_CENTER_X, TOWER_CENTER_Y, TOWER_RADIUS * 4.2);
+                glow.addColorStop(0, `rgba(255, 196, 120, ${(factor * 0.22).toFixed(3)})`);
+                glow.addColorStop(1, "rgba(255, 196, 120, 0)");
+                targetCtx.fillStyle = glow;
+                targetCtx.beginPath();
+                targetCtx.arc(TOWER_CENTER_X, TOWER_CENTER_Y, TOWER_RADIUS * 4.2, 0, Math.PI * 2);
+                targetCtx.fill();
+                targetCtx.restore();
+            }
+
+            // A cold ring on anything that came out of the dark, so a night wave is
+            // readable as one at a glance rather than only in how hard it hits.
+            function drawNocturnalMarks(targetCtx) {
+                targetCtx.save();
+                targetCtx.lineWidth = 2;
+                for (const enemy of game.enemies) {
+                    if (!enemy.nocturnal) continue;
+                    if (!circleInView(enemy.x, enemy.y, enemy.r + 12)) continue;
+                    targetCtx.strokeStyle = "#8fb6ff9c";
+                    targetCtx.beginPath();
+                    targetCtx.arc(enemy.x, enemy.y, enemy.r + 5, 0, Math.PI * 2);
+                    targetCtx.stroke();
+                }
+                targetCtx.restore();
+            }
+
+            // A caravan that arrived after dusk is doing nothing, and doing nothing looks
+            // identical to being stuck. Say which it is.
+            function drawWaitingTraders(targetCtx) {
+                targetCtx.save();
+                targetCtx.font = mapFont(12, 700);
+                targetCtx.textAlign = "center";
+                targetCtx.textBaseline = "alphabetic";
+                for (const minion of game.minionUnits) {
+                    // Both conditions on purpose: a run reset leaves the flag set on a
+                    // caravan it has already sent home, and a label saying the market is
+                    // shut over a trader standing in the tower is worse than no label.
+                    if (minion.role !== "trader" || !minion.tradeWaiting) continue;
+                    if (minion.state !== "toVillage") continue;
+                    if (!circleInView(minion.x, minion.y, 30)) continue;
+                    targetCtx.fillStyle = "#0b1422cc";
+                    targetCtx.fillText("market shut", minion.x + 1, minion.y - 21);
+                    targetCtx.fillStyle = "#ffd88a";
+                    targetCtx.fillText("market shut", minion.x, minion.y - 22);
+                }
+                targetCtx.restore();
+            }
+
+            function drawFloaters(targetCtx) {
+                if (game.floaters.length === 0) return;
+                targetCtx.save();
+                targetCtx.textAlign = "center";
+                targetCtx.textBaseline = "alphabetic";
+                targetCtx.font = mapFont(13, 700);
+                for (const floater of game.floaters) {
+                    if (!circleInView(floater.x, floater.y, 24)) continue;
+                    const fade = Math.min(1, floater.ticks / (FLOATER_TICKS * 0.6));
+                    targetCtx.globalAlpha = fade;
+                    targetCtx.fillStyle = "#0b1422";
+                    targetCtx.fillText(floater.text, floater.x + 1, floater.y + 1);
+                    targetCtx.fillStyle = floater.color;
+                    targetCtx.fillText(floater.text, floater.x, floater.y);
+                }
+                targetCtx.globalAlpha = 1;
                 targetCtx.restore();
             }
 
@@ -7155,6 +7767,44 @@
                 drawTower(targetCtx);
             }
 
+            // What the next wave is worth bracing for: how many, and the worst thing in
+            // the mix. None of this was visible until it was already walking at you.
+            const WAVE_ENEMY_LABEL = {
+                scout: "scout",
+                brute: "brute",
+                wisp: "wisp",
+                hunter: "hunter"
+            };
+
+            // Kept deliberately terse. This shares the "Next" chip rather than getting one
+            // of its own: the header had about twenty spare pixels across it before any of
+            // this went in, and a second chip's icon, label, padding and border cost more
+            // than the text they would have carried.
+            function nextWaveSummary() {
+                const wave = game.waveNumber + 1;
+                const size = waveSizeFor(wave) + game.nextWaveSizeBonus;
+                const claimers = claimersForWave(wave);
+                const blight = claimers > 0 ? ` +${claimers}B` : "";
+                if (wave % 10 === 0) return `${size} +BOSS${blight}`;
+
+                let worst = "scout";
+                if (wave >= 3) worst = "brute";
+                if (wave >= 5) worst = "wisp";
+                if (wave >= 8) worst = "hunter";
+                return `${size} ${WAVE_ENEMY_LABEL[worst]}${blight}`;
+            }
+
+            function refreshSpeedUi() {
+                if (gameSpeedBtn) gameSpeedBtn.textContent = `${gameSpeed()}x`;
+            }
+
+            function cycleGameSpeed() {
+                const index = GAME_SPEEDS.indexOf(gameSpeed());
+                save.gameSpeed = GAME_SPEEDS[(index + 1) % GAME_SPEEDS.length];
+                refreshSpeedUi();
+                saveGame();
+            }
+
             function togglePause() {
                 if (!game.started) return;
                 // A finished run has nothing to resume - only New Run leaves this state.
@@ -7343,6 +7993,97 @@
                 resumeAfterSkillTreeClose = false;
             }
 
+            // Draft and event popovers pause the run the same way the skill tree does: an
+            // offer you have to read while a wave walks in is not an offer. `resumeAfter`
+            // is tracked per popover so closing one cannot resume a run the other paused.
+            let resumeAfterOfferClose = false;
+
+            function pauseForOffer() {
+                if (game.running) {
+                    togglePause();
+                    resumeAfterOfferClose = true;
+                }
+            }
+
+            function resumeAfterOffer() {
+                if (resumeAfterOfferClose && game.started && !game.running && !game.runOver) {
+                    togglePause();
+                }
+                resumeAfterOfferClose = false;
+            }
+
+            function openDraftPopover() {
+                if (!draftPopoverEl || !game.pendingDraft) return;
+                pauseForOffer();
+
+                draftSubtitleEl.textContent = `Wave ${game.waveNumber} cleared. Choose one - it lasts the rest of the run.`;
+                draftOptionsEl.innerHTML = game.pendingDraft
+                    .map((id) => {
+                        const boon = DRAFT_BOONS.find((entry) => entry.id === id);
+                        if (!boon) return "";
+                        const owned = boonCount(id);
+                        const stack = owned > 0 ? ` <span>(held x${owned})</span>` : "";
+                        return `<button class="secondary draft-option" data-draft-boon="${boon.id}">`
+                            + `<strong>${boon.label}</strong>${stack}<span>${boon.desc}</span></button>`;
+                    })
+                    .join("");
+
+                draftPopoverEl.classList.add("open");
+                draftPopoverEl.setAttribute("aria-hidden", "false");
+            }
+
+            function closeDraftPopover() {
+                if (!draftPopoverEl) return;
+                draftPopoverEl.classList.remove("open");
+                draftPopoverEl.setAttribute("aria-hidden", "true");
+                resumeAfterOffer();
+            }
+
+            function openEventPopover() {
+                if (!eventPopoverEl || !game.pendingEvent) return;
+                const event = RUN_EVENTS.find((entry) => entry.id === game.pendingEvent);
+                if (!event) { game.pendingEvent = null; return; }
+                pauseForOffer();
+
+                eventTitleEl.textContent = event.label.toUpperCase();
+                eventDescEl.textContent = event.desc;
+                eventAcceptBtn.textContent = event.acceptLabel;
+                eventPopoverEl.classList.add("open");
+                eventPopoverEl.setAttribute("aria-hidden", "false");
+            }
+
+            function closeEventPopover() {
+                if (!eventPopoverEl) return;
+                eventPopoverEl.classList.remove("open");
+                eventPopoverEl.setAttribute("aria-hidden", "true");
+                resumeAfterOffer();
+            }
+
+            if (draftOptionsEl) {
+                draftOptionsEl.addEventListener("click", (e) => {
+                    const button = e.target.closest("[data-draft-boon]");
+                    if (!button) return;
+                    resolveDraft(button.getAttribute("data-draft-boon"));
+                    closeDraftPopover();
+                    // A wave that is a multiple of both cadences owes an event as well.
+                    offerEventIfDue(game.waveNumber);
+                });
+            }
+
+            if (eventAcceptBtn) {
+                eventAcceptBtn.addEventListener("click", () => {
+                    acceptEvent();
+                    closeEventPopover();
+                });
+            }
+
+            if (eventDeclineBtn) {
+                eventDeclineBtn.addEventListener("click", () => {
+                    declineEvent();
+                    closeEventPopover();
+                });
+            }
+
             function random(min, max) {
                 return Math.random() * (max - min) + min;
             }
@@ -7395,7 +8136,7 @@
             function activeNodeCapForSpawner(spawnerIndex) {
                 const spawner = spawners[spawnerIndex];
                 if (!spawner) return BASE_ACTIVE_NODES_PER_SPAWNER;
-                return activeNodeCapForType(spawner.type);
+                return Math.max(1, Math.round(activeNodeCapForType(spawner.type) * modValue("nodeCapScale")));
             }
 
             function countActiveNodesForSpawner(spawnerIndex) {
@@ -7524,7 +8265,7 @@
                 const ageSpeedup = Math.min(0.55, ageSteps * 0.04);
                 const upgradeSpeedup = Math.min(0.4, spawnerLevelFor(type) * 0.04);
                 const speedup = Math.min(0.82, ageSpeedup + upgradeSpeedup);
-                const scaled = Math.round(baseRespawn * (1 - speedup));
+                const scaled = Math.round(baseRespawn * (1 - speedup) * modValue("respawnScale"));
                 return Math.max(14, scaled);
             }
 
@@ -7746,8 +8487,7 @@
             function bankWarChiefKill(enemy) {
                 save.warChiefKills += 1;
                 save.essence += 40 + save.warChiefKills * 20;
-                save.stored += WARCHIEF_TROPHY_SCORE * save.warChiefKills;
-                if (save.stored > save.bestRunScore) save.bestRunScore = save.stored;
+                addStoredValue(WARCHIEF_TROPHY_SCORE * save.warChiefKills);
                 // The fields stay yours: wiping them would mean recapturing everything
                 // before the next one could be provoked, which is busywork, not a fight.
                 game.warChiefMourning = WARCHIEF_MOURNING_TICKS;
@@ -7872,6 +8612,91 @@
                     if (spawner.timer > 0) continue;
                     activeNodes = spawnFromSpawnerWithActiveCount(spawner, i, activeNodes);
                 }
+            }
+
+            // How many times a boon has been drafted. Boons stack, so this is a count
+            // rather than a flag.
+            function boonCount(id) {
+                const boons = save.draftBoons;
+                if (!boons) return 0;
+                const value = boons[id];
+                return Number.isFinite(value) ? Math.max(0, Math.floor(value)) : 0;
+            }
+
+            function grantBoon(id) {
+                if (!save.draftBoons || typeof save.draftBoons !== "object") save.draftBoons = {};
+                save.draftBoons[id] = boonCount(id) + 1;
+                if (id === "bounty") save.essence += 30;
+                // Health is baked onto each minion when it is made, so a boon that
+                // changes the multiplier has to restate it on everything already alive.
+                if (id === "iron-posts") syncMinionHealthToSkills();
+                saveGame();
+                refreshHud();
+            }
+
+            // Temporary event effects live on `game` rather than `save.*` levels: they
+            // are measured in ticks and have no meaning once the run is over.
+            function eventEssenceMultiplier() {
+                return game.eventEssenceTicks > 0 ? 3 : 1;
+            }
+
+            function eventYieldMultiplier() {
+                return game.eventYieldTicks > 0 ? 2 : 1;
+            }
+
+            function runModifier() {
+                const found = RUN_MODIFIERS.find((entry) => entry.id === save.runModifier);
+                return found || RUN_MODIFIERS[0];
+            }
+
+            function modValue(key) {
+                const mod = runModifier();
+                const value = mod[key];
+                return value === undefined ? RUN_MODIFIER_DEFAULTS[key] : value;
+            }
+
+            // Which resource grows where, shuffled inside each distance ring. Tier decides
+            // how far out a field sits and therefore what it is worth to walk to, so
+            // shuffling across tiers would rewrite the economy rather than the map. Within
+            // a ring it only changes which way you set off, which is the part worth
+            // varying. The tribe's ivory fields are never touched.
+            function rollFieldTypes() {
+                const byTier = new Map();
+                for (let i = 0; i < MEADOW_SPAWNER_COUNT; i += 1) {
+                    const tier = SPAWNER_LAYOUT[i].tier;
+                    if (!byTier.has(tier)) byTier.set(tier, []);
+                    byTier.get(tier).push(i);
+                }
+
+                const types = SPAWNER_LAYOUT.map((entry) => entry.type);
+                for (const indices of byTier.values()) {
+                    const pool = indices.map((index) => SPAWNER_LAYOUT[index].type);
+                    for (let i = pool.length - 1; i > 0; i -= 1) {
+                        const j = Math.floor(Math.random() * (i + 1));
+                        const swap = pool[i];
+                        pool[i] = pool[j];
+                        pool[j] = swap;
+                    }
+                    indices.forEach((index, slot) => { types[index] = pool[slot]; });
+                }
+                return types;
+            }
+
+            // Writes the rolled layout onto the fields themselves. The terrain sprites are
+            // built from a field's type, so the cache has to go with it - otherwise the
+            // new wood field keeps last run's amber ground.
+            function applyFieldTypes() {
+                const types = Array.isArray(save.fieldTypes) ? save.fieldTypes : null;
+                for (let i = 0; i < MEADOW_SPAWNER_COUNT; i += 1) {
+                    const type = types && materialConfig[types[i]] ? types[i] : SPAWNER_LAYOUT[i].type;
+                    spawners[i].type = type;
+                }
+                spawnTerrainPatches = null;
+            }
+
+            function rollRunLayout() {
+                save.fieldTypes = rollFieldTypes();
+                save.runModifier = RUN_MODIFIERS[Math.floor(Math.random() * RUN_MODIFIERS.length)].id;
             }
 
             function seedWorld() {
@@ -8076,6 +8901,7 @@
                 let multiplier = 1;
                 if (isSkillUnlocked("minionArmor")) multiplier *= MINION_ARMOR_MULTIPLIER;
                 if (isSkillUnlocked("minionArmor2")) multiplier *= MINION_ARMOR_MULTIPLIER;
+                multiplier *= Math.pow(1.5, boonCount("iron-posts"));
                 return multiplier;
             }
 
@@ -8151,6 +8977,7 @@
                     tradeRoute: normalizedTradeRoute(savedRoute),
                     tradeDwell: 0,
                     tradeCarryRoute: null,
+                    tradeWaiting: false,
                     carryTurret: null,
                     speed: minionMoveSpeed(resolvedSlot) + minionRoleSpeedBonus(role)
                 };
@@ -8160,12 +8987,14 @@
                 return unit;
             }
 
-            function createTurretAt(x, y, type = "basic") {
+            function createTurretAt(x, y, type = "basic", level = 0, priority = "closest") {
                 const point = clampTurretPoint(x, y);
                 return {
                     x: point.x,
                     y: point.y,
                     type,
+                    level: clamp(Math.floor(level) || 0, 0, TURRET_MAX_LEVEL),
+                    priority: TURRET_PRIORITIES.indexOf(priority) === -1 ? "closest" : priority,
                     // Settled at placement, which is rare, rather than asked every shot.
                     bank: bankOf(point.x, point.y),
                     cooldown: 0,
@@ -8211,7 +9040,7 @@
                 for (let i = 0; i < maxPlaced; i += 1) {
                     const p = placements[i];
                     if (!p || !Number.isFinite(p.x) || !Number.isFinite(p.y)) continue;
-                    game.turrets.push(createTurretAt(p.x, p.y, "basic"));
+                    game.turrets.push(createTurretAt(p.x, p.y, "basic", p.level, p.priority));
                     placedBasics += 1;
                 }
 
@@ -8219,7 +9048,7 @@
                 for (let i = 0; i < maxSniperPlaced; i += 1) {
                     const p = sniperPlacements[i];
                     if (!p || !Number.isFinite(p.x) || !Number.isFinite(p.y)) continue;
-                    game.turrets.push(createTurretAt(p.x, p.y, "sniper"));
+                    game.turrets.push(createTurretAt(p.x, p.y, "sniper", p.level, p.priority));
                     placedSnipers += 1;
                 }
 
@@ -8227,7 +9056,7 @@
                 for (let i = 0; i < maxSlowPlaced; i += 1) {
                     const p = slowPlacements[i];
                     if (!p || !Number.isFinite(p.x) || !Number.isFinite(p.y)) continue;
-                    game.turrets.push(createTurretAt(p.x, p.y, "slow"));
+                    game.turrets.push(createTurretAt(p.x, p.y, "slow", p.level, p.priority));
                     placedSlow += 1;
                 }
 
@@ -8264,7 +9093,8 @@
             const TURRET_HASTE_BONUS = 0.3;
 
             function turretFireRateMultiplier() {
-                return isSkillUnlocked("turretHaste") ? 1 + TURRET_HASTE_BONUS : 1;
+                const base = isSkillUnlocked("turretHaste") ? 1 + TURRET_HASTE_BONUS : 1;
+                return base + boonCount("sharp-sentries") * 0.2;
             }
 
             function turretRangeForType(type) {
@@ -8320,6 +9150,21 @@
                 return parts.join(" ");
             }
 
+            // A placed turret used to be finished with you: no upgrade, no targeting, no
+            // reason to ever look at it again, so the defensive half of the game played
+            // itself once it was set up. A level and a firing order are two things worth
+            // walking back to a turret for.
+            const TURRET_MAX_LEVEL = 5;
+            const TURRET_UPGRADE_BASE = 18;
+            const TURRET_UPGRADE_STEP = 14;
+            // Which enemy a turret picks out of the ones it can reach.
+            const TURRET_PRIORITIES = ["closest", "strongest", "leader"];
+            const TURRET_PRIORITY_LABEL = {
+                closest: "Nearest",
+                strongest: "Toughest",
+                leader: "Closest to tower"
+            };
+
             const TURRET_SELL_RATE = 0.75;
             const TURRET_PICK_RADIUS = W(20);
 
@@ -8366,6 +9211,106 @@
                 const route = TRADE_ROUTES.find((entry) => entry.turret === type);
                 if (!route) return null;
                 return { [route.from]: TURRET_TRADE_BASE[type] + owned * TURRET_TRADE_STEP[type] };
+            }
+
+            function turretUpgradeCost(turret) {
+                const route = TRADE_ROUTES.find((entry) => entry.turret === turret.type);
+                if (!route) return null;
+                const level = turret.level || 0;
+                return { [route.from]: TURRET_UPGRADE_BASE + level * TURRET_UPGRADE_STEP };
+            }
+
+            // A level is worth the same as roughly one more turret of that kind, spread
+            // over damage and reach so a levelled sniper covers ground a fresh one cannot.
+            function turretShotDamage(turret) {
+                const level = turret.level || 0;
+                return turret.type === "sniper" ? 3 + level * 2 : 1 + level;
+            }
+
+            function turretRangeFor(turret) {
+                const level = turret.level || 0;
+                return turretRangeForType(turret.type) * (1 + level * 0.08);
+            }
+
+            function upgradeTurretAt(x, y) {
+                const index = findTurretIndexAt(x, y);
+                if (index === -1) return false;
+                const turret = game.turrets[index];
+                if ((turret.level || 0) >= TURRET_MAX_LEVEL) return false;
+
+                const cost = turretUpgradeCost(turret);
+                if (!cost || !hasBankForCost(cost)) return false;
+                spendBankForCost(cost);
+                turret.level = (turret.level || 0) + 1;
+                syncPlacementFromTurret(turret);
+                saveGame();
+                refreshHud();
+                return true;
+            }
+
+            function cycleTurretPriorityAt(x, y) {
+                const index = findTurretIndexAt(x, y);
+                if (index === -1) return false;
+                const turret = game.turrets[index];
+                const current = TURRET_PRIORITIES.indexOf(turret.priority);
+                turret.priority = TURRET_PRIORITIES[(current + 1) % TURRET_PRIORITIES.length];
+                syncPlacementFromTurret(turret);
+                saveGame();
+                refreshHud();
+                return true;
+            }
+
+            // Levels live on the placement so they survive a reload; the live turret is
+            // the thing that gets edited, so the placement is restated from it.
+            function syncPlacementFromTurret(turret) {
+                const placements = placementsForTurretType(turret.type);
+                let bestIndex = -1;
+                let bestDistSq = Infinity;
+                for (let i = 0; i < placements.length; i += 1) {
+                    const p = placements[i];
+                    if (!p || !Number.isFinite(p.x) || !Number.isFinite(p.y)) continue;
+                    const dx = p.x - turret.x;
+                    const dy = p.y - turret.y;
+                    const distSq = dx * dx + dy * dy;
+                    if (distSq < bestDistSq) {
+                        bestDistSq = distSq;
+                        bestIndex = i;
+                    }
+                }
+                if (bestIndex === -1) return;
+                placements[bestIndex].level = turret.level || 0;
+                placements[bestIndex].priority = turret.priority || "closest";
+            }
+
+            // "Nearest" is the old behaviour and still the default. "Toughest" is what you
+            // want a sniper doing while sentries mop up; "Closest to tower" is what stops a
+            // leaker while the rest of the wave is still walking.
+            function findTurretTargetIndex(turret, range, bank) {
+                const priority = turret.priority || "closest";
+                if (priority === "closest") return findClosestEnemyIndexFrom(turret.x, turret.y, range, bank);
+
+                const rangeSq = range * range;
+                let bestIndex = -1;
+                let bestScore = -Infinity;
+                for (let i = 0; i < game.enemies.length; i += 1) {
+                    const enemy = game.enemies[i];
+                    if (bank === -1 ? trackBank(enemy) !== -1 : trackBank(enemy) === -1) continue;
+                    const dx = enemy.x - turret.x;
+                    const dy = enemy.y - turret.y;
+                    const distSq = dx * dx + dy * dy;
+                    if (distSq > rangeSq) continue;
+
+                    // Toughest goes by what is left standing, not what it started with, so
+                    // a nearly-dead brute stops soaking shots a scout would have taken.
+                    const score = priority === "strongest"
+                        ? enemy.hp
+                        : -(enemy.x * enemy.x + enemy.y * enemy.y);   // tower sits at the origin
+                    if (score > bestScore) {
+                        bestScore = score;
+                        bestIndex = i;
+                    }
+                }
+                return bestIndex;
             }
 
             function turretSellValue(type) {
@@ -8551,6 +9496,7 @@
                         }
                         minion.carryType = null;
                         minion.carryLoad = 0;
+                        minion.tradeWaiting = false;
                         minion.carry.wood = 0;
                         minion.carry.stone = 0;
                         minion.carry.crystal = 0;
@@ -8580,7 +9526,7 @@
                 game.player.x = 0;
                 game.player.y = 0;
                 centerCameraOn(game.player.x, game.player.y);
-                game.player.speed = BASE_PLAYER_SPEED + save.speedLevel * PLAYER_SPEED_LEVEL_STEP;
+                game.player.speed = playerSpeedValue();
                 game.player.stamina = PLAYER_STAMINA_MAX;
                 game.inventory.wood = 0;
                 game.inventory.stone = 0;
@@ -8598,6 +9544,13 @@
                 game.waveBreakTimer = WAVE_START_DELAY;
                 game.waveInProgress = false;
                 game.waveIntroPendingType = null;
+                game.pendingDraft = null;
+                game.pendingEvent = null;
+                game.floaters = [];
+                game.runPeakStored = 0;
+                game.eventEssenceTicks = 0;
+                game.eventYieldTicks = 0;
+                game.nextWaveSizeBonus = 0;
                 game.towerHp = TOWER_MAX_HP;
                 game.minionHasteTicks = 0;
                 game.warPaintTicks = 0;
@@ -8620,6 +9573,9 @@
                 game.nextMinionId = 1;
                 game.nextMinionSlot = 0;
                 game.nextEnemyId = 1;
+                // Before the world is seeded: the first nodes have to grow the resource
+                // this run's field actually carries.
+                applyFieldTypes();
                 seedWorld();
                 syncMinionUnits(true);
                 syncTurretsFromSave();
@@ -8631,6 +9587,7 @@
             // saved run is meant to be picked up rather than thrown away.
             function startRun() {
                 Object.assign(save, freshRunState());
+                rollRunLayout();
                 resetSession();
                 saveGame();
             }
@@ -8826,8 +9783,7 @@
                     + gainedAmber * materialConfig.amber.value
                     + gainedAether * materialConfig.aether.value
                     + gainedIvory * materialConfig.ivory.value;
-                save.stored += gained;
-                if (save.stored > save.bestRunScore) save.bestRunScore = save.stored;
+                addStoredValue(gained);
                 save.bankWood += gainedWood;
                 save.bankStone += gainedStone;
                 save.bankCrystal += gainedCrystal;
@@ -8874,69 +9830,6 @@
                 return false;
             }
 
-            function spawnEnemy() {
-                const side = Math.floor(Math.random() * 4);
-                const margin = W(16);
-                let x = 0;
-                let y = 0;
-
-                if (side === 0) {
-                    x = random(world.minX + margin, world.maxX - margin);
-                    y = world.minY + margin;
-                } else if (side === 1) {
-                    x = world.maxX - margin;
-                    y = random(world.minY + margin, world.maxY - margin);
-                } else if (side === 2) {
-                    x = random(world.minX + margin, world.maxX - margin);
-                    y = world.maxY - margin;
-                } else {
-                    x = world.minX + margin;
-                    y = random(world.minY + margin, world.maxY - margin);
-                }
-
-                const ageTier = Math.floor(save.worldAge / 1800);
-                const scoutWeight = Math.max(0.2, 1.15 - ageTier * 0.03);
-                const bruteWeight = Math.min(1.3, 0.18 + ageTier * 0.04);
-                const wispWeight = Math.min(1.2, 0.35 + ageTier * 0.03);
-                const hunterWeight = game.dayTick >= HUNTER_UNLOCK_TICKS
-                    ? Math.min(1.1, 0.1 + ageTier * 0.05)
-                    : 0;
-                const totalWeight = scoutWeight + bruteWeight + wispWeight + hunterWeight;
-                const roll = Math.random() * totalWeight;
-
-                let enemyType = enemyTypeConfig.scout;
-                if (roll > scoutWeight + bruteWeight + wispWeight) {
-                    enemyType = enemyTypeConfig.hunter;
-                } else if (roll > scoutWeight + bruteWeight) {
-                    enemyType = enemyTypeConfig.wisp;
-                } else if (roll > scoutWeight) {
-                    enemyType = enemyTypeConfig.brute;
-                }
-
-                return {
-                    id: game.nextEnemyId++,
-                    x,
-                    y,
-                    type: enemyType.key,
-                    color: enemyType.color,
-                    stroke: enemyType.stroke,
-                    shape: enemyType.shape,
-                    r: enemyType.r,
-                    hp: enemyType.hp,
-                    speed: enemyType.speed + W(Math.min(0.55, ageTier * 0.02)),
-                    baseSpeed: enemyType.speed + W(Math.min(0.55, ageTier * 0.02)),
-                    damage: enemyType.damage,
-                    minionFocus: enemyType.minionFocus,
-                    minionShotRange: enemyType.minionShotRange,
-                    minionShotCooldownMax: enemyType.minionShotCooldown,
-                    laserColor: enemyType.laserColor,
-                    minionShotCooldown: 0,
-                    ticksSinceMinionKill: 0,
-                    shotFlash: 0,
-                    shotTargetX: x,
-                    shotTargetY: y
-                };
-            }
 
             function spawnEnemyOfType(typeKey) {
                 if (typeKey === "boss") {
@@ -8965,6 +9858,16 @@
                 }
 
                 const ageTier = Math.floor(save.worldAge / 1800);
+                // Ghouls, blights and wardens are not part of a wave's count and never
+                // push the tower, so they take the softer curve - see OFFWAVE_HP_SCALE_ROOT.
+                const offWave = enemyType.roams === true || enemyType.tribe === true
+                    || enemyType.claimsSpawner === true;
+                // What comes out of the dark is worse than what comes out of the light,
+                // and it keeps that for its whole life: the buff is stamped at spawn, so a
+                // thing born at night is still a night thing when the sun catches it.
+                const nocturnal = !offWave && isNight();
+                const nightHp = nocturnal ? NIGHT_ENEMY_HP_SCALE : 1;
+                const scaledHp = Math.max(1, Math.round(scaledEnemyHp(enemyType.hp, game.waveNumber, offWave) * nightHp));
                 return {
                     id: game.nextEnemyId++,
                     x,
@@ -8974,10 +9877,12 @@
                     stroke: enemyType.stroke,
                     shape: enemyType.shape,
                     r: enemyType.r,
-                    hp: enemyType.hp,
-                    speed: enemyType.speed + W(Math.min(0.55, ageTier * 0.02)),
-                    baseSpeed: enemyType.speed + W(Math.min(0.55, ageTier * 0.02)),
-                    damage: enemyType.damage,
+                    hp: scaledHp,
+                    maxHp: scaledHp,
+                    nocturnal,
+                    speed: (enemyType.speed + W(Math.min(0.55, ageTier * 0.02))) * modValue("enemySpeedScale") * (nocturnal ? NIGHT_ENEMY_SPEED_SCALE : 1),
+                    baseSpeed: (enemyType.speed + W(Math.min(0.55, ageTier * 0.02))) * modValue("enemySpeedScale") * (nocturnal ? NIGHT_ENEMY_SPEED_SCALE : 1),
+                    damage: Math.round(enemyType.damage * enemyDamageMultiplier(game.waveNumber)),
                     minionFocus: enemyType.minionFocus,
                     minionShotRange: enemyType.minionShotRange,
                     minionShotCooldownMax: enemyType.minionShotCooldown,
@@ -9133,7 +10038,7 @@
                 const bearing = Math.random() * Math.PI * 2;
                 const originX = anchor.x + Math.cos(bearing) * GHOUL_SPAWN_DISTANCE;
                 const originY = anchor.y + Math.sin(bearing) * GHOUL_SPAWN_DISTANCE;
-                const size = Math.floor(random(GHOUL_HORDE_MIN, GHOUL_HORDE_MAX + 1));
+                const size = Math.floor(random(GHOUL_HORDE_MIN, GHOUL_HORDE_MAX + 1)) + modValue("ghoulHordeBonus");
 
                 for (let i = 0; i < size; i += 1) {
                     if (countGhouls() >= GHOUL_MAX_ALIVE) return;
@@ -9150,7 +10055,8 @@
 
             function claimersForWave(waveNumber) {
                 if (waveNumber < CLAIM_FIRST_WAVE) return 0;
-                if ((waveNumber - CLAIM_FIRST_WAVE) % CLAIM_WAVE_INTERVAL !== 0) return 0;
+                const interval = Math.max(1, Math.round(CLAIM_WAVE_INTERVAL * modValue("claimIntervalScale")));
+                if ((waveNumber - CLAIM_FIRST_WAVE) % interval !== 0) return 0;
                 return 1 + Math.floor((waveNumber - CLAIM_FIRST_WAVE) / CLAIM_EXTRA_EVERY_WAVES);
             }
 
@@ -9204,7 +10110,9 @@
                 }
 
                 const tier = Math.max(1, milestone);
-                const hp = 10 + tier * 6;
+                const nocturnal = isNight();
+                const hp = Math.max(1, Math.round((10 + tier * 6) * enemyHpMultiplier(game.waveNumber)
+                    * (nocturnal ? NIGHT_ENEMY_HP_SCALE : 1)));
                 const baseSpeed = 0.9 + Math.min(0.9, tier * 0.04);
 
                 return {
@@ -9217,6 +10125,8 @@
                     shape: "square",
                     r: Math.min(E(24), E(14) + Math.floor(tier * 0.35 * WORLD_SCALE)),
                     hp,
+                    maxHp: hp,
+                    nocturnal,
                     speed: baseSpeed * WORLD_SCALE * ENEMY_SPEED_MULTIPLIER,
                     baseSpeed: baseSpeed * WORLD_SCALE * ENEMY_SPEED_MULTIPLIER,
                     damage: 16 + tier * 2,
@@ -9240,8 +10150,26 @@
                 return null;
             }
 
+            // Wave enemies and bosses take the full curve; everything that answers to its
+            // own clock takes its root. `waveNumber` is read at spawn, so a unit keeps the
+            // strength of the wave it arrived on rather than growing in place.
+            function enemyHpMultiplier(waveNumber) {
+                const wave = Math.max(0, waveNumber);
+                return (1 + wave * ENEMY_HP_LINEAR_PER_WAVE) * Math.pow(ENEMY_HP_COMPOUND_PER_WAVE, wave);
+            }
+
+            function enemyDamageMultiplier(waveNumber) {
+                return 1 + Math.max(0, waveNumber) * ENEMY_DAMAGE_LINEAR_PER_WAVE;
+            }
+
+            function scaledEnemyHp(baseHp, waveNumber, offWave) {
+                const full = enemyHpMultiplier(waveNumber);
+                const mult = offWave ? Math.pow(full, OFFWAVE_HP_SCALE_ROOT) : full;
+                return Math.max(1, Math.round(baseHp * mult * modValue("enemyHpScale")));
+            }
+
             function waveSpawnInterval() {
-                return Math.max(WAVE_SPAWN_INTERVAL_MIN, WAVE_SPAWN_INTERVAL_BASE - Math.floor(game.waveNumber * 0.05));
+                return Math.max(WAVE_SPAWN_INTERVAL_MIN, WAVE_SPAWN_INTERVAL_BASE - Math.floor(game.waveNumber * 0.3));
             }
 
             function waveSizeFor(waveNumber) {
@@ -9249,15 +10177,15 @@
                 const slowGrowth = 1
                     + Math.floor(Math.log2(waveNumber + 1) * 1.7)
                     + Math.floor(waveNumber / 12);
-                return Math.min(18, Math.max(1, slowGrowth));
+                return Math.min(WAVE_SIZE_MAX, Math.max(1, slowGrowth + modValue("waveSizeBonus")));
             }
 
             function activeEnemyLimitForWave(waveNumber) {
-                return Math.min(12, 2 + Math.floor(waveNumber * 0.35));
+                return Math.min(ACTIVE_ENEMY_MAX, 2 + Math.floor(waveNumber * 0.35));
             }
 
             function waveBreakDuration(waveNumber) {
-                return WAVE_BREAK_TICKS + Math.min(280, Math.floor(waveNumber * 6));
+                return Math.round((WAVE_BREAK_TICKS + Math.min(280, Math.floor(waveNumber * 6))) * modValue("waveBreakScale"));
             }
 
             function pickWaveEnemyType(waveNumber) {
@@ -9276,17 +10204,83 @@
                 return picks[picks.length - 1].type;
             }
 
+            // Offered in the break after a wave, never during one: a decision you have to
+            // make while something is walking at the tower is not a decision.
+            function offerDraftIfDue(clearedWave) {
+                if (clearedWave <= 0 || clearedWave % DRAFT_EVERY_WAVES !== 0) return false;
+                const pool = DRAFT_BOONS.slice();
+                const options = [];
+                for (let i = 0; i < DRAFT_OPTION_COUNT && pool.length > 0; i += 1) {
+                    options.push(pool.splice(Math.floor(Math.random() * pool.length), 1)[0].id);
+                }
+                if (options.length === 0) return false;
+                game.pendingDraft = options;
+                openDraftPopover();
+                return true;
+            }
+
+            function offerEventIfDue(clearedWave) {
+                if (clearedWave <= 0 || clearedWave % EVENT_EVERY_WAVES !== 0) return false;
+                game.pendingEvent = RUN_EVENTS[Math.floor(Math.random() * RUN_EVENTS.length)].id;
+                openEventPopover();
+                return true;
+            }
+
+            function resolveDraft(boonId) {
+                if (!game.pendingDraft || game.pendingDraft.indexOf(boonId) === -1) return;
+                game.pendingDraft = null;
+                grantBoon(boonId);
+                captureRuntimeSnapshot();
+            }
+
+            // The whole trade, gift and price together, so declining is always just
+            // nothing happening.
+            function acceptEvent() {
+                const eventId = game.pendingEvent;
+                game.pendingEvent = null;
+                if (eventId === "blight-surge") {
+                    spawnClaimers(3);
+                    game.eventEssenceTicks = 3600;
+                } else if (eventId === "war-drums") {
+                    game.nextWaveSizeBonus += 6;
+                    save.essence += 50;
+                } else if (eventId === "forced-march") {
+                    game.eventYieldTicks = 2700;
+                    game.towerHp = Math.max(1, game.towerHp - 12);
+                } else if (eventId === "old-bones") {
+                    spawnGhoulHorde();
+                    bloomFields();
+                }
+                saveGame();
+                refreshHud();
+                captureRuntimeSnapshot();
+            }
+
+            function declineEvent() {
+                game.pendingEvent = null;
+                captureRuntimeSnapshot();
+            }
+
             function startNextWave() {
                 game.waveNumber += 1;
                 if (game.waveNumber > save.bestRunWave) save.bestRunWave = game.waveNumber;
                 spawnClaimers(claimersForWave(game.waveNumber));
-                game.waveRemainingSpawns = waveSizeFor(game.waveNumber);
+                game.waveRemainingSpawns = waveSizeFor(game.waveNumber) + game.nextWaveSizeBonus;
+                game.nextWaveSizeBonus = 0;
                 game.waveSpawnTimer = 0;
                 game.waveInProgress = true;
                 game.waveIntroPendingType = waveIntroEnemyType(game.waveNumber);
             }
 
             function essenceFromEnemy(enemy) {
+                // Paid at the rate of the hour it dies in, not the hour it was born in:
+                // the risk being priced is standing out there in the dark right now.
+                const nightRate = isNight() ? NIGHT_ESSENCE_SCALE : 1;
+                return Math.round(baseEssenceFromEnemy(enemy) * modValue("essenceScale")
+                    * eventEssenceMultiplier() * nightRate);
+            }
+
+            function baseEssenceFromEnemy(enemy) {
                 if (!enemy) return 0;
                 if (enemy.type === "boss") return 8;
                 if (enemy.type === "warchief") return 0;   // paid out by bankWarChiefKill
@@ -9295,6 +10289,26 @@
                 if (enemy.roams) return GHOUL_ESSENCE;
                 if (enemy.type === "hunter") return 2;
                 return 1;
+            }
+
+            // Short-lived numbers that drift up off whatever was hit. Capped, because a
+            // maxed defence firing into a full wave can produce them faster than they
+            // expire and an unbounded list would be a per-frame cost that only grows.
+            const FLOATER_MAX = 60;
+            const FLOATER_TICKS = 42;
+
+            function addFloater(x, y, text, color) {
+                if (game.floaters.length >= FLOATER_MAX) game.floaters.shift();
+                game.floaters.push({ x, y, text, color, ticks: FLOATER_TICKS });
+            }
+
+            function updateFloaters() {
+                for (let i = game.floaters.length - 1; i >= 0; i -= 1) {
+                    const floater = game.floaters[i];
+                    floater.ticks -= 1;
+                    floater.y -= 0.55;
+                    if (floater.ticks <= 0) game.floaters.splice(i, 1);
+                }
             }
 
             function defeatEnemyAt(index) {
@@ -9318,6 +10332,18 @@
                 // case of a run that ends without ever having banked a new record.
                 if (save.stored > save.bestRunScore) save.bestRunScore = save.stored;
                 save.runsPlayed += 1;
+
+                if (!Array.isArray(save.runHistory)) save.runHistory = [];
+                save.runHistory.push({
+                    run: save.runsPlayed,
+                    wave: game.waveNumber,
+                    score: save.stored,
+                    peak: game.runPeakStored,
+                    modifier: runModifier().label
+                });
+                if (save.runHistory.length > RUN_HISTORY_MAX) {
+                    save.runHistory = save.runHistory.slice(-RUN_HISTORY_MAX);
+                }
 
                 game.runSummary = {
                     wave: game.waveNumber,
@@ -9438,7 +10464,10 @@
                 updateTribeGuards();
                 game.ghoulTimer -= 1;
                 if (game.ghoulTimer <= 0) {
-                    game.ghoulTimer = GHOUL_INTERVAL_TICKS;
+                    // Ghouls are the one thing that likes the dark on its own account.
+                    game.ghoulTimer = Math.max(60, Math.round(GHOUL_INTERVAL_TICKS
+                        * modValue("ghoulIntervalScale")
+                        * (isNight() ? NIGHT_GHOUL_INTERVAL_SCALE : 1)));
                     spawnGhoulHorde();
                 }
 
@@ -9541,14 +10570,14 @@
                         claimTarget.claimedBy = enemy.id;
                         // A full interval before the first node goes, so arriving and
                         // stripping the field are not the same moment.
-                        enemy.consumeCooldown = CLAIM_CONSUME_TICKS;
+                        enemy.consumeCooldown = Math.round(CLAIM_CONSUME_TICKS * (1 + boonCount("warded-fields") * 0.8));
                         playTowerHitSfx(4);
                     }
 
                     if (claimTarget && claimTarget.claimedBy === enemy.id) {
                         enemy.consumeCooldown -= 1;
                         if (enemy.consumeCooldown <= 0) {
-                            enemy.consumeCooldown = CLAIM_CONSUME_TICKS;
+                            enemy.consumeCooldown = Math.round(CLAIM_CONSUME_TICKS * (1 + boonCount("warded-fields") * 0.8));
                             consumeClaimedNode(enemy, enemy.claimTargetIndex);
                         }
                     }
@@ -9649,6 +10678,9 @@
                 if (game.waveInProgress && game.waveRemainingSpawns <= 0 && countWaveEnemies() === 0) {
                     game.waveInProgress = false;
                     game.waveBreakTimer = waveBreakDuration(game.waveNumber);
+                    // Draft first: it is the more interesting of the two, and the offsets
+                    // mean they only ever land together on a multiple of both.
+                    if (!offerDraftIfDue(game.waveNumber)) offerEventIfDue(game.waveNumber);
                 }
             }
 
@@ -9719,10 +10751,10 @@
                     // Rounded because cooldown ticks down in whole steps - a fractional
                     // value wastes most of a tick and quietly eats part of the bonus.
                     const fireCooldown = Math.max(1, Math.round(baseCooldown / turretFireRateMultiplier()));
-                    const range = isSniper ? SNIPER_TURRET_RANGE : BASIC_TURRET_RANGE;
-                    const shotDamage = isSniper ? 3 : 1;
+                    const range = turretRangeFor(turret);
+                    const shotDamage = turretShotDamage(turret);
 
-                    const enemyIndex = findClosestEnemyIndexFrom(turret.x, turret.y, range, turret.bank === -1 ? -1 : 1);
+                    const enemyIndex = findTurretTargetIndex(turret, range, turret.bank === -1 ? -1 : 1);
                     if (enemyIndex === -1) continue;
 
                     const enemy = game.enemies[enemyIndex];
@@ -9731,6 +10763,7 @@
                     turret.flash = isSniper ? 7 : 4;
                     turret.cooldown = fireCooldown;
                     enemy.hp -= shotDamage;
+                    addFloater(enemy.x, enemy.y - enemy.r, String(shotDamage), isSniper ? "#9be7ff" : "#ffd166");
 
                     if (enemy.hp <= 0) {
                         defeatEnemyAt(enemyIndex);
@@ -9742,9 +10775,10 @@
                 // Chill is a slow field over the whole map for as long as it runs, so it
                 // enters here rather than as a second speed term at every call site.
                 let slowMultiplier = chillSpellActive() ? CHILL_SPELL_SPEED_MULTIPLIER : 1;
-                const slowRadiusSq = SLOW_FIELD_RADIUS * SLOW_FIELD_RADIUS;
                 for (const turret of game.turrets) {
                     if (turret.type !== "slow") continue;
+                    const slowRadius = turretRangeFor(turret);
+                    const slowRadiusSq = slowRadius * slowRadius;
                     const dx = enemy.x - turret.x;
                     const dy = enemy.y - turret.y;
                     if (dx * dx + dy * dy <= slowRadiusSq) {
@@ -9798,6 +10832,7 @@
                 minion.carryType = null;
                 minion.carryLoad = 0;
                 minion.tradeCarryRoute = null;
+                minion.tradeWaiting = false;
                 minion.state = "idle";
             }
 
@@ -9832,8 +10867,7 @@
                     + bankAmberGain * materialConfig.amber.value
                     + bankAetherGain * materialConfig.aether.value
                     + bankIvoryGain * materialConfig.ivory.value;
-                save.stored += gainedValue;
-                if (save.stored > save.bestRunScore) save.bestRunScore = save.stored;
+                addStoredValue(gainedValue);
                 game.minionPulse = Math.min(999, game.minionPulse + gainedValue);
 
                 minion.carryType = null;
@@ -9979,7 +11013,9 @@
                         moveEntityTowards(minion, enemy.x, enemy.y, minionTravelSpeed(minion, 1, DEFENDER_CHASE_SPEED_BONUS));
                         const strikeRange = W(12) + enemy.r;
                         if (distanceSq(minion, enemy) <= strikeRange * strikeRange && minion.attackCooldown <= 0) {
-                            enemy.hp -= minionStrikeDamage();
+                            const strike = minionStrikeDamage();
+                            enemy.hp -= strike;
+                            addFloater(enemy.x, enemy.y - enemy.r, String(strike), "#ffb08a");
                             minion.attackCooldown = 24;
                             minion.attackFlash = 5;
 
@@ -10023,9 +11059,17 @@
                             const market = tradeRouteDestination(tradeRouteByKey(minion.tradeCarryRoute) || route);
                             const reached = moveEntityTowards(minion, market.x, market.y, minionTravelSpeed(minion));
                             if (reached) {
-                                if (minion.tradeDwell > 0) {
+                                // Nobody trades in the dark. A caravan that gets here after
+                                // dusk camps at the market and does its business at first
+                                // light, which is what makes setting one off late a real
+                                // decision rather than a free action.
+                                if (isNight()) {
+                                    minion.tradeWaiting = true;
+                                } else if (minion.tradeDwell > 0) {
+                                    minion.tradeWaiting = false;
                                     minion.tradeDwell -= 1;
                                 } else {
+                                    minion.tradeWaiting = false;
                                     // The deal it left with, not whatever it is set to
                                     // now: a route changed mid-haul must not rewrite a
                                     // load that is already in the cart.
@@ -10160,6 +11204,7 @@
                 updateMinions();
                 updateEnemies();
                 updateTurrets();
+                updateFloaters();
 
                 game.player.stamina = Math.min(PLAYER_STAMINA_MAX, game.player.stamina + PLAYER_STAMINA_REGEN_PER_TICK);
 
@@ -10192,6 +11237,14 @@
                 if (game.warPaintTicks > 0) {
                     game.warPaintTicks -= 1;
                 }
+                if (game.eventEssenceTicks > 0) {
+                    game.eventEssenceTicks -= 1;
+                    if (game.eventEssenceTicks === 0) refreshHud();
+                }
+                if (game.eventYieldTicks > 0) {
+                    game.eventYieldTicks -= 1;
+                    if (game.eventYieldTicks === 0) refreshHud();
+                }
                 if (game.minionHasteTicks > 0) {
                     game.minionHasteTicks -= 1;
                     if (game.minionHasteTicks === 0) refreshHud();   // the spell just lapsed
@@ -10212,6 +11265,7 @@
                 if (game.villagePulse > 0) game.villagePulse -= 1;
                 if (game.cityPulse > 0) game.cityPulse -= 1;
                 if (game.dayTick % 15 === 0) syncMusicMood();
+                if (game.dayTick % 30 === 0) updateTutorial();
                 if (game.dayTick % 120 === 0) {
                     captureRuntimeSnapshot();
                     reportScore();
@@ -10502,11 +11556,22 @@
                     ctx.fillText(`${Math.floor(game.towerPulse)} tower`, tower.x - 8, tower.y - 70);
                 }
 
+                drawNocturnalMarks(ctx);
                 drawDefenderPosts(ctx);
                 drawTurretSellHint(ctx);
                 drawSellPulse(ctx);
                 drawTurretPlacementPreview(ctx);
                 drawDefenderPostPreview(ctx);
+                // These three are positioned in world units - over an enemy, over the
+                // point a hit landed, against the camera's own rectangle - so they belong
+                // in the world pass. Below the restore they were being drawn at world
+                // coordinates into screen space, which pins them to the top-left of the
+                // map and slides them away from whatever they are labelling.
+                drawNightTint(ctx);
+                drawWaitingTraders(ctx);
+                drawEnemyHealthBars(ctx);
+                drawFloaters(ctx);
+                drawTutorialBanner(ctx);
 
                 ctx.restore();
 
@@ -10515,6 +11580,7 @@
                 ctx.save();
                 ctx.scale(renderScale, renderScale);
 
+                drawDayNightIndicator(ctx);
                 drawOffscreenPlayerIndicator(ctx);
                 drawOffscreenBossIndicators(ctx);
 
@@ -10558,8 +11624,8 @@
                     ctx.font = mapFont(30, 700);
                     ctx.fillText(
                         summary.record
-                            ? `${summary.score} progress - new best run`
-                            : `${summary.score} progress banked`,
+                            ? `${summary.score} progress held - new best run`
+                            : `${summary.score} progress held`,
                         cx,
                         cy - 12
                     );
@@ -10577,6 +11643,21 @@
                     ctx.fillStyle = "#cde6f2";
                     ctx.font = mapFont(18, 500);
                     ctx.fillText(`New Run to start run ${summary.runsPlayed + 1}.`, cx, cy + 128);
+
+                    // The last few runs, so this one reads as part of a series instead of
+                    // a number that flashes past and is gone.
+                    const history = Array.isArray(save.runHistory) ? save.runHistory.slice(-5).reverse() : [];
+                    if (history.length > 1) {
+                        ctx.fillStyle = "#9fb8c8";
+                        ctx.font = mapFont(15, 700);
+                        ctx.fillText("RECENT RUNS", cx, cy + 168);
+                        ctx.font = mapFont(14, 500);
+                        history.forEach((entry, i) => {
+                            const line = `Run ${entry.run}  -  wave ${entry.wave}  -  peak ${entry.peak}  -  ${entry.modifier}`;
+                            ctx.fillStyle = i === 0 ? "#e6f2fa" : "#9fb8c8";
+                            ctx.fillText(line, cx, cy + 192 + i * 20);
+                        });
+                    }
                 } else if (!game.running) {
                     ctx.fillStyle = "#112233cc";
                     ctx.fillRect(0, 0, viewport.w, viewport.h);
@@ -10590,17 +11671,33 @@
                     if (game.started) {
                         ctx.fillText("Paused - Press Pause/Resume or P", viewport.w / 2, viewport.h / 2 + 20);
                     } else {
-                        ctx.fillText("Collect, relax, and deposit at your own pace", viewport.w / 2, viewport.h / 2 + 20);
+                        // What the game actually is. The old line promised somewhere to
+                        // relax, which stopped being true several systems ago - there is a
+                        // tower that falls, a tribe over the river and a clock on the rot.
+                        ctx.fillText("Work the meadows, arm the tower, and hold it as long as you can.", viewport.w / 2, viewport.h / 2 + 20);
                     }
 
+                    if (!game.started) {
+                        // Name the run's modifier before it starts, not after it bites.
+                        const mod = runModifier();
+                        ctx.fillStyle = "#ffd166";
+                        ctx.font = mapFont(18, 700);
+                        ctx.fillText(`This run: ${mod.label}`, viewport.w / 2, viewport.h / 2 + 56);
+                        ctx.fillStyle = "#e0c9a0";
+                        ctx.font = mapFont(15, 500);
+                        ctx.fillText(mod.desc, viewport.w / 2, viewport.h / 2 + 80);
+                    }
+
+                    const controlsTop = game.started ? viewport.h / 2 + 56 : viewport.h / 2 + 120;
                     ctx.fillStyle = "#e9f4fb";
                     ctx.font = mapFont(17, 500);
-                    ctx.fillText("Move: Arrow Keys / WASD (or touch drag)", viewport.w / 2, viewport.h / 2 + 56);
-                    ctx.fillText("Zoom the map: mouse wheel, [ and ], 0 to reset", viewport.w / 2, viewport.h / 2 + 84);
-                    ctx.fillText("Walk into TOWER to bank materials", viewport.w / 2, viewport.h / 2 + 112);
-                    ctx.fillText("Use the FIELD SHOP for Speed, Bag, and Minion crafting", viewport.w / 2, viewport.h / 2 + 140);
-                    ctx.fillText("Wood: green square | Stone: gray circle | Crystal: blue diamond | Amber: orange triangle | Aether: violet star", viewport.w / 2, viewport.h / 2 + 168);
-                    ctx.fillText("Bump red enemies and place sentries where you want to defend TOWER.", viewport.w / 2, viewport.h / 2 + 196);
+                    ctx.fillText("Move: WASD or arrows (touch: drag)   -   Zoom: wheel, [ ], 0 to reset", viewport.w / 2, controlsTop);
+                    ctx.fillText("Pause: P   -   Speed: F   -   Skill Tree buys the unlocks that outlive the run", viewport.w / 2, controlsTop + 28);
+                    ctx.fillStyle = "#9fb8c8";
+                    ctx.font = mapFont(15, 500);
+                    ctx.fillText("Wood square  -  Stone circle  -  Crystal diamond  -  Amber triangle  -  Aether star  -  Ivory shard", viewport.w / 2, controlsTop + 60);
+                    ctx.fillText("Markets shut after dark, and what walks out of it is stronger. Caravans caught out wait for dawn.", viewport.w / 2, controlsTop + 84);
+                    ctx.fillText("The rest is explained on the map as you go.", viewport.w / 2, controlsTop + 108);
                 }
 
                 ctx.restore();
@@ -11049,27 +12146,42 @@
             // itself dragging - and ran half again too fast on a 90Hz screen.
             const SIM_STEP_MS = 1000 / 60;
             // Past this many steps in one frame the machine is not keeping up, and
-            // catching up in full would only make the next frame later still.
-            const SIM_MAX_STEPS_PER_FRAME = 5;
+            // catching up in full would only make the next frame later still. Scaled by
+            // the speed setting, or picking 3x would silently drop two thirds of the steps
+            // it asked for and run at 1x with a stutter.
+            const SIM_BASE_MAX_STEPS_PER_FRAME = 5;
+            // A minute of wave break at 1x is a minute of watching. The simulation is a
+            // fixed step already, so speed is only how many steps a frame may run -
+            // nothing in the game logic has to know about it.
+            const GAME_SPEEDS = [1, 2, 3];
             let simAccumulatorMs = 0;
             let lastFrameMs = 0;
+
+            function gameSpeed() {
+                return GAME_SPEEDS.indexOf(save.gameSpeed) === -1 ? 1 : save.gameSpeed;
+            }
 
             function loop(nowMs) {
                 const now = Number.isFinite(nowMs) ? nowMs : performance.now();
                 if (!lastFrameMs) lastFrameMs = now;
+                const speed = gameSpeed();
+                const maxSteps = SIM_BASE_MAX_STEPS_PER_FRAME * speed;
                 // A tab that was in the background hands back a gap of minutes. Clamped,
                 // or the catch-up would run thousands of steps in one frame.
-                const elapsed = Math.min(now - lastFrameMs, SIM_STEP_MS * SIM_MAX_STEPS_PER_FRAME);
+                const elapsed = Math.min((now - lastFrameMs) * speed, SIM_STEP_MS * maxSteps);
                 lastFrameMs = now;
                 simAccumulatorMs += elapsed;
 
                 let steps = 0;
-                while (simAccumulatorMs >= SIM_STEP_MS && steps < SIM_MAX_STEPS_PER_FRAME) {
+                while (simAccumulatorMs >= SIM_STEP_MS && steps < maxSteps) {
                     tickGame();
+                    // A tick can end the run or open an offer, and every step after that
+                    // would be simulating a world the player is no longer playing.
+                    if (!game.running) { simAccumulatorMs = 0; break; }
                     simAccumulatorMs -= SIM_STEP_MS;
                     steps += 1;
                 }
-                if (steps === SIM_MAX_STEPS_PER_FRAME) simAccumulatorMs = 0;
+                if (steps === maxSteps) simAccumulatorMs = 0;
 
                 render();
                 if (game.running) {
@@ -11108,6 +12220,10 @@
                 if (key === "escape" && isAudioPanelOpen()) {
                     e.preventDefault();
                     setAudioPanelOpen(false);
+                    return;
+                }
+                if (key === "f") {
+                    cycleGameSpeed();
                     return;
                 }
                 if (key === "p" || key === "escape") {
@@ -11205,7 +12321,17 @@
                     updatePlacementPreview(e.clientX, e.clientY);
                     return;
                 }
-                if (game.pendingBasicTurretPlacements + game.pendingSniperTurretPlacements + game.pendingSlowTurretPlacements <= 0) return;
+                if (game.pendingBasicTurretPlacements + game.pendingSniperTurretPlacements + game.pendingSlowTurretPlacements <= 0) {
+                    // Nothing queued, so a click on a turret is about that turret: shift
+                    // changes what it shoots at, a plain click pays to make it better.
+                    const hit = worldPointFromClient(e.clientX, e.clientY);
+                    if (e.shiftKey) {
+                        if (cycleTurretPriorityAt(hit.x, hit.y)) updatePlacementPreview(e.clientX, e.clientY);
+                    } else if (upgradeTurretAt(hit.x, hit.y)) {
+                        updatePlacementPreview(e.clientX, e.clientY);
+                    }
+                    return;
+                }
                 const point = worldPointFromClient(e.clientX, e.clientY);
                 placePendingTurretAt(point.x, point.y);
                 updatePlacementPreview(e.clientX, e.clientY);
@@ -11349,7 +12475,7 @@
                 const minions = save.minions + save.defenderMinions;
                 runRestartSummaryEl.innerHTML = "";
                 for (const line of [
-                    `Wave ${game.waveNumber}, ${save.stored} progress banked`,
+                    `Wave ${game.waveNumber}, ${save.stored} progress held`,
                     `${turrets} turret${turrets === 1 ? "" : "s"}, ${minions} minion${minions === 1 ? "" : "s"}`,
                     `Bank ${save.bankWood}W / ${save.bankStone}S / ${save.bankCrystal}C / ${save.bankAmber}A / ${save.bankAether}Ae / ${save.bankIvory}Iv`
                 ]) {
@@ -11432,6 +12558,13 @@
                 togglePause();
             });
 
+            if (gameSpeedBtn) {
+                gameSpeedBtn.classList.add("compact-btn");
+                gameSpeedBtn.addEventListener("click", () => {
+                    cycleGameSpeed();
+                });
+            }
+
             speedBtn.addEventListener("click", () => {
                 if (!canUseUpgrade("speed")) return;
                 const recipe = speedRecipe();
@@ -11439,7 +12572,7 @@
 
                 spendBankForCost(recipe);
                 save.speedLevel += 1;
-                game.player.speed = BASE_PLAYER_SPEED + save.speedLevel * PLAYER_SPEED_LEVEL_STEP;
+                game.player.speed = playerSpeedValue();
                 saveGame();
                 refreshHud();
             });
@@ -11989,13 +13122,25 @@
 
             cameraState.zoom = Number.isFinite(save.mapZoom) ? clamp(save.mapZoom, MIN_MAP_ZOOM, MAX_MAP_ZOOM) : 1;
 
+            // A save from before run variation existed - and the very first run of a new
+            // save, which reaches beginRun() without ever passing through startRun() -
+            // has no layout rolled yet. Roll one before anything reads it.
+            if (!save.runModifier || !Array.isArray(save.fieldTypes)) {
+                rollRunLayout();
+            }
+
             if (!restoreRuntimeSnapshot()) {
                 resetSession();
             }
+
+            // An offer that was on screen when the tab closed is still owed.
+            if (game.pendingDraft) openDraftPopover();
+            else if (game.pendingEvent) openEventPopover();
             fitCanvasToStage();
             render();
 
             refreshMusicUi();
+            refreshSpeedUi();
             // Autoplay policy: the context can only start from a user gesture, so arm
             // the track on whichever interaction happens first.
             const armMusic = () => {
