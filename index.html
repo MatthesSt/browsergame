@@ -2019,8 +2019,8 @@
                 defender: { label: "Unlock Defenders", cost: { wood: 14, stone: 14 }, requires: [] },
                 minionSpeed: { label: "Unlock Minion Speed", cost: { stone: 12, crystal: 4 }, requires: ["gatherer", "trader"] },
                 minionCapacity: { label: "Unlock Minion Capacity", cost: { wood: 14, amber: 3 }, requires: ["gatherer"] },
-                turret: { label: "Unlock Sentries", cost: { wood: 18, stone: 16 }, requires: ["defender"] },
-                sniperTurret: { label: "Unlock Snipers", cost: { wood: 24, stone: 26 }, requires: ["turret"] },
+                turret: { label: "Unlock Slings", cost: { wood: 18, stone: 16 }, requires: ["defender"] },
+                sniperTurret: { label: "Unlock Catapults", cost: { wood: 24, stone: 26 }, requires: ["turret"] },
                 slowTurret: { label: "Unlock Slow Field", cost: { crystal: 14, amber: 9, essence: 2 }, requires: ["sniperTurret"] },
                 turretCap: { label: "Unlock Turret Capacity", cost: { crystal: 18, amber: 10, essence: 3 }, requires: ["slowTurret"] },
                 trader: { label: "Unlock Traders", desc: "Caravans that carry bank goods to the village and trade them", cost: { wood: 26, stone: 22 }, requires: ["bag"] },
@@ -2033,7 +2033,7 @@
                 mendSpell: { label: "Unlock Mend", desc: "Cast to repair the tower - nothing else brings its health back", cost: { crystal: 60, amber: 40, essence: 6 }, requires: ["chillSpell"] },
                 minionArmor2: { label: "Unlock Minion Plating", desc: "Doubles minion health again, 4x in total", cost: { stone: 180, crystal: 90, amber: 60, essence: 80 }, requires: ["minionArmor"] },
                 minionArmor: { label: "Unlock Minion Armor", desc: "Doubles the health of every gatherer and defender", cost: { stone: 90, crystal: 48, amber: 48 }, requires: ["turret"] },
-                turretHaste: { label: "Unlock Rapid Fire", desc: "All sentries and snipers fire 30% faster", cost: { crystal: 240, amber: 140, essence: 50 }, requires: ["slowTurret"] },
+                turretHaste: { label: "Unlock Rapid Fire", desc: "All slings and catapults loose 30% faster", cost: { crystal: 240, amber: 140, essence: 50 }, requires: ["slowTurret"] },
                 spawnerWood: { label: "Unlock Wood Spawner", cost: { wood: 12, stone: 18 }, requires: [] },
                 spawnerStone: { label: "Unlock Stone Spawner", cost: { wood: 22, stone: 12 }, requires: ["spawnerWood"] },
                 spawnerCrystal: { label: "Unlock Crystal Spawner", cost: { wood: 20, amber: 6 }, requires: ["spawnerStone"] },
@@ -2190,6 +2190,17 @@
             const MIN_MAP_ZOOM = 0.25;
             const MAX_MAP_ZOOM = 1;
             const MAP_ZOOM_STEP = 1.12;
+
+            // A minute of wave break at 1x is a minute of watching. The simulation is a
+            // fixed step already, so speed is only how many steps a frame may run -
+            // nothing in the game logic has to know about it.
+            //
+            // Declared up here with the other settings rather than beside the loop that
+            // uses it: loadSave() reads it, loadSave() runs long before the loop is
+            // defined, and a `const` is not merely undefined before its line - it throws.
+            // That threw on every load, and the catch below turned it into a silent
+            // fresh save.
+            const GAME_SPEEDS = [1, 2, 3];
 
             const cameraState = {
                 x: 0,
@@ -2600,7 +2611,7 @@
                 { id: "bank", text: "Carry them into the TOWER at the centre to bank them." },
                 { id: "skills", text: "Open the Skill Tree - banked resources buy permanent unlocks that outlive the run." },
                 { id: "gatherer", text: "Unlock Gatherers in the Skill Tree, then craft one: they gather while you do." },
-                { id: "defend", text: "Unlock Defenders and Sentries. The tower falling ends the run." },
+                { id: "defend", text: "Unlock Defenders and Slings. The tower falling ends the run." },
                 { id: "wave", text: "Survive the first wave. Watch Incoming for what the next one brings." }
             ];
 
@@ -2656,7 +2667,7 @@
                 { id: "iron-posts", label: "Iron Posts", desc: "Half again as much health on every minion." },
                 { id: "deep-bags", label: "Deep Bags", desc: "Carry 4 more before you have to walk back." },
                 { id: "fleet-foot", label: "Fleet Foot", desc: "You move noticeably faster." },
-                { id: "sharp-sentries", label: "Sharp Sentries", desc: "Turrets fire 20% faster." },
+                { id: "sharp-sentries", label: "Keen Slings", desc: "Turrets fire 20% faster." },
                 { id: "warded-fields", label: "Warded Fields", desc: "Blights eat through a field far more slowly." },
                 { id: "bounty", label: "Bounty", desc: "30 essence, right now." }
             ];
@@ -2747,6 +2758,27 @@
             const HUNTER_RAMP_MAX_BONUS = 0.72;
             const BASE_MAX_TURRETS = 15;
             const TURRET_CAP_STEP = 3;
+
+            // A placed turret used to be finished with you: no upgrade, no targeting, no
+            // reason to ever look at it again, so the defensive half of the game played
+            // itself once it was set up. A level and a firing order are two things worth
+            // walking back to a turret for.
+            //
+            // These live up here with the other turret limits, not beside the upgrade
+            // code that reads them, because normalizeTurretPlacements clamps against them
+            // and loadSave() calls that on the way in - long before the upgrade code is
+            // reached. A `const` read before its line throws rather than reading
+            // undefined, which is how this took the whole saved run down with it.
+            const TURRET_MAX_LEVEL = 5;
+            const TURRET_UPGRADE_BASE = 18;
+            const TURRET_UPGRADE_STEP = 14;
+            // Which enemy a turret picks out of the ones it can reach.
+            const TURRET_PRIORITIES = ["closest", "strongest", "leader"];
+            const TURRET_PRIORITY_LABEL = {
+                closest: "Nearest",
+                strongest: "Toughest",
+                leader: "Closest to tower"
+            };
             const TURRET_MIN_SPACING = W(26);
             const TURRET_EDGE_PADDING = W(12);
             const SLOW_FIELD_RADIUS = W(190);
@@ -3178,8 +3210,8 @@
                 { key: "amber-aether", dest: "village", from: "amber", to: "aether" },
                 // One turret per caravan. The skill tree is the licence to buy a type;
                 // the run to the city is the price of each one.
-                { key: "buy-sentry", dest: "city", from: "stone", turret: "basic", skill: "turret", label: "Sentry" },
-                { key: "buy-sniper", dest: "city", from: "crystal", turret: "sniper", skill: "sniperTurret", label: "Sniper" },
+                { key: "buy-sentry", dest: "city", from: "stone", turret: "basic", skill: "turret", label: "Sling" },
+                { key: "buy-sniper", dest: "city", from: "crystal", turret: "sniper", skill: "sniperTurret", label: "Catapult" },
                 { key: "buy-slow", dest: "city", from: "amber", turret: "slow", skill: "slowTurret", label: "Slow Field" }
             ];
             const TURRET_TRADE_BASE = { basic: 34, sniper: 26, slow: 22 };
@@ -3379,7 +3411,17 @@
                     }
                 }
 
-                if (normalized.length === 0 && turretCount > 0) {
+                // Saves written before turrets had positions carry a count and no
+                // placement list at all, and those turrets have to be put somewhere.
+                //
+                // The test is whether the field is MISSING, not whether it is empty. An
+                // empty array is a perfectly ordinary modern save: it means every turret
+                // you own is still in the store waiting to be placed. Treating that as
+                // legacy data force-placed the whole store onto the map at fixed grid
+                // slots on the next load, which read as the turrets vanishing from the
+                // shop - you had them, they were simply already on the ground somewhere
+                // you never put them.
+                if (!Array.isArray(rawPlacements) && turretCount > 0) {
                     for (let i = 0; i < Math.min(turretCount, maxCount); i += 1) {
                         normalized.push(legacyTurretSlotPoint(i));
                     }
@@ -3607,7 +3649,19 @@
                         coordOrigin: "tower",
                         runtimeState: data.runtimeState && typeof data.runtimeState === "object" ? data.runtimeState : null
                     };
-                } catch {
+                } catch (err) {
+                    // Reaching here means a saved game could not be read and the player is
+                    // about to be handed a brand new one. That is the most destructive
+                    // thing this file can do, so it does not do it quietly: the reason goes
+                    // to the console and the unreadable save is kept under another key
+                    // rather than being overwritten by the first autosave.
+                    console.error("Save could not be loaded - starting fresh:", err);
+                    try {
+                        const raw = localStorage.getItem(STORAGE_KEY);
+                        if (raw) localStorage.setItem(`${STORAGE_KEY}-unreadable`, raw);
+                    } catch (ignored) {
+                        // Storage is refusing us either way; nothing further to try.
+                    }
                     return {
                         ...fresh,
                         bestRunScore: 0,
@@ -4551,8 +4605,8 @@
             }
 
             const TURRET_STOCK_TYPES = [
-                { type: "basic", label: "Sentry" },
-                { type: "sniper", label: "Sniper" },
+                { type: "basic", label: "Sling" },
+                { type: "sniper", label: "Catapult" },
                 { type: "slow", label: "Slow Field" }
             ];
 
@@ -5235,7 +5289,7 @@
                     const value = bankAmount(type);
                     if (treeBankCache[type] === value) continue;
                     treeBankCache[type] = value;
-                    el.textContent = type === "essence" ? String(value) : convertNotation(value);
+                    el.textContent = convertNotation(value);
                 }
             }
 
@@ -5333,7 +5387,10 @@
                 setHudNumber("stored", storedEl, save.stored);
                 setHudNumber("bestRunScore", bestRunScoreEl, save.bestRunScore);
                 setCapacityHud(currentInventoryCount, currentBagCapacity);
-                setHudNumber("essence", essenceEl, save.essence, (value) => String(value));
+                // Essence sits in the same bank strip as the materials and is spent the same
+                // way, so it abbreviates the same way. convertNotation is exact below a
+                // thousand anyway, which is where every skill price lives.
+                setHudNumber("essence", essenceEl, save.essence);
                 setHudNumber("wave", waveHudEl, Math.max(0, game.waveNumber), (value) => String(value));
                 const nextWaveText = game.waveInProgress
                     ? "in progress"
@@ -9680,21 +9737,6 @@
                 return parts.join(" ");
             }
 
-            // A placed turret used to be finished with you: no upgrade, no targeting, no
-            // reason to ever look at it again, so the defensive half of the game played
-            // itself once it was set up. A level and a firing order are two things worth
-            // walking back to a turret for.
-            const TURRET_MAX_LEVEL = 5;
-            const TURRET_UPGRADE_BASE = 18;
-            const TURRET_UPGRADE_STEP = 14;
-            // Which enemy a turret picks out of the ones it can reach.
-            const TURRET_PRIORITIES = ["closest", "strongest", "leader"];
-            const TURRET_PRIORITY_LABEL = {
-                closest: "Nearest",
-                strongest: "Toughest",
-                leader: "Closest to tower"
-            };
-
             const TURRET_SELL_RATE = 0.75;
             const TURRET_PICK_RADIUS = W(20);
 
@@ -12043,32 +12085,85 @@
                         continue;
                     }
 
+                    const isCatapult = turret.type === "sniper";
+                    const aimAngle = Math.atan2(turret.targetY - turret.y, turret.targetX - turret.x);
+
                     if (turret.flash > 0) {
                         ctx.save();
-                        const isSniper = turret.type === "sniper";
-                        ctx.strokeStyle = isSniper ? "#ffd166" : "#9be7ff";
-                        ctx.lineWidth = isSniper ? 3 : 2;
+                        ctx.strokeStyle = isCatapult ? "#ffd166" : "#9be7ff";
+                        ctx.lineWidth = isCatapult ? 3 : 2;
                         ctx.globalAlpha = 0.65;
                         ctx.beginPath();
                         ctx.moveTo(turret.x, turret.y);
-                        ctx.lineTo(turret.targetX, turret.targetY);
+                        if (isCatapult) {
+                            // A catapult lobs. A straight beam from a throwing arm read as
+                            // a rifle shot, which is the whole thing this was not meant to
+                            // look like - so the stone travels on an arc, bowed out
+                            // perpendicular to the throw.
+                            const midX = (turret.x + turret.targetX) / 2;
+                            const midY = (turret.y + turret.targetY) / 2;
+                            const span = Math.hypot(turret.targetX - turret.x, turret.targetY - turret.y);
+                            const lift = Math.min(W(70), span * 0.28);
+                            ctx.quadraticCurveTo(
+                                midX + Math.cos(aimAngle - Math.PI / 2) * lift,
+                                midY + Math.sin(aimAngle - Math.PI / 2) * lift,
+                                turret.targetX, turret.targetY);
+                        } else {
+                            ctx.lineTo(turret.targetX, turret.targetY);
+                        }
                         ctx.stroke();
                         ctx.restore();
                     }
 
                     ctx.save();
-                    const isSniper = turret.type === "sniper";
-                    ctx.fillStyle = isSniper ? "#ffd166" : "#8ecae6";
-                    ctx.beginPath();
-                    ctx.arc(turret.x, turret.y, isSniper ? 10 : 9, 0, Math.PI * 2);
-                    ctx.fill();
-                    ctx.strokeStyle = isSniper ? "#6b4e16" : "#1b4965";
-                    ctx.lineWidth = 2;
-                    ctx.stroke();
-                    ctx.fillStyle = isSniper ? "#fff2c5" : "#d9f3ff";
-                    ctx.beginPath();
-                    ctx.arc(turret.x, turret.y - 2, 3, 0, Math.PI * 2);
-                    ctx.fill();
+                    if (isCatapult) {
+                        // Base, throwing arm swung towards what it is shooting at, and the
+                        // stone in the cup. Recoil is free: the arm sits further back for
+                        // the few ticks after a shot.
+                        const recoil = turret.flash > 0 ? 0.9 : 0;
+                        ctx.translate(turret.x, turret.y);
+                        ctx.rotate(aimAngle);
+
+                        ctx.fillStyle = "#6b4e16";
+                        ctx.beginPath();
+                        ctx.moveTo(-9, -8);
+                        ctx.lineTo(7, -6);
+                        ctx.lineTo(7, 6);
+                        ctx.lineTo(-9, 8);
+                        ctx.closePath();
+                        ctx.fill();
+                        ctx.strokeStyle = "#3d2c0c";
+                        ctx.lineWidth = 2;
+                        ctx.stroke();
+
+                        ctx.strokeStyle = "#ffd166";
+                        ctx.lineWidth = 3;
+                        ctx.beginPath();
+                        ctx.moveTo(-6, 0);
+                        ctx.lineTo(7 - recoil * 9, -8 + recoil * 5);
+                        ctx.stroke();
+
+                        ctx.fillStyle = "#fff2c5";
+                        ctx.beginPath();
+                        ctx.arc(7 - recoil * 9, -8 + recoil * 5, 3.2, 0, Math.PI * 2);
+                        ctx.fill();
+                    } else {
+                        // A sling: a low post with the cord whipped round it.
+                        ctx.fillStyle = "#8ecae6";
+                        ctx.beginPath();
+                        ctx.arc(turret.x, turret.y, 9, 0, Math.PI * 2);
+                        ctx.fill();
+                        ctx.strokeStyle = "#1b4965";
+                        ctx.lineWidth = 2;
+                        ctx.stroke();
+                        ctx.beginPath();
+                        ctx.ellipse(turret.x, turret.y, 6, 2.6, aimAngle, 0, Math.PI * 2);
+                        ctx.stroke();
+                        ctx.fillStyle = "#d9f3ff";
+                        ctx.beginPath();
+                        ctx.arc(turret.x + Math.cos(aimAngle) * 6, turret.y + Math.sin(aimAngle) * 6, 2.6, 0, Math.PI * 2);
+                        ctx.fill();
+                    }
                     ctx.restore();
                 }
 
@@ -12155,10 +12250,17 @@
                     ctx.font = mapFont(16, 700);
                     ctx.textAlign = "center";
                     ctx.textBaseline = "alphabetic";
-                    const basicPending = game.pendingBasicTurretPlacements;
-                    const sniperPending = game.pendingSniperTurretPlacements;
-                    const slowPending = game.pendingSlowTurretPlacements;
-                    ctx.fillText(`Place turret: ${pendingTurretTotal} (B:${basicPending} S:${sniperPending} F:${slowPending})`, viewport.w / 2, 34);
+                    // Named rather than initialled: Sling and Slow Field both start with
+                    // an S, so the old B/S/F shorthand stopped telling them apart. Only
+                    // the kinds actually waiting are listed.
+                    const waiting = [
+                        [game.pendingBasicTurretPlacements, "Sling"],
+                        [game.pendingSniperTurretPlacements, "Catapult"],
+                        [game.pendingSlowTurretPlacements, "Slow Field"]
+                    ].filter(([count]) => count > 0)
+                        .map(([count, name]) => `${name} x${count}`)
+                        .join("   ");
+                    ctx.fillText(`Place turret: ${waiting}`, viewport.w / 2, 34);
                     ctx.fillStyle = "#9be7ffaa";
                     ctx.font = mapFont(13, 500);
                     ctx.fillText("Right-click to cancel and refund", viewport.w / 2, 54);
@@ -12738,10 +12840,6 @@
             // the speed setting, or picking 3x would silently drop two thirds of the steps
             // it asked for and run at 1x with a stutter.
             const SIM_BASE_MAX_STEPS_PER_FRAME = 5;
-            // A minute of wave break at 1x is a minute of watching. The simulation is a
-            // fixed step already, so speed is only how many steps a frame may run -
-            // nothing in the game logic has to know about it.
-            const GAME_SPEEDS = [1, 2, 3];
             let simAccumulatorMs = 0;
             let lastFrameMs = 0;
 
