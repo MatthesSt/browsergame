@@ -1465,6 +1465,14 @@
             font-weight: 700;
         }
 
+        /* The panel covers more than audio now, so the two groups get a line between
+           them rather than reading as one list of four unrelated switches. */
+        .audio-panel-divider {
+            height: 1px;
+            background: #3a5676;
+            margin: 2px 0;
+        }
+
         .audio-panel-row button {
             padding: 4px 12px;
             font-size: 0.78rem;
@@ -1554,7 +1562,7 @@
                 <button id="pauseBtn" class="secondary">Pause</button>
                 <button id="gameSpeedBtn" class="secondary" title="Game speed (F to cycle)">1x</button>
                 <div class="audio-menu">
-                    <button id="musicBtn" class="secondary" title="Audio (M mutes, +/- volume)" aria-haspopup="true" aria-expanded="false">♪</button>
+                    <button id="musicBtn" class="secondary" title="Settings (M mutes, +/- volume, T toggles tips)" aria-haspopup="true" aria-expanded="false">♪</button>
                     <div id="audioPanel" class="audio-panel" hidden>
                         <div class="audio-panel-row">
                             <span>Music</span>
@@ -1567,6 +1575,11 @@
                         <div class="audio-panel-row volume-control" title="Volume (+ / - keys)">
                             <input id="musicVolume" type="range" min="0" max="100" step="1" value="100" aria-label="Volume">
                             <strong id="musicVolumeValue">100%</strong>
+                        </div>
+                        <div class="audio-panel-divider" role="separator"></div>
+                        <div class="audio-panel-row" title="The step-by-step guidance drawn over the map (T)">
+                            <span>Tips</span>
+                            <button id="tipsBtn" class="secondary" aria-pressed="true">On</button>
                         </div>
                     </div>
                 </div>
@@ -1920,6 +1933,7 @@
             const musicBtn = document.getElementById("musicBtn");
             const muteBtn = document.getElementById("muteBtn");
             const sfxBtn = document.getElementById("sfxBtn");
+            const tipsBtn = document.getElementById("tipsBtn");
             const audioPanelEl = document.getElementById("audioPanel");
             const musicVolumeEl = document.getElementById("musicVolume");
             const musicVolumeValueEl = document.getElementById("musicVolumeValue");
@@ -2348,6 +2362,229 @@
                 return 1;
             }
 
+            // ---- Weather -----------------------------------------------------------
+            //
+            // The run already varies three ways: a modifier fixed at the roll, a day/night
+            // cycle on a perfectly predictable loop, and punctual drafts and events. The
+            // gap those leave is something irregular and medium-length that you can see
+            // coming and change your behaviour for - so weather is telegraphed, lasts
+            // under a minute, and leaves real gaps of clear sky between.
+            //
+            // Every entry gives as well as takes, the same way the run modifiers read. A
+            // weather that is purely bad is a tax; one that trades something for something
+            // is a decision about how to spend the next forty seconds.
+            const WEATHER_WARNING_TICKS = 600;           // ten seconds of "it is coming"
+            const WEATHER_MIN_TICKS = 2400;              // forty seconds
+            const WEATHER_MAX_TICKS = 3600;              // sixty seconds
+            const WEATHER_MIN_GAP_TICKS = 7200;          // two minutes of clear sky
+            const WEATHER_MAX_GAP_TICKS = 14400;         // four minutes
+            const WEATHER_FIRST_GAP_TICKS = 5400;        // ninety seconds into a run
+
+            // Unnamed keys fall through to these, so adding a knob does not mean editing
+            // every entry - the same contract RUN_MODIFIER_DEFAULTS uses.
+            const WEATHER_DEFAULTS = {
+                turretRangeScale: 1,
+                aggroScale: 1,
+                enemyShotRangeScale: 1,
+                respawnScale: 1,
+                ferryClosed: false,
+                enemySpeedScale: 1,
+                minionSpeedScale: 1,
+                slowFieldScale: 1,
+                resourceBonus: 0,
+                spellCooldownRate: 1,
+                essenceScale: 1,
+                fieldsFrozen: false,
+                lightning: false
+            };
+
+            const WEATHER_TYPES = [
+                {
+                    id: "fog",
+                    label: "Fog",
+                    warning: "Fog is rolling in - your turrets will not see far.",
+                    desc: "Turrets and defenders see half as far. So does everything shooting back.",
+                    tint: "182, 196, 214",
+                    tintAlpha: 0.34,
+                    turretRangeScale: 0.5,
+                    aggroScale: 0.6,
+                    enemyShotRangeScale: 0.55
+                },
+                {
+                    id: "rain",
+                    label: "Rain",
+                    warning: "Rain is coming - the crossing will shut. Get your people back.",
+                    desc: "Fields regrow fast. The river is too high to cross at all.",
+                    tint: "60, 96, 140",
+                    tintAlpha: 0.2,
+                    respawnScale: 0.6,
+                    ferryClosed: true,
+                    precipitation: "rain"
+                },
+                {
+                    id: "frost",
+                    label: "Hard Frost",
+                    warning: "A hard frost is setting in - the fields will stop.",
+                    desc: "Everything slows, yours and theirs. Slow fields bite wider. Nothing grows.",
+                    tint: "170, 205, 235",
+                    tintAlpha: 0.26,
+                    enemySpeedScale: 0.65,
+                    minionSpeedScale: 0.78,
+                    slowFieldScale: 1.5,
+                    fieldsFrozen: true,
+                    precipitation: "snow"
+                },
+                {
+                    id: "storm",
+                    label: "Thunderstorm",
+                    warning: "A thunderstorm is closing - stay away from open ground.",
+                    desc: "Lightning strikes whatever is standing there, yours included. Everything banks more.",
+                    tint: "40, 44, 72",
+                    tintAlpha: 0.3,
+                    resourceBonus: 0.35,
+                    lightning: true,
+                    precipitation: "rain"
+                },
+                {
+                    id: "aetherfall",
+                    label: "Aetherfall",
+                    warning: "The air is going bright - something is falling through it.",
+                    desc: "Spells recover twice as fast and every kill pays more. Everything out there moves quicker too.",
+                    tint: "150, 110, 235",
+                    tintAlpha: 0.24,
+                    spellCooldownRate: 2,
+                    enemySpeedScale: 1.15,
+                    essenceScale: 1.5
+                }
+            ];
+
+            const LIGHTNING_INTERVAL_TICKS = 150;
+            const LIGHTNING_RADIUS = W(95);
+            const LIGHTNING_ENEMY_DAMAGE = 14;
+            const LIGHTNING_MINION_DAMAGE = 3;
+            const LIGHTNING_FLASH_TICKS = 20;
+            const LIGHTNING_MAX_MARKS = 8;
+
+            function weatherById(id) {
+                return WEATHER_TYPES.find((entry) => entry.id === id) || null;
+            }
+
+            function activeWeather() {
+                return game.weather ? weatherById(game.weather) : null;
+            }
+
+            function weatherValue(key) {
+                const weather = activeWeather();
+                if (!weather) return WEATHER_DEFAULTS[key];
+                const value = weather[key];
+                return value === undefined ? WEATHER_DEFAULTS[key] : value;
+            }
+
+            // Fog at night would be a dark map, blinded turrets and night-buffed monsters
+            // all at once. That is not a hard moment, it is an unfair one, so fog does not
+            // roll after dusk - though fog already running when night falls rides it out.
+            function pickWeather() {
+                const pool = WEATHER_TYPES.filter((entry) => !(entry.id === "fog" && isNight()));
+                if (pool.length === 0) return null;
+                return pool[Math.floor(Math.random() * pool.length)].id;
+            }
+
+            function updateWeather() {
+                if (game.weather) {
+                    game.weatherTicks -= 1;
+                    if (game.weatherTicks <= 0) {
+                        game.weather = null;
+                        game.weatherTicks = 0;
+                        game.weatherGapTicks = Math.floor(random(WEATHER_MIN_GAP_TICKS, WEATHER_MAX_GAP_TICKS));
+                        refreshHud();
+                    }
+                    return;
+                }
+
+                if (game.weatherPending) {
+                    game.weatherWarnTicks -= 1;
+                    if (game.weatherWarnTicks <= 0) {
+                        game.weather = game.weatherPending;
+                        game.weatherPending = null;
+                        game.weatherWarnTicks = 0;
+                        game.weatherTicks = Math.floor(random(WEATHER_MIN_TICKS, WEATHER_MAX_TICKS));
+                        game.weatherStrikeTimer = LIGHTNING_INTERVAL_TICKS;
+                        refreshHud();
+                    }
+                    return;
+                }
+
+                game.weatherGapTicks -= 1;
+                if (game.weatherGapTicks <= 0) {
+                    const pick = pickWeather();
+                    if (!pick) {
+                        // Nothing may roll right now; look again shortly rather than
+                        // burning the whole gap over again.
+                        game.weatherGapTicks = 600;
+                        return;
+                    }
+                    game.weatherPending = pick;
+                    game.weatherWarnTicks = WEATHER_WARNING_TICKS;
+                    refreshHud();
+                }
+            }
+
+            // A strike lands on whatever is standing there. It does not check sides: that
+            // is the whole trade for the storm's banking bonus, and a caravan crossing
+            // open ground during one is a real thing to have got wrong.
+            function strikeLightning() {
+                let x;
+                let y;
+                if (game.enemies.length > 0) {
+                    const target = game.enemies[Math.floor(Math.random() * game.enemies.length)];
+                    x = target.x + random(-LIGHTNING_RADIUS * 0.5, LIGHTNING_RADIUS * 0.5);
+                    y = target.y + random(-LIGHTNING_RADIUS * 0.5, LIGHTNING_RADIUS * 0.5);
+                } else {
+                    x = game.player.x + random(-W(600), W(600));
+                    y = game.player.y + random(-W(600), W(600));
+                }
+                x = clamp(x, world.minX, world.maxX);
+                y = clamp(y, world.minY, world.maxY);
+
+                if (game.lightningMarks.length >= LIGHTNING_MAX_MARKS) game.lightningMarks.shift();
+                game.lightningMarks.push({ x, y, ticks: LIGHTNING_FLASH_TICKS });
+                playLightningSting();
+
+                const radiusSq = LIGHTNING_RADIUS * LIGHTNING_RADIUS;
+                // Backwards: defeatEnemyAt splices, so a forward walk would skip the
+                // entry that slides into the gap.
+                for (let i = game.enemies.length - 1; i >= 0; i -= 1) {
+                    const enemy = game.enemies[i];
+                    const dx = enemy.x - x;
+                    const dy = enemy.y - y;
+                    if (dx * dx + dy * dy > radiusSq) continue;
+                    enemy.hp -= LIGHTNING_ENEMY_DAMAGE;
+                    addFloater(enemy.x, enemy.y - enemy.r, String(LIGHTNING_ENEMY_DAMAGE), "#ffe9a0");
+                    if (enemy.hp <= 0) defeatEnemyAt(i);
+                }
+
+                for (let i = game.minionUnits.length - 1; i >= 0; i -= 1) {
+                    const minion = game.minionUnits[i];
+                    const dx = minion.x - x;
+                    const dy = minion.y - y;
+                    if (dx * dx + dy * dy > radiusSq) continue;
+                    minion.hp -= LIGHTNING_MINION_DAMAGE;
+                    minion.hitFlash = 6;
+                    addFloater(minion.x, minion.y - 12, String(LIGHTNING_MINION_DAMAGE), "#ff9f7f");
+                    if (minion.hp <= 0) {
+                        removeMinionAt(i);
+                        refreshHud();
+                    }
+                }
+            }
+
+            function updateLightningMarks() {
+                for (let i = game.lightningMarks.length - 1; i >= 0; i -= 1) {
+                    game.lightningMarks[i].ticks -= 1;
+                    if (game.lightningMarks[i].ticks <= 0) game.lightningMarks.splice(i, 1);
+                }
+            }
+
             const RUN_HISTORY_MAX = 8;
 
             // ---- First-run guidance ----------------------------------------------
@@ -2377,7 +2614,12 @@
                 return true;
             }
 
+            function tipsEnabled() {
+                return save.tipsEnabled !== false;
+            }
+
             function currentTutorialStep() {
+                if (!tipsEnabled()) return null;
                 if (!game.started || game.runOver) return null;
                 const index = Number.isFinite(save.tutorialStep) ? save.tutorialStep : 0;
                 if (index >= TUTORIAL_STEPS.length) return null;
@@ -2387,6 +2629,9 @@
             // Called from the tick. Steps can be satisfied out of order - banking before
             // the hint to bank has even appeared is normal - so this walks forward past
             // everything already true rather than advancing one at a time.
+            // Deliberately not gated on tipsEnabled: progress keeps being tracked while
+            // tips are off, so switching them back on shows the step you are actually on
+            // rather than one you finished twenty minutes ago.
             function updateTutorial() {
                 if (!Number.isFinite(save.tutorialStep)) save.tutorialStep = 0;
                 if (save.tutorialStep >= TUTORIAL_STEPS.length) return;
@@ -2838,8 +3083,16 @@
             // minion standing on the far bank when you change its orders has to be able
             // to come back, or you have marooned it for the rest of the run. Where a
             // minion goes is decided by what it is aiming at, not by this.
+            // A crossing already under way always finishes - see ferryStep and the
+            // player's own branch in movePlayer. Closing the river on someone standing in
+            // the middle of it would strand them there, so what shuts is boarding, not
+            // the boat. Anyone caught on the far bank walks the weather out.
+            function ferryOpen() {
+                return !weatherValue("ferryClosed");
+            }
+
             function minionMayCross(minion) {
-                return isSkillUnlocked("boat");
+                return isSkillUnlocked("boat") && ferryOpen();
             }
 
             // The one exception to "walk at it and let the river shove you back". A
@@ -3020,6 +3273,13 @@
                 pendingEvent: null,
                 floaters: [],
                 runPeakStored: 0,
+                weather: null,
+                weatherTicks: 0,
+                weatherPending: null,
+                weatherWarnTicks: 0,
+                weatherGapTicks: WEATHER_FIRST_GAP_TICKS,
+                weatherStrikeTimer: 0,
+                lightningMarks: [],
                 eventEssenceTicks: 0,
                 eventYieldTicks: 0,
                 nextWaveSizeBonus: 0,
@@ -3325,6 +3585,7 @@
                         spawnerAetherLevel: Number.isFinite(data.spawnerAetherLevel) ? data.spawnerAetherLevel : fresh.spawnerAetherLevel,
                         runHistory: Array.isArray(data.runHistory) ? data.runHistory.slice(-RUN_HISTORY_MAX) : [],
                         tutorialStep: Number.isFinite(data.tutorialStep) ? Math.max(0, Math.floor(data.tutorialStep)) : 0,
+                        tipsEnabled: data.tipsEnabled !== false,
                         runModifier: typeof data.runModifier === "string" ? data.runModifier : fresh.runModifier,
                         draftBoons: data.draftBoons && typeof data.draftBoons === "object" ? data.draftBoons : {},
                         fieldTypes: Array.isArray(data.fieldTypes) ? data.fieldTypes : fresh.fieldTypes,
@@ -3354,6 +3615,7 @@
                         runsPlayed: 0,
                         runHistory: [],
                         tutorialStep: 0,
+                        tipsEnabled: true,
                         warChiefKills: 0,
                         essence: 0,
                         unlockedSkills: normalizeUnlockedSkills(null),
@@ -3758,6 +4020,11 @@
                     waveBreakTimer: game.waveBreakTimer,
                     waveInProgress: game.waveInProgress,
                     waveIntroPendingType: game.waveIntroPendingType,
+                    weather: game.weather,
+                    weatherTicks: game.weatherTicks,
+                    weatherPending: game.weatherPending,
+                    weatherWarnTicks: game.weatherWarnTicks,
+                    weatherGapTicks: game.weatherGapTicks,
                     pendingDraft: game.pendingDraft,
                     pendingEvent: game.pendingEvent,
                     eventEssenceTicks: game.eventEssenceTicks,
@@ -3841,6 +4108,16 @@
                     : WAVE_START_DELAY;
                 game.waveInProgress = Boolean(snapshot.waveInProgress);
                 game.waveIntroPendingType = typeof snapshot.waveIntroPendingType === "string" ? snapshot.waveIntroPendingType : null;
+                // Lightning marks are not restored: they are a twentieth of a second of
+                // flash, and a bolt hanging in the air on load would read as a bug.
+                game.weather = weatherById(snapshot.weather) ? snapshot.weather : null;
+                game.weatherTicks = Number.isFinite(snapshot.weatherTicks) ? Math.max(0, snapshot.weatherTicks) : 0;
+                game.weatherPending = weatherById(snapshot.weatherPending) ? snapshot.weatherPending : null;
+                game.weatherWarnTicks = Number.isFinite(snapshot.weatherWarnTicks) ? Math.max(0, snapshot.weatherWarnTicks) : 0;
+                game.weatherGapTicks = Number.isFinite(snapshot.weatherGapTicks)
+                    ? Math.max(0, snapshot.weatherGapTicks)
+                    : WEATHER_FIRST_GAP_TICKS;
+                game.lightningMarks = [];
                 game.pendingDraft = Array.isArray(snapshot.pendingDraft) ? snapshot.pendingDraft : null;
                 game.pendingEvent = typeof snapshot.pendingEvent === "string" ? snapshot.pendingEvent : null;
                 game.eventEssenceTicks = Number.isFinite(snapshot.eventEssenceTicks) ? Math.max(0, snapshot.eventEssenceTicks) : 0;
@@ -4084,7 +4361,7 @@
 
             function resourceMultiplier() {
                 const base = 1 + save.globalMultiplierLevel * 0.1 + modValue("resourceBonus")
-                    + boonCount("rich-harvest") * 0.15;
+                    + boonCount("rich-harvest") * 0.15 + weatherValue("resourceBonus");
                 return base * eventYieldMultiplier();
             }
 
@@ -4621,7 +4898,7 @@
             // moment of moving, so it lifts every minion at once and drops away cleanly
             // when the spell lapses.
             function minionTravelSpeed(minion, factor = 1, bonus = 0) {
-                const speed = minion.speed * factor + bonus;
+                const speed = (minion.speed * factor + bonus) * weatherValue("minionSpeedScale");
                 return minionHasteActive() ? speed * MINION_HASTE_MULTIPLIER : speed;
             }
 
@@ -5710,8 +5987,11 @@
                 const viewBottom = viewTop + viewWorldH();
 
                 for (const turret of game.turrets) {
-                    const style = TURRET_RANGE_STYLES[turret.type] || TURRET_RANGE_STYLES.basic;
-                    const range = style.range;
+                    // The turret's own reach, not the type's: a levelled turret covers
+                    // more ground and fog takes ground away, and a ring that showed the
+                    // base figure through either would be telling the player something
+                    // that is not true about where their defence actually reaches.
+                    const range = turretRangeFor(turret);
                     if (turret.x + range < viewLeft || turret.x - range > viewRight
                         || turret.y + range < viewTop || turret.y - range > viewBottom) {
                         continue;
@@ -5727,8 +6007,9 @@
                     targetCtx.save();
                     targetCtx.beginPath();
                     for (const turret of bucket) {
-                        targetCtx.moveTo(turret.x + style.range, turret.y);
-                        targetCtx.arc(turret.x, turret.y, style.range, 0, Math.PI * 2);
+                        const range = turretRangeFor(turret);
+                        targetCtx.moveTo(turret.x + range, turret.y);
+                        targetCtx.arc(turret.x, turret.y, range, 0, Math.PI * 2);
                     }
                     targetCtx.fillStyle = style.fill;
                     targetCtx.fill();
@@ -5774,6 +6055,12 @@
                     `Right-click: sell +${formatCostShort(refund)}`
                 ];
 
+                targetCtx.restore();
+
+                // Anchored to the turret, sized for the screen: three lines of it at a
+                // quarter zoom was unreadable, which for the panel that explains what the
+                // click does is the same as not drawing it.
+                beginWorldLabel(targetCtx, turret.x, turret.y);
                 targetCtx.font = mapFont(17, 700);
                 targetCtx.textAlign = "center";
                 targetCtx.textBaseline = "alphabetic";
@@ -5781,15 +6068,15 @@
                 for (const line of lines) width = Math.max(width, targetCtx.measureText(line).width + 21);
                 const lineHeight = Math.round(23 * MAP_TEXT_SCALE);
                 const boxHeight = lineHeight * lines.length + 10;
-                const boxTop = turret.y - 66 - (boxHeight - 30);
+                const boxTop = -boxHeight - 34;
                 targetCtx.fillStyle = "#0b1422ee";
-                targetCtx.fillRect(turret.x - width / 2, boxTop, width, boxHeight);
+                targetCtx.fillRect(-width / 2, boxTop, width, boxHeight);
                 targetCtx.strokeStyle = "#ffd16688";
                 targetCtx.lineWidth = 1.5;
-                targetCtx.strokeRect(turret.x - width / 2, boxTop, width, boxHeight);
+                targetCtx.strokeRect(-width / 2, boxTop, width, boxHeight);
                 targetCtx.fillStyle = "#ffd166";
                 lines.forEach((line, i) => {
-                    targetCtx.fillText(line, turret.x, boxTop + 20 + i * lineHeight);
+                    targetCtx.fillText(line, 0, boxTop + 20 + i * lineHeight);
                 });
                 targetCtx.restore();
             }
@@ -5815,28 +6102,35 @@
                 targetCtx.restore();
             }
 
-            // Drawn in world space with the rest of the map layer, pinned above the tower
-            // so it is wherever the player is looking at the start of a run.
+            // Screen furniture, so it is laid out in viewport units and drawn in the
+            // screen pass. In world units its on-screen size tracked the zoom, and the
+            // map zooms out to a quarter - which turned the one line explaining the game
+            // to a new player into something they could not read.
             function drawTutorialBanner(targetCtx) {
                 const step = currentTutorialStep();
                 if (!step) return;
+                drawScreenBanner(targetCtx, step.text, viewport.h * 0.13, "#0b1422e6", "#9be7ff66", "#9be7ff", 1);
+            }
 
-                const text = step.text;
+            // The two map-wide banners are the same object with different words, so they
+            // are measured, boxed and centred in one place.
+            function drawScreenBanner(targetCtx, text, y, fill, stroke, ink, alpha) {
                 targetCtx.save();
                 targetCtx.font = mapFont(15, 700);
                 targetCtx.textAlign = "center";
                 targetCtx.textBaseline = "alphabetic";
-                const width = targetCtx.measureText(text).width + 30;
+                const width = Math.min(viewport.w - 24, targetCtx.measureText(text).width + 30);
                 const height = Math.round(30 * MAP_TEXT_SCALE);
-                const x = cameraState.x + viewWorldW() / 2;
-                const y = cameraState.y + viewWorldH() * 0.14;
-                targetCtx.fillStyle = "#0b1422e6";
+                const x = viewport.w / 2;
+                targetCtx.globalAlpha = alpha;
+                targetCtx.fillStyle = fill;
                 targetCtx.fillRect(x - width / 2, y, width, height);
-                targetCtx.strokeStyle = "#9be7ff66";
+                targetCtx.strokeStyle = stroke;
                 targetCtx.lineWidth = 1.5;
                 targetCtx.strokeRect(x - width / 2, y, width, height);
-                targetCtx.fillStyle = "#9be7ff";
+                targetCtx.fillStyle = ink;
                 targetCtx.fillText(text, x, y + height * 0.66);
+                targetCtx.globalAlpha = 1;
                 targetCtx.restore();
             }
 
@@ -5888,6 +6182,188 @@
                 targetCtx.textAlign = "left";
                 targetCtx.fillStyle = night ? "#cfe0ff" : "#ffe3ac";
                 targetCtx.fillText(text, x + 26, y + height * 0.66);
+
+                // Weather hangs under the clock: what is running and how long is left, or
+                // what is coming and how long you have to get ready for it.
+                const weather = activeWeather();
+                const pending = game.weatherPending ? weatherById(game.weatherPending) : null;
+                if (weather || pending) {
+                    const shown = weather || pending;
+                    const remaining = weather ? game.weatherTicks : game.weatherWarnTicks;
+                    const secs = Math.ceil(remaining / 60);
+                    const line = weather
+                        ? `${shown.label}  ${secs}s`
+                        : `${shown.label} incoming  ${secs}s`;
+
+                    targetCtx.font = mapFont(12, 700);
+                    const lineWidth = targetCtx.measureText(line).width + 22;
+                    const lineHeight = Math.round(22 * MAP_TEXT_SCALE);
+                    const lineX = viewport.w - lineWidth - 10;
+                    const lineY = y + height + 6;
+
+                    // A warning reads amber and pulses; weather already here reads calm.
+                    const warn = !weather;
+                    const pulse = warn ? 0.72 + 0.28 * Math.sin(game.dayTick * 0.22) : 1;
+                    targetCtx.globalAlpha = pulse;
+                    targetCtx.fillStyle = warn ? "#3a2a10ee" : "#12243be6";
+                    targetCtx.fillRect(lineX, lineY, lineWidth, lineHeight);
+                    targetCtx.strokeStyle = warn ? "#ffb04d" : `rgba(${shown.tint}, 0.6)`;
+                    targetCtx.lineWidth = 1.5;
+                    targetCtx.strokeRect(lineX, lineY, lineWidth, lineHeight);
+                    targetCtx.fillStyle = warn ? "#ffd08a" : "#dce9f5";
+                    targetCtx.fillText(line, lineX + 11, lineY + lineHeight * 0.68);
+                    targetCtx.globalAlpha = 1;
+                }
+                targetCtx.restore();
+            }
+
+            // The one-line warning across the middle of the map while weather is inbound.
+            // The whole point of telegraphing is that you get to do something about it -
+            // call the caravans in, hold the aether run, spend the cooldowns now - so it
+            // says what is coming and what it will do, not just that something will.
+            function drawWeatherWarning(targetCtx) {
+                if (!game.weatherPending) return;
+                const pending = weatherById(game.weatherPending);
+                if (!pending) return;
+
+                const seconds = Math.ceil(game.weatherWarnTicks / 60);
+                const text = `${pending.warning}  (${seconds}s)`;
+                // Sits under the tutorial line rather than over it, so a new player who
+                // is being warned about weather can still read what to do about it.
+                const y = currentTutorialStep() ? viewport.h * 0.13 + Math.round(38 * MAP_TEXT_SCALE) : viewport.h * 0.13;
+                const pulse = 0.75 + 0.25 * Math.sin(game.dayTick * 0.22);
+                drawScreenBanner(targetCtx, text, y, "#2a1c08ee", "#ffb04daa", "#ffd08a", pulse);
+            }
+
+            // Precipitation is one tiled pattern scrolled by an offset, not a field of
+            // particle objects. A few thousand drops updated and drawn per frame is the
+            // shape that put a fixed per-frame cost on this file once already; this is
+            // three canvas calls whatever the density, and it does not grow with the map,
+            // the zoom or how long the storm has been running.
+            const precipPatterns = new Map();
+
+            function precipPattern(kind) {
+                const cached = precipPatterns.get(kind);
+                if (cached) return cached;
+
+                const tile = document.createElement("canvas");
+                tile.width = 128;
+                tile.height = 128;
+                const tileCtx = tile.getContext("2d");
+
+                if (kind === "rain") {
+                    tileCtx.strokeStyle = "#cfe0ff8c";
+                    tileCtx.lineWidth = 1.4;
+                    tileCtx.beginPath();
+                    for (let i = 0; i < 26; i += 1) {
+                        // terrainNoise keeps the tile identical between sessions, so the
+                        // rain does not reshuffle every time a storm starts.
+                        const x = terrainNoise(311.7, i) * 128;
+                        const y = terrainNoise(197.3, i) * 128;
+                        tileCtx.moveTo(x, y);
+                        tileCtx.lineTo(x - 3, y + 11);
+                    }
+                    tileCtx.stroke();
+                } else {
+                    tileCtx.fillStyle = "#eef6ffb0";
+                    for (let i = 0; i < 22; i += 1) {
+                        const x = terrainNoise(151.9, i) * 128;
+                        const y = terrainNoise(263.1, i) * 128;
+                        const r = 1 + terrainNoise(87.5, i) * 1.6;
+                        tileCtx.beginPath();
+                        tileCtx.arc(x, y, r, 0, Math.PI * 2);
+                        tileCtx.fill();
+                    }
+                }
+
+                const pattern = ctx.createPattern(tile, "repeat");
+                precipPatterns.set(kind, pattern);
+                return pattern;
+            }
+
+            // Screen space on purpose: weather falls past the camera, it does not sit on
+            // the ground, so it must not pan or scale with the world.
+            function drawPrecipitation(targetCtx) {
+                const weather = activeWeather();
+                if (!weather || !weather.precipitation) return;
+                const pattern = precipPattern(weather.precipitation);
+                if (!pattern) return;
+
+                const fast = weather.precipitation === "rain";
+                const driftX = fast ? -(game.dayTick * 1.6) % 128 : -(game.dayTick * 0.35) % 128;
+                const driftY = fast ? (game.dayTick * 7) % 128 : (game.dayTick * 1.5) % 128;
+
+                targetCtx.save();
+                targetCtx.globalAlpha = fast ? 0.55 : 0.75;
+                targetCtx.translate(driftX, driftY);
+                targetCtx.fillStyle = pattern;
+                targetCtx.fillRect(-128, -128, viewport.w + 256, viewport.h + 256);
+                targetCtx.restore();
+            }
+
+            // The weather's own wash, plus fog's vignette. Sits with the night tint so the
+            // two stack rather than fight - a foggy dusk is darker and flatter than either.
+            function drawWeatherTint(targetCtx) {
+                const weather = activeWeather();
+                if (!weather) return;
+
+                // Eases in and out over two seconds at each end so weather arrives rather
+                // than switching on.
+                const fade = Math.min(1,
+                    Math.min(game.weatherTicks, WEATHER_MAX_TICKS - game.weatherTicks, 120) / 120);
+                const alpha = weather.tintAlpha * Math.max(0, fade);
+                if (alpha <= 0) return;
+
+                targetCtx.save();
+                targetCtx.fillStyle = `rgba(${weather.tint}, ${alpha.toFixed(3)})`;
+                targetCtx.fillRect(cameraState.x, cameraState.y, viewWorldW(), viewWorldH());
+
+                if (weather.id === "fog") {
+                    // Closes the view down towards the player, which is the thing fog
+                    // actually does to you here: you cannot see what your turrets cannot.
+                    const cx = cameraState.x + viewWorldW() / 2;
+                    const cy = cameraState.y + viewWorldH() / 2;
+                    const inner = Math.min(viewWorldW(), viewWorldH()) * 0.22;
+                    const outer = Math.max(viewWorldW(), viewWorldH()) * 0.72;
+                    const vignette = targetCtx.createRadialGradient(cx, cy, inner, cx, cy, outer);
+                    vignette.addColorStop(0, `rgba(${weather.tint}, 0)`);
+                    vignette.addColorStop(1, `rgba(${weather.tint}, ${(alpha * 1.5).toFixed(3)})`);
+                    targetCtx.fillStyle = vignette;
+                    targetCtx.fillRect(cameraState.x, cameraState.y, viewWorldW(), viewWorldH());
+                }
+                targetCtx.restore();
+            }
+
+            function drawLightningMarks(targetCtx) {
+                if (game.lightningMarks.length === 0) return;
+                targetCtx.save();
+                for (const mark of game.lightningMarks) {
+                    const life = mark.ticks / LIGHTNING_FLASH_TICKS;
+                    targetCtx.globalAlpha = Math.max(0, life);
+                    const glow = targetCtx.createRadialGradient(mark.x, mark.y, 0, mark.x, mark.y, LIGHTNING_RADIUS);
+                    glow.addColorStop(0, "#ffffffcc");
+                    glow.addColorStop(0.35, "#ffe9a0aa");
+                    glow.addColorStop(1, "#ffe9a000");
+                    targetCtx.fillStyle = glow;
+                    targetCtx.beginPath();
+                    targetCtx.arc(mark.x, mark.y, LIGHTNING_RADIUS, 0, Math.PI * 2);
+                    targetCtx.fill();
+
+                    // The bolt itself: a jagged line down to the strike, deterministic per
+                    // mark so it does not twitch about while it fades.
+                    targetCtx.strokeStyle = "#fffbe8";
+                    targetCtx.lineWidth = 3 * Math.max(0.2, life);
+                    targetCtx.beginPath();
+                    targetCtx.moveTo(mark.x, mark.y - viewWorldH());
+                    let x = mark.x;
+                    for (let i = 1; i <= 6; i += 1) {
+                        const t = i / 6;
+                        x = mark.x + (terrainNoise(mark.ticks * 0 + i * 13.7, Math.round(mark.x)) - 0.5) * W(70) * (1 - t);
+                        targetCtx.lineTo(x, mark.y - viewWorldH() * (1 - t));
+                    }
+                    targetCtx.stroke();
+                }
+                targetCtx.globalAlpha = 1;
                 targetCtx.restore();
             }
 
@@ -5931,11 +6407,46 @@
 
             // A caravan that arrived after dusk is doing nothing, and doing nothing looks
             // identical to being stuck. Say which it is.
-            function drawWaitingTraders(targetCtx) {
+            // Text pinned to a place on the map but sized for the screen. Inside the world
+            // pass everything is multiplied by the camera zoom, and the map zooms out to a
+            // quarter - legible at full zoom, unreadable below it. Undoing the zoom about
+            // the anchor keeps the label where it belongs at a size the player can read.
+            // Draw around (0, 0) after calling this, and restore() when done.
+            function beginWorldLabel(targetCtx, anchorX, anchorY) {
+                const inverse = 1 / Math.max(0.0001, cameraState.zoom);
                 targetCtx.save();
-                targetCtx.font = mapFont(12, 700);
+                targetCtx.translate(anchorX, anchorY);
+                targetCtx.scale(inverse, inverse);
+            }
+
+            // Said where the question gets asked: at the water's edge, when the crossing is
+            // the thing you are trying to do and it will not happen.
+            function drawFerryClosedNote(targetCtx) {
+                if (ferryOpen() || !isSkillUnlocked("boat")) return;
+                const dock = trackBank(game.player) === 1 ? FERRY_DOCKS.home : FERRY_DOCKS.far;
+                const dx = game.player.x - dock.x;
+                const dy = game.player.y - dock.y;
+                if (dx * dx + dy * dy > FERRY_BOARDING_RADIUS * FERRY_BOARDING_RADIUS * 9) return;
+
+                beginWorldLabel(targetCtx, dock.x, dock.y);
+                targetCtx.font = mapFont(14, 700);
                 targetCtx.textAlign = "center";
                 targetCtx.textBaseline = "alphabetic";
+                const text = "The river is too high to cross";
+                const width = targetCtx.measureText(text).width + 26;
+                const height = Math.round(26 * MAP_TEXT_SCALE);
+                const top = -height - 46;
+                targetCtx.fillStyle = "#20140bee";
+                targetCtx.fillRect(-width / 2, top, width, height);
+                targetCtx.strokeStyle = "#ff9f6eaa";
+                targetCtx.lineWidth = 1.5;
+                targetCtx.strokeRect(-width / 2, top, width, height);
+                targetCtx.fillStyle = "#ffbf9a";
+                targetCtx.fillText(text, 0, top + height * 0.66);
+                targetCtx.restore();
+            }
+
+            function drawWaitingTraders(targetCtx) {
                 for (const minion of game.minionUnits) {
                     // Both conditions on purpose: a run reset leaves the flag set on a
                     // caravan it has already sent home, and a label saying the market is
@@ -5943,31 +6454,36 @@
                     if (minion.role !== "trader" || !minion.tradeWaiting) continue;
                     if (minion.state !== "toVillage") continue;
                     if (!circleInView(minion.x, minion.y, 30)) continue;
+
+                    beginWorldLabel(targetCtx, minion.x, minion.y);
+                    targetCtx.font = mapFont(12, 700);
+                    targetCtx.textAlign = "center";
+                    targetCtx.textBaseline = "alphabetic";
                     targetCtx.fillStyle = "#0b1422cc";
-                    targetCtx.fillText("market shut", minion.x + 1, minion.y - 21);
+                    targetCtx.fillText("market shut", 1, -21);
                     targetCtx.fillStyle = "#ffd88a";
-                    targetCtx.fillText("market shut", minion.x, minion.y - 22);
+                    targetCtx.fillText("market shut", 0, -22);
+                    targetCtx.restore();
                 }
-                targetCtx.restore();
             }
 
             function drawFloaters(targetCtx) {
                 if (game.floaters.length === 0) return;
-                targetCtx.save();
-                targetCtx.textAlign = "center";
-                targetCtx.textBaseline = "alphabetic";
-                targetCtx.font = mapFont(13, 700);
                 for (const floater of game.floaters) {
                     if (!circleInView(floater.x, floater.y, 24)) continue;
                     const fade = Math.min(1, floater.ticks / (FLOATER_TICKS * 0.6));
+                    beginWorldLabel(targetCtx, floater.x, floater.y);
+                    targetCtx.textAlign = "center";
+                    targetCtx.textBaseline = "alphabetic";
+                    targetCtx.font = mapFont(13, 700);
                     targetCtx.globalAlpha = fade;
                     targetCtx.fillStyle = "#0b1422";
-                    targetCtx.fillText(floater.text, floater.x + 1, floater.y + 1);
+                    targetCtx.fillText(floater.text, 1, 1);
                     targetCtx.fillStyle = floater.color;
-                    targetCtx.fillText(floater.text, floater.x, floater.y);
+                    targetCtx.fillText(floater.text, 0, 0);
+                    targetCtx.globalAlpha = 1;
+                    targetCtx.restore();
                 }
-                targetCtx.globalAlpha = 1;
-                targetCtx.restore();
             }
 
             function drawSellPulse(targetCtx) {
@@ -7591,6 +8107,19 @@
                     targetCtx.arc(piling[0], piling[1], W(5), 0, Math.PI * 2);
                     targetCtx.fill();
                 }
+
+                // Barred while the river is up. Walking to a jetty and simply not boarding
+                // is indistinguishable from a broken boat, so the jetty says so itself.
+                if (!ferryOpen()) {
+                    targetCtx.strokeStyle = "#ff9f6e";
+                    targetCtx.lineWidth = W(4);
+                    targetCtx.beginPath();
+                    targetCtx.moveTo(-W(28), -W(12));
+                    targetCtx.lineTo(W(34), W(12));
+                    targetCtx.moveTo(-W(28), W(12));
+                    targetCtx.lineTo(W(34), -W(12));
+                    targetCtx.stroke();
+                }
                 targetCtx.restore();
             }
 
@@ -8265,7 +8794,7 @@
                 const ageSpeedup = Math.min(0.55, ageSteps * 0.04);
                 const upgradeSpeedup = Math.min(0.4, spawnerLevelFor(type) * 0.04);
                 const speedup = Math.min(0.82, ageSpeedup + upgradeSpeedup);
-                const scaled = Math.round(baseRespawn * (1 - speedup) * modValue("respawnScale"));
+                const scaled = Math.round(baseRespawn * (1 - speedup) * modValue("respawnScale") * weatherValue("respawnScale"));
                 return Math.max(14, scaled);
             }
 
@@ -8543,6 +9072,7 @@
             }
 
             function spawnerProduces(spawner) {
+                if (weatherValue("fieldsFrozen")) return false;
                 return spawner.owner !== "tribe";
             }
 
@@ -9229,7 +9759,13 @@
 
             function turretRangeFor(turret) {
                 const level = turret.level || 0;
-                return turretRangeForType(turret.type) * (1 + level * 0.08);
+                const base = turretRangeForType(turret.type) * (1 + level * 0.08);
+                // A slow field is not sight, it is cold on the ground, so frost widens it
+                // where fog narrows everything that has to see to shoot.
+                const weatherScale = turret.type === "slow"
+                    ? weatherValue("slowFieldScale")
+                    : weatherValue("turretRangeScale");
+                return base * weatherScale;
             }
 
             function upgradeTurretAt(x, y) {
@@ -9548,6 +10084,13 @@
                 game.pendingEvent = null;
                 game.floaters = [];
                 game.runPeakStored = 0;
+                game.weather = null;
+                game.weatherTicks = 0;
+                game.weatherPending = null;
+                game.weatherWarnTicks = 0;
+                game.weatherGapTicks = WEATHER_FIRST_GAP_TICKS;
+                game.weatherStrikeTimer = 0;
+                game.lightningMarks = [];
                 game.eventEssenceTicks = 0;
                 game.eventYieldTicks = 0;
                 game.nextWaveSizeBonus = 0;
@@ -9649,7 +10192,7 @@
                     return;
                 }
 
-                if (isSkillUnlocked("boat") && isInRiver(game.player.x, game.player.y, game.player.r)) {
+                if (isSkillUnlocked("boat") && ferryOpen() && isInRiver(game.player.x, game.player.y, game.player.r)) {
                     const side = trackBank(game.player);
                     const dock = side === 1 ? FERRY_DOCKS.home : FERRY_DOCKS.far;
                     const dx = game.player.x - dock.x;
@@ -10277,7 +10820,7 @@
                 // the risk being priced is standing out there in the dark right now.
                 const nightRate = isNight() ? NIGHT_ESSENCE_SCALE : 1;
                 return Math.round(baseEssenceFromEnemy(enemy) * modValue("essenceScale")
-                    * eventEssenceMultiplier() * nightRate);
+                    * eventEssenceMultiplier() * nightRate * weatherValue("essenceScale"));
             }
 
             function baseEssenceFromEnemy(enemy) {
@@ -10635,7 +11178,8 @@
                     }
 
                     if (canAttackMinions && enemy.minionShotCooldown <= 0 && game.minionUnits.length > 0) {
-                        const minionIndex = findClosestMinionIndexFrom(enemy.x, enemy.y, enemy.minionShotRange || W(46));
+                        const shotRange = (enemy.minionShotRange || W(46)) * weatherValue("enemyShotRangeScale");
+                        const minionIndex = findClosestMinionIndexFrom(enemy.x, enemy.y, shotRange);
                         if (minionIndex !== -1) {
                             const minion = game.minionUnits[minionIndex];
                             enemy.shotTargetX = minion.x;
@@ -10773,8 +11317,11 @@
 
             function slowMultiplierAtEnemy(enemy) {
                 // Chill is a slow field over the whole map for as long as it runs, so it
-                // enters here rather than as a second speed term at every call site.
-                let slowMultiplier = chillSpellActive() ? CHILL_SPELL_SPEED_MULTIPLIER : 1;
+                // enters here rather than as a second speed term at every call site. So is
+                // weather: it turns on and off under enemies that already exist, which is
+                // exactly why it cannot be stamped at spawn the way the night buff is.
+                let slowMultiplier = (chillSpellActive() ? CHILL_SPELL_SPEED_MULTIPLIER : 1)
+                    * weatherValue("enemySpeedScale");
                 for (const turret of game.turrets) {
                     if (turret.type !== "slow") continue;
                     const slowRadius = turretRangeFor(turret);
@@ -10907,7 +11454,7 @@
                         let enemy = findEnemyById(minion.targetEnemyId);
                         if (!enemy) {
                             minion.targetEnemyId = null;
-                            let enemyIndex = findClosestEnemyIndexFrom(minion.x, minion.y, DEFENDER_AGGRO_RADIUS, post.bank);
+                            let enemyIndex = findClosestEnemyIndexFrom(minion.x, minion.y, DEFENDER_AGGRO_RADIUS * weatherValue("aggroScale"), post.bank);
                             if (enemyIndex === -1) {
                                 enemyIndex = findClosestEnemyIndexFrom(post.x, post.y, DEFENDER_TOWER_ALERT_RADIUS, post.bank);
                             }
@@ -11205,6 +11752,15 @@
                 updateEnemies();
                 updateTurrets();
                 updateFloaters();
+                updateWeather();
+                updateLightningMarks();
+                if (weatherValue("lightning")) {
+                    game.weatherStrikeTimer -= 1;
+                    if (game.weatherStrikeTimer <= 0) {
+                        game.weatherStrikeTimer = LIGHTNING_INTERVAL_TICKS;
+                        strikeLightning();
+                    }
+                }
 
                 game.player.stamina = Math.min(PLAYER_STAMINA_MAX, game.player.stamina + PLAYER_STAMINA_REGEN_PER_TICK);
 
@@ -11253,9 +11809,10 @@
                     game.chillTicks -= 1;
                     if (game.chillTicks === 0) refreshHud();
                 }
+                const cooldownRate = weatherValue("spellCooldownRate");
                 for (const spellKey of SPELL_KEYS) {
                     if (game.spellCooldowns[spellKey] <= 0) continue;
-                    game.spellCooldowns[spellKey] -= 1;
+                    game.spellCooldowns[spellKey] = Math.max(0, game.spellCooldowns[spellKey] - cooldownRate);
                     if (game.spellCooldowns[spellKey] === 0) refreshHud();   // castable again
                 }
 
@@ -11567,11 +12124,13 @@
                 // in the world pass. Below the restore they were being drawn at world
                 // coordinates into screen space, which pins them to the top-left of the
                 // map and slides them away from whatever they are labelling.
+                drawLightningMarks(ctx);
+                drawWeatherTint(ctx);
                 drawNightTint(ctx);
                 drawWaitingTraders(ctx);
+                drawFerryClosedNote(ctx);
                 drawEnemyHealthBars(ctx);
                 drawFloaters(ctx);
-                drawTutorialBanner(ctx);
 
                 ctx.restore();
 
@@ -11580,6 +12139,9 @@
                 ctx.save();
                 ctx.scale(renderScale, renderScale);
 
+                drawPrecipitation(ctx);
+                drawTutorialBanner(ctx);
+                drawWeatherWarning(ctx);
                 drawDayNightIndicator(ctx);
                 drawOffscreenPlayerIndicator(ctx);
                 drawOffscreenBossIndicators(ctx);
@@ -11692,7 +12254,7 @@
                     ctx.fillStyle = "#e9f4fb";
                     ctx.font = mapFont(17, 500);
                     ctx.fillText("Move: WASD or arrows (touch: drag)   -   Zoom: wheel, [ ], 0 to reset", viewport.w / 2, controlsTop);
-                    ctx.fillText("Pause: P   -   Speed: F   -   Skill Tree buys the unlocks that outlive the run", viewport.w / 2, controlsTop + 28);
+                    ctx.fillText("Pause: P   -   Speed: F   -   Tips: T   -   Skill Tree buys the unlocks that outlive the run", viewport.w / 2, controlsTop + 28);
                     ctx.fillStyle = "#9fb8c8";
                     ctx.font = mapFont(15, 500);
                     ctx.fillText("Wood square  -  Stone circle  -  Crystal diamond  -  Amber triangle  -  Aether star  -  Ivory shard", viewport.w / 2, controlsTop + 60);
@@ -12089,6 +12651,16 @@
                 playToneVoice(start + 0.07, midiToFreq(79), 2, 0.1, musicState.thinPulseWave, 0, false, musicState.sfxBus);
             }
 
+            // A crack and a roll. Same guards as every other effect here: silent if the
+            // context was never unlocked from a gesture, or if effects are off.
+            function playLightningSting() {
+                if (!musicState.ctx || !musicState.sfxBus || save.sfxMuted) return;
+                const start = musicState.ctx.currentTime + 0.01;
+                playDrumVoice(start, "snare", musicState.sfxBus);
+                playToneVoice(start, midiToFreq(31), 6, 0.24, "triangle", 0, false, musicState.sfxBus);
+                playToneVoice(start + 0.05, midiToFreq(26), 8, 0.18, "triangle", 0, false, musicState.sfxBus);
+            }
+
             // Descending minor figure over the breach overlay. Reuses the track's voices,
             // and stays silent if the audio context was never unlocked or music is muted.
             function playDefeatSting() {
@@ -12130,6 +12702,22 @@
 
             function nudgeMusicVolume(delta) {
                 setMusicVolume(musicVolumeSetting() + delta, true);
+            }
+
+            function refreshTipsUi() {
+                if (!tipsBtn) return;
+                const on = tipsEnabled();
+                tipsBtn.textContent = on ? "On" : "Off";
+                tipsBtn.setAttribute("aria-pressed", String(on));
+            }
+
+            function toggleTips() {
+                save.tipsEnabled = !tipsEnabled();
+                refreshTipsUi();
+                saveGame();
+                // The banner lives on the canvas, so a paused game would otherwise keep
+                // showing it until something else forced a frame.
+                if (!game.running) render();
             }
 
             function toggleSfxMuted() {
@@ -12224,6 +12812,10 @@
                 }
                 if (key === "f") {
                     cycleGameSpeed();
+                    return;
+                }
+                if (key === "t") {
+                    toggleTips();
                     return;
                 }
                 if (key === "p" || key === "escape") {
@@ -12534,6 +13126,7 @@
 
             muteBtn.addEventListener("click", toggleMusicMuted);
             sfxBtn.addEventListener("click", toggleSfxMuted);
+            if (tipsBtn) tipsBtn.addEventListener("click", toggleTips);
 
             audioPanelEl.addEventListener("click", (e) => {
                 e.stopPropagation();
@@ -13141,6 +13734,7 @@
 
             refreshMusicUi();
             refreshSpeedUi();
+            refreshTipsUi();
             // Autoplay policy: the context can only start from a user gesture, so arm
             // the track on whichever interaction happens first.
             const armMusic = () => {
