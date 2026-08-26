@@ -13735,22 +13735,42 @@
                 return musicVolumeSetting() > 0 && (!save.musicMuted || !save.sfxMuted);
             }
 
+            // What each bus should be holding right now. Shared by startMusic(), which
+            // sets them outright as the graph is built, and applyMusicVolume(), which
+            // ramps them afterwards - if these two ever disagreed, the graph would open
+            // in one state and slide into another.
+            function musicBusTarget() {
+                return save.musicMuted ? 0 : (game.running ? 1 : MUSIC_PAUSED_DUCK);
+            }
+
+            function sfxBusTarget() {
+                return save.sfxMuted ? 0 : 1;
+            }
+
+            // An exponential ramp approaches its target and never arrives, so it can never
+            // reach a true zero: silence is a small epsilon instead.
+            function busGainValue(value) {
+                return value <= 0 ? 0.0001 : value;
+            }
+
             // Master carries the volume setting; the two buses carry their own mutes, so
             // silencing the music leaves gameplay effects audible.
+            //
+            // Every change here is a ramp, which is right for a mute the player just
+            // pressed and wrong for the first moment of a graph that has only now been
+            // built - see startMusic().
             function applyMusicVolume() {
                 if (!musicState.master || !musicState.ctx) return;
                 const volume = musicVolumeSetting();
                 const now = musicState.ctx.currentTime;
-                // The gain ramp is exponential, so it can never reach a true zero.
                 const setBus = (node, value, tau) => {
                     node.gain.cancelScheduledValues(now);
-                    node.gain.setTargetAtTime(value <= 0 ? 0.0001 : value, now, tau);
+                    node.gain.setTargetAtTime(busGainValue(value), now, tau);
                 };
 
                 setBus(musicState.master, volume <= 0 ? 0 : MUSIC_BASE_GAIN * volume, 0.08);
-                setBus(musicState.musicBus,
-                    save.musicMuted ? 0 : (game.running ? 1 : MUSIC_PAUSED_DUCK), 0.08);
-                setBus(musicState.sfxBus, save.sfxMuted ? 0 : 1, 0.05);
+                setBus(musicState.musicBus, musicBusTarget(), 0.08);
+                setBus(musicState.sfxBus, sfxBusTarget(), 0.05);
             }
 
             function refreshMusicUi() {
@@ -13801,6 +13821,20 @@
                 feedback.gain.value = 0.24;
                 echoMix.gain.value = 0.22;
                 master.gain.value = 0.0001;
+                // The buses open holding the value they are meant to hold, rather than
+                // being left at the GainNode default of 1 for applyMusicVolume() to ramp
+                // away from at the bottom of this function.
+                //
+                // That ramp is why a muted page could still be heard: setTargetAtTime is
+                // exponential, so a music bus muted from 1 is still near 37% one tau
+                // (0.08s) later - and nextStepTime below puts the first note at exactly
+                // ctx.currentTime + 0.08, inside that window. One or two notes escaped on
+                // the first click and then faded out, which is the blip.
+                //
+                // Only on a graph being built: a mute the player presses mid-run still
+                // ramps, because a hard cut there is an audible click.
+                musicBus.gain.value = busGainValue(musicBusTarget());
+                sfxBus.gain.value = busGainValue(sfxBusTarget());
 
                 musicBus.connect(tone);
                 musicBus.connect(delay);

@@ -845,6 +845,28 @@ slots 2-7 cast the six spells, and 8-9 stay empty as room for whatever moves in 
 - [ ] Stings fire: tower hit (scaled by damage), turret sell, lightning, defeat.
 - [ ] Music turns dark while a boss is alive and recovers when it dies or the run ends.
 - [ ] Audio starts only after a user gesture (no autoplay warning in the console).
+- [ ] **A muted page makes no sound at all on the first gesture.** Load with music muted,
+      click once, and listen: not one note, not a fragment of one. Same with Effects muted.
+      Regression: `ctx.createGain()` starts at gain **1** and the two buses were never
+      given a starting value - `applyMusicVolume()` only ever *ramps* toward its target
+      with `setTargetAtTime(..., 0.08)`. A muted music bus therefore began at full and
+      decayed exponentially: still ~37% one tau (80ms) later, ~14% at 160ms. And
+      `musicState.nextStepTime` is set to `ctx.currentTime + 0.08`, putting the very first
+      note at 80ms - inside that window. One or two notes escaped and faded out.
+      Three reasons a naive check misses it: it is **one or two notes** and gone, so it
+      reads as a stray click rather than the track playing; it only happens on the gesture
+      that *builds* the audio graph, so muting and unmuting in an already-running session
+      never shows it; and whether anything is audible depends on whether step 0 of the
+      pattern carries a note, which is why it was reported as happening only sometimes.
+- [ ] **Music is muted by the bus gain alone - there is no per-note check.** The SFX
+      helpers each early-return on `save.sfxMuted`, but `scheduleMusicStep()` schedules
+      unconditionally, so anything that leaves the music bus at the wrong gain is instantly
+      audible. Do not "fix" a future leak by having the scheduler skip while muted: the
+      step clock would fall behind `ctx.currentTime` and unmuting would flush every missed
+      step at once, as a cluster.
+- [ ] A mute pressed **during** play still ramps rather than cutting - a hard cut on a
+      running voice is an audible click. Only a freshly built graph sets its gains
+      outright. Toggle `M` mid-run and listen for a click at the transition.
 
 ---
 
@@ -975,3 +997,8 @@ Each of these has broken the game before, and the failure was silent.
       returned turrets *owned*, and the turret cap was checked against it precisely because
       the name said what the caller wanted to hear. When a count feeds a limit, read the
       body before trusting the identifier.
+- [ ] **A node created with a default, then only ever ramped.** A Web Audio `GainNode`
+      starts at 1 and `setTargetAtTime` is an exponential approach, so "set it to muted"
+      is a fade *from full*, not a state. Anything built while it should already be silent
+      has to be given its value outright at construction - see `startMusic()` and §20. The
+      same shape applies to any node whose steady-state setter is a ramp.
