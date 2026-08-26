@@ -185,7 +185,11 @@ entirely until its skill is unlocked, and buying it deducts exactly the quoted c
 - [ ] **Turrets**: Turret Store (buy via caravan), Turret Capacity (+3 per level from a
       base of 15). The group header shows `placed/cap`.
 - [ ] **Minions**: Craft Gatherer, Gatherer Focus, Far Bank, Craft Trader, Trade Routes,
-      Craft Defender, Defender Posts, Minion Speed, Minion Capacity.
+      Craft Defender, Defender Posts, Minion Speed, Minion Load.
+- [ ] **"Minion Load" reads `Lv N carries M`**, where M is `1 + level`. It must not be
+      called Capacity: it sits under "Turret Capacity", which *is* a maximum count, and
+      the same word for two different things had testers reading it as a limit on how many
+      minions they could own. It also raises trader cargo (`24 + level * 6`).
 - [ ] **Spells**: Haste, War Paint, Bloom, Waygate, Chill, Mend Tower.
 - [ ] Every recipe scales with the count already owned - crafting the 4th gatherer costs
       more than the 3rd.
@@ -204,8 +208,22 @@ entirely until its skill is unlocked, and buying it deducts exactly the quoted c
       covers the cost.
 - [ ] Buying deducts the cost, redraws the node as owned, and reveals the matching shop
       buttons immediately.
-- [ ] Link lines connect each node to its prerequisites; no two node boxes overlap at
-      default zoom.
+- [ ] Link lines connect each node to its prerequisites.
+- [ ] **Every node shows its cost until it is owned** - locked ones included, so a route
+      through the tree can be priced before it is bought into. Only unlocked nodes drop it.
+- [ ] **All 27 nodes carry a hint** in the tooltip, above the tier/status/cost lines.
+      Where the node buys the *right* to do something rather than the thing itself (all
+      three turret types), the hint has to say so.
+- [ ] **No two node boxes overlap at 1600x1000 or wider.** Showing costs made every node a
+      row taller (52px -> 74px), and the economy strand had exactly 3px of vertical
+      clearance at the old 20-degree angle; it runs at 32 now to buy the room vertically
+      rather than by spreading the rings, which would have grown the whole tree.
+      Regression: check after **any** change to node contents, font, or padding - this
+      layout is tuned to within a few pixels and the failure is silent.
+- [ ] Known, pre-existing: at **1440x900 and below** the defense strand overlaps
+      (Defenders/Slings/Catapults/Slow Field/Turret Capacity). Present before the cost
+      change and unrelated to it - node widths clamp at 128px while the map layer keeps
+      shrinking. Compare against `git stash` before blaming a new change for it.
 - [ ] Prerequisite chains behave (spot-check the awkward ones):
       `minionSpeed` needs **both** `gatherer` and `trader`;
       `gathererFocus` needs `minionCapacity`;
@@ -263,6 +281,14 @@ and are killed by ghouls/hunters/the war chief.
 - [ ] States cycle idle → toNode → toTower → idle; a gatherer with a full bag walks home.
 - [ ] **Gatherer Focus**: `auto` plus one per resource. A focused gatherer only picks its
       resource; `auto` takes the nearest.
+- [ ] **Ivory is not offered until `boat` is unlocked** - six options before, seven after,
+      and the list refreshes the moment the skill is bought without needing another redraw.
+      Ivory grows only on the tribe's ground, so without the ferry there is none to walk to.
+- [ ] An ivory order that arrives anyway is coerced to `auto` - including one restored from
+      a save written while the option was still on offer.
+      Regression: the focus used to be accepted and then silently ignored (the gatherer
+      falls back to the nearest node of anything), so the row read "Ivory" while the minion
+      hauled wood. A stalled minion would have been obvious; this was not.
 - [ ] **Far Bank**: only selectable once `boat` is unlocked. Set to `far`, the gatherer
       rides the ferry and works the tribe's ivory fields.
 - [ ] Re-pointing a gatherer mid-crossing does not strand it - it finishes the crossing
@@ -272,6 +298,12 @@ and are killed by ghouls/hunters/the war chief.
 
 ### Traders
 - [ ] A fresh trader starts on route `none` and does nothing until given one.
+- [ ] **A trader with no route says so.** The map draws `no route set` over it, and the
+      collapsed panel summary reads `Trade Routes (N, 1 idle)`. Both cues clear the moment
+      a route is assigned. A caravan is expensive and standing still looks identical to
+      working, so silence here reads as a purchase that did nothing.
+- [ ] The night label still wins over the route label: a routed caravan waiting out the
+      dark says `market shut`, not `no route set`.
 - [ ] 9 routes: 6 village trades (wood→crystal, stone→crystal, wood→amber, stone→amber,
       crystal→aether, amber→aether) and 3 city turret purchases (stone→Sling,
       crystal→Catapult, amber→Slow Field).
@@ -332,7 +364,42 @@ and are killed by ghouls/hunters/the war chief.
       share one polyline).
 - [ ] Exactly one crossing, at the point the river passes closest to the tower, with a
       dock on each bank. It appears only once `boat` is unlocked.
-- [ ] Boarding works within 150 units of a jetty and nowhere else.
+- [ ] Boarding works within 150 units of a jetty and nowhere else. That radius is measured
+      **along the bank** and the player must already be in the water, so it is not a way to
+      board from dry land.
+- [ ] **The ride runs waterline to waterline.** The jetty (`FERRY_DOCK_OFFSET`, 36 past
+      the water's edge) is only what an entity walks *to*; the crossing itself starts and
+      ends at `FERRY_BOARD_OFFSET`, 15 past the edge. Watch a gatherer cross both ways: the
+      hull must appear as it steps off the deck and vanish as it reaches the far one -
+      never slide over ground at either end.
+      Regression: the crossing used to run jetty to jetty, so it opened *and* closed with a
+      boat on dry land. Check the **landing** as well as the launch - fixing only the near
+      end leaves it half wrong, which is what happened the first time.
+- [ ] `FERRY_BOARD_OFFSET` has a hard floor: it must clear `RIVER_HALF_WIDTH +
+      MINION_RIVER_RADIUS`, or `keepOutOfRiver` shoves minions back short of the point they
+      are walking to and the crossing never starts. It currently clears it by 1.
+- [ ] The board point must stay **inside the jetty deck** (`dock - 34` to `dock + 42` along
+      the crossing axis), so a minion boards from the planks rather than beside them.
+- [ ] `FERRY_DOCK_REACH` can be small safely - the step before it snaps an entity exactly
+      onto its target once it is within one stride, so arrival never depends on the reach
+      being generous. A wide reach only means the hull appears further inland.
+
+### The player and the boat
+
+- [ ] **A ferry is moored at each jetty while the crossing is open**, and both disappear
+      when it shuts (rain). Walking to the dock and finding nothing there gave no sign the
+      river could be crossed at all.
+- [ ] **Boarding happens on the step that would enter the water**, not once the player is
+      already in it - so the boat meets you at the end of the jetty instead of fishing you
+      out of the river. Verify the player is still on dry land at the moment they board.
+- [ ] **The controls are dead for the whole crossing.** Hold any direction, or several: the
+      player must travel in a dead straight line to the landing.
+      Regression: the ferry step ran *after* the input step, so a held key was applied and
+      then partly undone every tick - you could row about mid-river and reach places the
+      water exists to keep you out of.
+- [ ] Landing leaves the player free again immediately, and holding the same key that
+      boarded them does not bounce them straight back (on the far bank it now points
+      inland).
 - [ ] Crossing speed is 0.55x walking - the ferry is a toll, not a shortcut.
 - [ ] A crossing entity is drawn with a hull under it, not walking on water.
 - [ ] **Rain closes the crossing entirely** - check what happens to someone already on it

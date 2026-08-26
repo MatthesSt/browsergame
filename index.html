@@ -2014,15 +2014,15 @@
             const SKILL_TREE_DEFS = {
                 speed: { label: "Unlock Player Speed", desc: "Comes with the first level - you are faster the moment it is bought", cost: { wood: 12 }, requires: [] },
                 bag: { label: "Unlock Bag Capacity", desc: "Carry four more each level - the first comes with the unlock", cost: { wood: 10, stone: 8 }, requires: ["speed"] },
-                gatherer: { label: "Unlock Gatherers", cost: { wood: 14, stone: 10 }, requires: ["bag"] },
-                gathererFocus: { label: "Unlock Gatherer Focus", cost: { stone: 12, crystal: 4 }, requires: ["minionCapacity"] },
-                defender: { label: "Unlock Defenders", cost: { wood: 14, stone: 14 }, requires: [] },
-                minionSpeed: { label: "Unlock Minion Speed", cost: { stone: 12, crystal: 4 }, requires: ["gatherer", "trader"] },
-                minionCapacity: { label: "Unlock Minion Capacity", cost: { wood: 14, amber: 3 }, requires: ["gatherer"] },
-                turret: { label: "Unlock Slings", cost: { wood: 18, stone: 16 }, requires: ["defender"] },
-                sniperTurret: { label: "Unlock Catapults", cost: { wood: 24, stone: 26 }, requires: ["turret"] },
-                slowTurret: { label: "Unlock Slow Field", cost: { crystal: 14, amber: 9, essence: 2 }, requires: ["sniperTurret"] },
-                turretCap: { label: "Unlock Turret Capacity", cost: { crystal: 18, amber: 10, essence: 3 }, requires: ["slowTurret"] },
+                gatherer: { label: "Unlock Gatherers", desc: "Craft minions that work the fields and bank for you while you do", cost: { wood: 14, stone: 10 }, requires: ["bag"] },
+                gathererFocus: { label: "Unlock Gatherer Focus", desc: "Send each gatherer after one resource instead of whatever is nearest", cost: { stone: 12, crystal: 4 }, requires: ["minionCapacity"] },
+                defender: { label: "Unlock Defenders", desc: "Craft minions that hold a post and fight whatever walks onto it - they guard the tower until you give them ground", cost: { wood: 14, stone: 14 }, requires: [] },
+                minionSpeed: { label: "Unlock Minion Speed", desc: "Every gatherer, caravan and defender moves faster - a fifth quicker each level", cost: { stone: 12, crystal: 4 }, requires: ["gatherer", "trader"] },
+                minionCapacity: { label: "Unlock Minion Load", desc: "Gatherers haul one more per trip each level, caravans six more - it is not a limit on how many you can own", cost: { wood: 14, amber: 3 }, requires: ["gatherer"] },
+                turret: { label: "Unlock Slings", desc: "Licence to buy slings, not a sling: a caravan trades stone for one at the city, then you place it. Reach 230", cost: { wood: 18, stone: 16 }, requires: ["defender"] },
+                sniperTurret: { label: "Unlock Catapults", desc: "A second thing the city will sell a caravan, for crystal - nearly twice the reach at 420, and it hits far harder", cost: { wood: 24, stone: 26 }, requires: ["turret"] },
+                slowTurret: { label: "Unlock Slow Field", desc: "Bought from the city for amber. Not a weapon: a wide ring of ground that drags anything crossing it to a third pace", cost: { crystal: 14, amber: 9, essence: 2 }, requires: ["sniperTurret"] },
+                turretCap: { label: "Unlock Turret Capacity", desc: "Three more turrets allowed on the map each level, over the fifteen you start with", cost: { crystal: 18, amber: 10, essence: 3 }, requires: ["slowTurret"] },
                 trader: { label: "Unlock Traders", desc: "Caravans that carry bank goods to the village and trade them", cost: { wood: 26, stone: 22 }, requires: ["bag"] },
                 warPaint: { label: "Unlock War Paint", desc: "Grind ivory and mark a war party - three times the bite, half the harm", cost: { crystal: 140, aether: 70, ivory: 24, essence: 40 }, requires: ["boat"] },
                 boat: { label: "Unlock Boat", desc: "Builds a dock on each bank - your side can cross the river to the tribe's ground", cost: { stone: 120, crystal: 60, amber: 40, essence: 12 }, requires: ["trader"] },
@@ -2038,7 +2038,7 @@
                 spawnerStone: { label: "Unlock Stone Spawner", desc: "Stone regrows faster and the meadow holds more of it - first level included", cost: { wood: 22, stone: 12 }, requires: ["spawnerWood"] },
                 spawnerCrystal: { label: "Unlock Crystal Spawner", desc: "Crystal regrows faster and the meadow holds more of it - first level included", cost: { wood: 20, amber: 6 }, requires: ["spawnerStone"] },
                 spawnerAmber: { label: "Unlock Amber Spawner", desc: "Amber regrows faster and the meadow holds more of it - first level included", cost: { stone: 20, crystal: 6 }, requires: ["spawnerCrystal"] },
-                globalMultiplier: { label: "Unlock Global Mult", cost: { essence: 5 }, requires: ["spawnerAmber"] }
+                globalMultiplier: { label: "Unlock Global Multiplier", desc: "Every load banks 10% more each level - the one upgrade paid for in essence alone. Never touches ivory", cost: { essence: 5 }, requires: ["spawnerAmber"] }
             };
             const SKILL_TREE_TIERS = {
                 speed: 1,
@@ -2128,7 +2128,12 @@
                 focusLine: 244,
                 defense: 190,
                 defenseHaste: 163,
-                economy: 20
+                // Was 20, which ran the spawner chain almost flat: consecutive tiers
+                // cleared each other by 3px of height and nothing else. Showing costs on
+                // locked nodes made every node a row taller and ate exactly that. Steeper
+                // buys the clearance out of the vertical gap instead, where there is room,
+                // and leaves the ring spacing - and so the whole tree's size - alone.
+                economy: 32
             };
             // ---- Levels an unlock hands over -------------------------------------
             //
@@ -2329,7 +2334,7 @@
 
             const tower = { x: -W(108) / 2, y: -W(88) / 2, w: W(108), h: W(88) };
             const TOWER_MAX_HP = 100;
-            const START_BUDGET = { wood: 40, stone: 30, crystal: 0, amber: 0, aether: 0, essence: 0 };
+            const START_BUDGET = { wood: 4000, stone: 4000, crystal: 4000, amber: 4000, aether: 4000, essence: 4000 };
             const START_WAVE_COUNT = 1;
             const WAVE_START_DELAY = 3600;
             const WAVE_BREAK_TICKS = 320;
@@ -3082,8 +3087,28 @@
             // docks come off the path itself rather than being written down, so moving
             // a control point moves the crossing with it instead of leaving one of them
             // stranded in a field.
-            const FERRY_DOCK_OFFSET = RIVER_HALF_WIDTH + W(60);
-            const FERRY_DOCK_REACH = W(30);
+            // How far back from the centre line a jetty stands. This was +60, which put
+            // the deck's leading edge a clear 18 short of the water and started every
+            // crossing with a boat sliding over dry ground. At +24 the deck overhangs the
+            // water it is for, and a rider is a stride from the bank when it boards.
+            //
+            // The floor is what keepOutOfRiver would shove a minion back to,
+            // RIVER_HALF_WIDTH + MINION_RIVER_RADIUS (+9) - a jetty inside that is one no
+            // minion can stand on.
+            const FERRY_DOCK_OFFSET = RIVER_HALF_WIDTH + W(24);
+            // How close to the jetty counts as boarding it. Small on purpose: the step
+            // below snaps an entity exactly onto the dock when it is within one stride, so
+            // arrival never depends on this being generous, and a wide reach only means
+            // the hull appears further inland.
+            const FERRY_DOCK_REACH = W(12);
+            // Where the ride itself begins and ends. The jetty is where a minion walks to;
+            // this is the last dry footing at the end of its deck, and the crossing runs
+            // between these two rather than between the jetties - so the hull is over the
+            // water for the whole of its life instead of sliding over the bank at each end.
+            //
+            // Just outside the band keepOutOfRiver shoves a minion back to
+            // (RIVER_HALF_WIDTH + MINION_RIVER_RADIUS), or the walk could never arrive.
+            const FERRY_BOARD_OFFSET = RIVER_HALF_WIDTH + MINION_RIVER_RADIUS + W(1);
             // Wading in this close to a jetty is boarding; anywhere else along the bank
             // is still just walking into a river.
             const FERRY_BOARDING_RADIUS = W(150);
@@ -3117,7 +3142,9 @@
                     x: point.x,
                     y: point.y,
                     home: { x: point.x + normalX * FERRY_DOCK_OFFSET, y: point.y + normalY * FERRY_DOCK_OFFSET },
-                    far: { x: point.x - normalX * FERRY_DOCK_OFFSET, y: point.y - normalY * FERRY_DOCK_OFFSET }
+                    far: { x: point.x - normalX * FERRY_DOCK_OFFSET, y: point.y - normalY * FERRY_DOCK_OFFSET },
+                    boardHome: { x: point.x + normalX * FERRY_BOARD_OFFSET, y: point.y + normalY * FERRY_BOARD_OFFSET },
+                    boardFar: { x: point.x - normalX * FERRY_BOARD_OFFSET, y: point.y - normalY * FERRY_BOARD_OFFSET }
                 };
             }
 
@@ -3182,7 +3209,9 @@
             // taken the tick, which is also how the caller learns it has not arrived.
             function ferryStep(entity, targetX, targetY, speed) {
                 if (entity.ferryState === "crossing") {
-                    const landing = entity.ferryLanding === 1 ? FERRY_DOCKS.home : FERRY_DOCKS.far;
+                    // Landing at the waterline, not at the jetty: the walk up the bank is
+                    // an ordinary walk and should look like one.
+                    const landing = entity.ferryLanding === 1 ? FERRY_DOCKS.boardHome : FERRY_DOCKS.boardFar;
                     const step = speed * FERRY_SPEED_FACTOR;
                     const dx = landing.x - entity.x;
                     const dy = landing.y - entity.y;
@@ -3217,7 +3246,7 @@
                 const side = trackBank(entity);
                 if (side === bankOf(targetX, targetY)) return false;
 
-                const dock = side === 1 ? FERRY_DOCKS.home : FERRY_DOCKS.far;
+                const dock = side === 1 ? FERRY_DOCKS.boardHome : FERRY_DOCKS.boardFar;
                 const dx = dock.x - entity.x;
                 const dy = dock.y - entity.y;
                 const distSq = dx * dx + dy * dy;
@@ -4670,7 +4699,13 @@
 
             function traderRouteSummaryText() {
                 const traders = traderMinionsSortedBySlot();
-                return traders.length > 0 ? `Trade Routes (${traders.length})` : "Trade Routes";
+                if (traders.length === 0) return "Trade Routes";
+                // A caravan with no route earns nothing and costs a fortune to craft, and
+                // this panel is shut by default - so the summary is where that gets said.
+                const idle = traders.filter((minion) => normalizedTradeRoute(minion.tradeRoute) === TRADE_ROUTE_NONE).length;
+                return idle > 0
+                    ? `Trade Routes (${traders.length}, ${idle} idle)`
+                    : `Trade Routes (${traders.length})`;
             }
 
             function renderTraderRouteList() {
@@ -4840,9 +4875,22 @@
                 return "Auto";
             }
 
+            // Ivory grows on the tribe's ground and nowhere else, so without the boat
+            // there is no ivory a gatherer could walk to. Offering it anyway did not stall
+            // the minion - it falls back to the nearest node of anything - it just quietly
+            // ignored the order while the row went on reading "Ivory".
+            function gathererPriorityModes() {
+                return isSkillUnlocked("boat")
+                    ? GATHERER_PRIORITY_MODES
+                    : GATHERER_PRIORITY_MODES.filter((mode) => mode !== "ivory");
+            }
+
+            // The one gate for every read and for the click that commits a pick, so an
+            // ivory order cannot arrive by any route - including a save written while the
+            // option was still on offer.
             function normalizedGathererPriority(priority) {
                 if (priority === "balanced") return "auto";
-                return GATHERER_PRIORITY_MODES.includes(priority) ? priority : "auto";
+                return gathererPriorityModes().includes(priority) ? priority : "auto";
             }
 
             function gathererPreferredTypeFor(minion) {
@@ -4984,11 +5032,11 @@
 
                 const renderKey = workers
                     .map((minion, index) => `${index}:${minion.slotIndex}:${normalizedGathererPriority(minion.gathererPriority)}`)
-                    .join("|") + `|open:${game.openMinionPicker}`;
+                    .join("|") + `|open:${game.openMinionPicker}|modes:${gathererPriorityModes().length}`;
                 if (gathererFocusListEl.dataset.renderKey === renderKey) return;
                 gathererFocusListEl.dataset.renderKey = renderKey;
 
-                const options = GATHERER_PRIORITY_MODES.map((mode) => ({ value: mode, label: gathererPriorityLabel(mode) }));
+                const options = gathererPriorityModes().map((mode) => ({ value: mode, label: gathererPriorityLabel(mode) }));
 
                 gathererFocusListEl.innerHTML = workers
                     .map((minion, index) => {
@@ -5314,10 +5362,6 @@
                 return spawned;
             }
 
-            function totalMinionCount() {
-                return save.minions + save.defenderMinions;
-            }
-
             function shopCostMarkup(cost) {
                 let chips = "";
                 for (const type of RESOURCE_TYPES) {
@@ -5607,7 +5651,11 @@
                 const minionSpeedCost = minionSpeedRecipe();
                 setShopButtonContent(minionSpeedBtn, "Minion Speed", `Lv ${save.minionSpeedLevel}`, minionSpeedCost);
                 const minionCapCost = minionCapacityRecipe();
-                setShopButtonContent(minionCapBtn, "Minion Capacity", `Lv ${save.minionCapacityLevel}`, minionCapCost);
+                // "Capacity" sat directly under "Turret Capacity", which is a maximum
+                // count - so this read as a cap on how many minions you could own, when
+                // it is how much each one hauls. The number it buys is spelled out for
+                // the same reason the turret cap spells its own out.
+                setShopButtonContent(minionCapBtn, "Minion Load", `Lv ${save.minionCapacityLevel} carries ${minionCarryCapacity()}`, minionCapCost);
                 // While it runs the button counts the spell down in place of its pitch.
                 const hasteRunning = minionHasteActive();
                 setShopButtonContent(
@@ -5713,7 +5761,11 @@
                     const affordableText = hasBankForCost(skillDef.cost) ? "Yes" : "No";
                     const descLine = skillDef.desc ? `${skillDef.desc}\n` : "";
                     const tooltipText = `${skillDef.label}\n${descLine}${tierLabel}\nStatus: ${statusText}\nRequires: ${requiresText}\nCost: ${costText}\nAffordable: ${affordableText}`;
-                    const showCost = !unlocked && requirementsMet;
+                    // Locked nodes used to hide their price, so a route through the tree
+                    // could not be costed until it had already been bought into. The cost
+                    // is what the planning is made of; only an owned node has nothing
+                    // left to say.
+                    const showCost = !unlocked;
                     setSkillNodeContent(button, skillDef.label, skillDef.cost, tooltipText, showCost);
                     button.disabled = unlocked || !requirementsMet || !hasBankForCost(skillDef.cost);
                     button.classList.toggle("unlocked", unlocked);
@@ -6634,13 +6686,24 @@
                 targetCtx.restore();
             }
 
+            // What a caravan that is not moving is waiting for. Standing still is the same
+            // picture whether the markets are shut or the trader was never given a route,
+            // and the second one is a purchase that looks like it did nothing - so it says
+            // which it is.
+            function traderIdleNote(minion) {
+                // Both conditions on purpose: a run reset leaves the flag set on a
+                // caravan it has already sent home, and a label saying the market is
+                // shut over a trader standing in the tower is worse than no label.
+                if (minion.tradeWaiting && minion.state === "toVillage") return "market shut";
+                if (normalizedTradeRoute(minion.tradeRoute) === TRADE_ROUTE_NONE) return "no route set";
+                return null;
+            }
+
             function drawWaitingTraders(targetCtx) {
                 for (const minion of game.minionUnits) {
-                    // Both conditions on purpose: a run reset leaves the flag set on a
-                    // caravan it has already sent home, and a label saying the market is
-                    // shut over a trader standing in the tower is worse than no label.
-                    if (minion.role !== "trader" || !minion.tradeWaiting) continue;
-                    if (minion.state !== "toVillage") continue;
+                    if (minion.role !== "trader") continue;
+                    const note = traderIdleNote(minion);
+                    if (!note) continue;
                     if (!circleInView(minion.x, minion.y, 30)) continue;
 
                     beginWorldLabel(targetCtx, minion.x, minion.y);
@@ -6648,9 +6711,9 @@
                     targetCtx.textAlign = "center";
                     targetCtx.textBaseline = "alphabetic";
                     targetCtx.fillStyle = "#0b1422cc";
-                    targetCtx.fillText("market shut", 1, -21);
+                    targetCtx.fillText(note, 1, -21);
                     targetCtx.fillStyle = "#ffd88a";
-                    targetCtx.fillText("market shut", 0, -22);
+                    targetCtx.fillText(note, 0, -22);
                     targetCtx.restore();
                 }
             }
@@ -8356,8 +8419,18 @@
                 targetCtx.restore();
             }
 
+            // A boat tied up at each jetty while the crossing is open. Walking to the dock
+            // and finding nothing there gave no sign the river could be crossed at all -
+            // and its absence is now also how a closed crossing reads.
+            function drawMooredFerries(targetCtx) {
+                if (!ferryOpen()) return;
+                drawFerryHull(targetCtx, { x: FERRY_DOCKS.boardHome.x, y: FERRY_DOCKS.boardHome.y, ferryLanding: -1 });
+                drawFerryHull(targetCtx, { x: FERRY_DOCKS.boardFar.x, y: FERRY_DOCKS.boardFar.y, ferryLanding: 1 });
+            }
+
             function drawFerryHulls(targetCtx) {
                 if (!isSkillUnlocked("boat")) return;
+                drawMooredFerries(targetCtx);
                 for (const minion of game.minionUnits) {
                     if (isCrossing(minion)) drawFerryHull(targetCtx, minion);
                 }
@@ -10315,7 +10388,51 @@
                 return dx * dx + dy * dy;
             }
 
+            // Whether the step about to be taken is the one that puts a foot in the water
+            // at the crossing. Boarding on the projected step rather than on having already
+            // waded in is what makes the boat meet you at the end of the jetty: before
+            // this, nothing happened when you reached the dock and you had to walk into the
+            // river to be picked up out of it.
+            function tryBoardPlayerFerry(stepX, stepY) {
+                if (!isSkillUnlocked("boat") || !ferryOpen()) return false;
+                if (!isInRiver(game.player.x + stepX, game.player.y + stepY, game.player.r)) return false;
+
+                const side = trackBank(game.player);
+                const board = side === 1 ? FERRY_DOCKS.boardHome : FERRY_DOCKS.boardFar;
+                const dx = game.player.x - board.x;
+                const dy = game.player.y - board.y;
+                if (dx * dx + dy * dy > FERRY_BOARDING_RADIUS * FERRY_BOARDING_RADIUS) return false;
+
+                game.player.ferryState = "crossing";
+                game.player.ferryLanding = -side;
+                return true;
+            }
+
             function movePlayer() {
+                // The boat has the tiller, and it takes the whole crossing. Handled before
+                // a key is read, because reading them first meant the walk was applied and
+                // then the boat dragged you back from wherever you had steered to - which
+                // let you row about mid-river and end up places the water was never meant
+                // to let you reach.
+                if (game.player.ferryState === "crossing") {
+                    const landing = game.player.ferryLanding === 1 ? FERRY_DOCKS.boardHome : FERRY_DOCKS.boardFar;
+                    const step = game.player.speed * FERRY_SPEED_FACTOR;
+                    const dx = landing.x - game.player.x;
+                    const dy = landing.y - game.player.y;
+                    const distSq = dx * dx + dy * dy;
+                    if (distSq <= step * step) {
+                        game.player.x = landing.x;
+                        game.player.y = landing.y;
+                        game.player.bank = game.player.ferryLanding;
+                        game.player.ferryState = null;
+                    } else {
+                        const invD = 1 / Math.sqrt(distSq);
+                        game.player.x += dx * invD * step;
+                        game.player.y += dy * invD * step;
+                    }
+                    return;
+                }
+
                 let vx = 0;
                 let vy = 0;
                 if (keys.has("arrowup") || keys.has("w")) vy -= 1;
@@ -10337,8 +10454,13 @@
                 if (vx !== 0 || vy !== 0) {
                     const magSq = vx * vx + vy * vy;
                     const invMag = 1 / Math.sqrt(magSq);
-                    game.player.x += (vx * invMag) * game.player.speed;
-                    game.player.y += (vy * invMag) * game.player.speed;
+                    const stepX = (vx * invMag) * game.player.speed;
+                    const stepY = (vy * invMag) * game.player.speed;
+                    // Asked before the step lands, so the ride starts from the bank the
+                    // player is standing on rather than from inside the river.
+                    if (tryBoardPlayerFerry(stepX, stepY)) return;
+                    game.player.x += stepX;
+                    game.player.y += stepY;
                 }
 
                 game.player.x = clamp(game.player.x, world.minX + game.player.r, world.maxX - game.player.r);
@@ -10364,18 +10486,6 @@
                         game.player.y += dy * invD * step;
                     }
                     return;
-                }
-
-                if (isSkillUnlocked("boat") && ferryOpen() && isInRiver(game.player.x, game.player.y, game.player.r)) {
-                    const side = trackBank(game.player);
-                    const dock = side === 1 ? FERRY_DOCKS.home : FERRY_DOCKS.far;
-                    const dx = game.player.x - dock.x;
-                    const dy = game.player.y - dock.y;
-                    if (dx * dx + dy * dy <= FERRY_BOARDING_RADIUS * FERRY_BOARDING_RADIUS) {
-                        game.player.ferryState = "crossing";
-                        game.player.ferryLanding = -side;
-                        return;
-                    }
                 }
 
                 keepOutOfRiver(game.player, game.player.r);
