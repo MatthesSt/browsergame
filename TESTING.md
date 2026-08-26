@@ -231,9 +231,17 @@ entirely until its skill is unlocked, and buying it deducts exactly the quoted c
       store as well as placed ones, so buying one and not placing it still moves the
       number. It read `placed/cap` here, which is what the counter behind it used to be
       called; it never counted placements.
-- [ ] **Minions**: Craft Gatherer, Gatherer Focus, Craft Trader, Trade Routes,
-      Craft Defender, Defender Posts, Minion Speed, Minion Load. There is **no** Far Bank
+- [ ] **Minions**: Craft Gatherer, Craft Trader, Craft Defender, Minion Speed, Minion Load
+      - five controls, all of which spend something.
+- [ ] **Standing Orders**: Gatherer Focus, Trade Routes, Defender Posts. Nothing in this
+      group costs anything; they are instructions you set once. There is **no** Far Bank
       panel - the gatherer's focus decides which bank it works (see §7).
+      Regression risk: these three used to sit inside Minions, which meant that group
+      carried crafting, directing and upgrading at once and held eight of the panel's
+      seventeen controls. If a future control is added, put it with the others that do the
+      same *kind* of thing, not with the ones that happen to concern the same unit.
+- [ ] The Standing Orders group is **hidden entirely** until at least one of its three
+      panels is unlocked, so an early run does not show an empty header.
 - [ ] **"Minion Load" reads `Lv N carries M`**, where M is `1 + level`. It must not be
       called Capacity: it sits under "Turret Capacity", which *is* a maximum count, and
       the same word for two different things had testers reading it as a limit on how many
@@ -242,6 +250,34 @@ entirely until its skill is unlocked, and buying it deducts exactly the quoted c
       The shop is stock and upgrades; the spells were never either.
 - [ ] Every recipe scales with the count already owned - crafting the 4th gatherer costs
       more than the 3rd.
+
+### Reading the panel at a glance
+
+- [ ] **A tile you cannot currently pay for is dimmed.** Bank nothing, open the shop, and
+      everything you cannot afford sits at ~42% opacity; bank enough for one and it comes
+      back to full on the next HUD pass. It must **dim, not disappear** - the upgrade you
+      are saving towards is the one you most need to keep reading.
+      Regression: the shop's only greyed state was *locked* (`setButtonDisabled(btn,
+      !unlocked)`), and locked controls are hidden anyway - so once most upgrades were
+      unlocked, all seventeen visible tiles looked equally live and the only way to tell
+      what you could buy was to read six cost chips against the bank strip, seventeen
+      times. The skill tree had always done this properly, which is why the shop's version
+      was never missed. Test **late**, with most things unlocked and a thin bank; early on
+      almost everything is locked and hidden, so the panel looks fine either way.
+- [ ] Dimming is a **signal, not the guard**. A dimmed tile is still clickable and clicking
+      it does nothing, because every buy handler re-checks `hasBankForCost` for itself.
+      Do not make these `disabled` - Chrome sends a disabled button no mouse events (§24).
+- [ ] The dimmed state uses the **same cost object** the tile was rendered with, so a tile
+      can never show one price and judge affordability by another. Check a stacking cost -
+      craft a gatherer until you cannot afford the next, and the tile that dims is the one
+      quoting the raised price.
+- [ ] **The four expanding panels do not look like purchase tiles.** Turret Store, Gatherer
+      Focus, Trade Routes and Defender Posts have a flatter fill, a dashed edge and a
+      **chevron** (▸/▾). They carry no cost chips and spend nothing when clicked.
+      Regression: all four carried `class="secondary shop-btn"`, making them pixel-identical
+      to a tile that spends resources, and their marker was a `+` - which on a shop tile
+      reads as "buy one more" rather than "this expands".
+
 - [ ] **A collapsed shop group is still collapsed after a reload.** Collapse Economy and
       Minions, refresh the page, and both must come back collapsed - and Player and Turrets
       must still be open. State lives in `save.shopGroupsOpen`, keyed by the `data-group`

@@ -464,6 +464,32 @@
             border-color: #5d7ea3;
         }
 
+        /* Standing Orders. Split out of Minions, which was carrying three different jobs
+           at once - crafting, directing and upgrading - and had eight of the panel's
+           seventeen controls. Nothing in here spends anything; they are instructions you
+           set once and leave. */
+        .shop-group.orders {
+            border-color: #6f8a3f;
+        }
+
+        /* The four expanding panels - Turret Store, Gatherer Focus, Trade Routes, Defender
+           Posts - carried `secondary shop-btn` and so were pixel-identical to a tile that
+           spends resources, with a "+" that on a shop tile reads as "buy one more". They
+           open a list. A flatter fill, a dashed edge and a disclosure chevron say so
+           without needing a fifth colour. Specificity has to beat both `.shop-btn` and
+           `button.secondary`, hence the doubled class. */
+        .shop-btn.gatherer-focus-summary {
+            background: #0f1e2d;
+            border-style: dashed;
+            border-color: #33506e;
+            font-weight: 700;
+        }
+
+        .shop-btn.gatherer-focus-summary:hover {
+            background: #16283a;
+            border-color: #5b86b5;
+        }
+
         .shop-controls {
             display: grid;
             gap: 8px;
@@ -493,8 +519,10 @@
             display: none;
         }
 
+        /* A chevron, not a "+". On a tile that otherwise looks like a purchase, "+" reads
+           as "buy one more" rather than "this expands". */
         .gatherer-focus-summary::after {
-            content: "+";
+            content: "\25B8";
             position: absolute;
             right: 10px;
             top: 8px;
@@ -503,7 +531,7 @@
         }
 
         .gatherer-focus-panel[open] .gatherer-focus-summary::after {
-            content: "-";
+            content: "\25BE";
         }
 
         .gatherer-focus-list {
@@ -1204,6 +1232,17 @@
             display: grid;
             gap: 6px;
             background: #1a3048;
+        }
+
+        /* What you cannot pay for yet. Dimmed, never hidden: an upgrade you are saving
+           towards is exactly the one you need to keep reading. Distinct from a *locked*
+           control, which is hidden outright until its skill is bought. */
+        .shop-btn.unaffordable {
+            opacity: 0.42;
+        }
+
+        .shop-btn.unaffordable:hover {
+            opacity: 0.62;
         }
 
         .skill-node.shop-btn {
@@ -2013,22 +2052,28 @@
                                 <summary class="shop-group-title">Minions</summary>
                                 <div class="shop-controls">
                                     <button id="craftBtn" class="secondary shop-btn">Craft Gatherer</button>
+                                    <button id="traderBtn" class="secondary shop-btn">Craft Trader</button>
+                                    <button id="defenderBtn" class="secondary shop-btn">Craft Defender</button>
+                                    <button id="minionSpeedBtn" class="secondary shop-btn">Minion Speed</button>
+                                    <button id="minionCapBtn" class="secondary shop-btn">Minion Capacity</button>
+                                </div>
+                            </details>
+
+                            <details class="shop-group orders" data-group="orders" open>
+                                <summary class="shop-group-title">Standing Orders</summary>
+                                <div class="shop-controls">
                                     <details id="gathererFocusPanel" class="gatherer-focus-panel">
                                         <summary id="gathererFocusSummary" class="secondary shop-btn gatherer-focus-summary">Gatherer Focus</summary>
                                         <div id="gathererFocusList" class="gatherer-focus-list"></div>
                                     </details>
-                                    <button id="traderBtn" class="secondary shop-btn">Craft Trader</button>
                                     <details id="traderRoutePanel" class="gatherer-focus-panel">
                                         <summary id="traderRouteSummary" class="secondary shop-btn gatherer-focus-summary">Trade Routes</summary>
                                         <div id="traderRouteList" class="gatherer-focus-list"></div>
                                     </details>
-                                    <button id="defenderBtn" class="secondary shop-btn">Craft Defender</button>
                                     <details id="defenderPostPanel" class="gatherer-focus-panel">
                                         <summary id="defenderPostSummary" class="secondary shop-btn gatherer-focus-summary">Defender Posts</summary>
                                         <div id="defenderPostList" class="gatherer-focus-list"></div>
                                     </details>
-                                    <button id="minionSpeedBtn" class="secondary shop-btn">Minion Speed</button>
-                                    <button id="minionCapBtn" class="secondary shop-btn">Minion Capacity</button>
                                 </div>
                             </details>
 
@@ -2657,7 +2702,7 @@
             //
             // A group whose key is not in this list keeps no state; a key here with no
             // markup behind it is simply never applied. Both are safe.
-            const SHOP_GROUP_KEYS = ["player", "economy", "defense", "minions"];
+            const SHOP_GROUP_KEYS = ["player", "economy", "defense", "minions", "orders"];
             const BESTIARY_ENTRIES = {
                 scout:    { name: "Scout",     scaling: "wave",     hp: 1,  damage: 5,  speed: 1.9,  note: "Fast and frail. Walks the shortest line to the tower." },
                 brute:    { name: "Brute",     scaling: "wave",     hp: 4,  damage: 14, speed: 0.95, note: "Slow, heavy, and the reason a wave stops being free." },
@@ -5782,6 +5827,15 @@
                 button.setAttribute("aria-label", tooltipText);
             }
 
+
+            // A class rather than the `disabled` property on purpose: a disabled button
+            // gets no mouse events in Chrome, and these tiles are the thing the player is
+            // reading to decide what to save for.
+            function setButtonAffordable(button, affordable) {
+                if (!button) return;
+                button.classList.toggle("unaffordable", !affordable);
+            }
+
             function setShopButtonContent(button, label, levelText, cost) {
                 const renderKey = `${label}|${levelText}|${RESOURCE_TYPES.map((type) => costAmount(cost, type)).join("|")}`;
                 if (button.dataset.renderKey === renderKey) return;
@@ -6148,6 +6202,38 @@
                 setButtonDisabled(defenderBtn, !defenderUnlocked);
                 setButtonDisabled(minionSpeedBtn, !minionSpeedUnlocked);
                 setButtonDisabled(minionCapBtn, !minionCapacityUnlocked);
+
+                // Which of the visible tiles you can actually act on right now.
+                //
+                // The skill tree has always answered this - it disables a node you cannot
+                // pay for and even prints an affordable Yes/No. The shop never did: its
+                // only greyed state was *locked*, and locked controls are hidden anyway, so
+                // once most upgrades were unlocked every tile on screen looked equally
+                // live. The only way to tell what you could buy was to read six cost chips
+                // against the bank strip, seventeen times.
+                //
+                // Dimmed, not hidden and not disabled. What you cannot afford is exactly
+                // what you are saving towards, so it has to stay legible; and every buy
+                // handler already re-checks hasBankForCost, so the class is a signal rather
+                // than the guard. Costs are the same objects the tiles were just rendered
+                // with, so this cannot quote a different price than the one on the button.
+                for (const [button, cost] of [
+                    [speedBtn, speedCost],
+                    [bagBtn, bagCost],
+                    [spawnerWoodBtn, woodSpawnerCost],
+                    [spawnerStoneBtn, stoneSpawnerCost],
+                    [spawnerCrystalBtn, crystalSpawnerCost],
+                    [spawnerAmberBtn, amberSpawnerCost],
+                    [globalMultBtn, globalMultCost],
+                    [turretCapBtn, turretCapCost],
+                    [craftBtn, workerRecipe],
+                    [traderBtn, traderRecipe],
+                    [defenderBtn, defenderRecipe],
+                    [minionSpeedBtn, minionSpeedCost],
+                    [minionCapBtn, minionCapCost]
+                ]) {
+                    setButtonAffordable(button, hasBankForCost(cost));
+                }
 
                 refreshShopGroupVisibility();
 
