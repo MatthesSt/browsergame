@@ -1979,7 +1979,7 @@
                     </div>
                     <div id="shopPane" class="shop-pane" role="tabpanel" aria-labelledby="shopTabShopBtn">
                         <div class="shop-groups">
-                            <details class="shop-group player" open>
+                            <details class="shop-group player" data-group="player" open>
                                 <summary class="shop-group-title">Player</summary>
                                 <div class="shop-controls">
                                     <button id="speedBtn" class="secondary shop-btn">Upgrade Speed</button>
@@ -1987,7 +1987,7 @@
                                 </div>
                             </details>
 
-                            <details class="shop-group economy" open>
+                            <details class="shop-group economy" data-group="economy" open>
                                 <summary class="shop-group-title">Economy</summary>
                                 <div class="shop-controls">
                                     <button id="spawnerWoodBtn" class="secondary shop-btn">Wood Spawner</button>
@@ -1998,7 +1998,7 @@
                                 </div>
                             </details>
 
-                            <details class="shop-group defense" open>
+                            <details class="shop-group defense" data-group="defense" open>
                                 <summary class="shop-group-title">Turrets <span id="turretGroupCount">0/15</span></summary>
                                 <div class="shop-controls">
                                     <details id="turretStockPanel" class="gatherer-focus-panel">
@@ -2009,7 +2009,7 @@
                                 </div>
                             </details>
 
-                            <details class="shop-group minions" open>
+                            <details class="shop-group minions" data-group="minions" open>
                                 <summary class="shop-group-title">Minions</summary>
                                 <div class="shop-controls">
                                     <button id="craftBtn" class="secondary shop-btn">Craft Gatherer</button>
@@ -2648,6 +2648,16 @@
             // `scaling` names which curve the kind's health actually follows, because they
             // do not share one. See bestiaryScaling().
             const BESTIARY_ORDER = ["scout", "brute", "wisp", "hunter", "ghoul", "warden", "blight", "boss", "warchief"];
+
+            // Which shop groups exist, and the order the markup lists them in. Declared up
+            // here beside BESTIARY_ORDER rather than next to the shop code, for the same
+            // reason: loadSave() normalises save.shopGroupsOpen against this list and runs
+            // long before the UI section - a module-scope const read too early throws, and
+            // loadSave()'s catch would turn that into a silently wiped save. See §24.
+            //
+            // A group whose key is not in this list keeps no state; a key here with no
+            // markup behind it is simply never applied. Both are safe.
+            const SHOP_GROUP_KEYS = ["player", "economy", "defense", "minions"];
             const BESTIARY_ENTRIES = {
                 scout:    { name: "Scout",     scaling: "wave",     hp: 1,  damage: 5,  speed: 1.9,  note: "Fast and frail. Walks the shortest line to the tower." },
                 brute:    { name: "Brute",     scaling: "wave",     hp: 4,  damage: 14, speed: 0.95, note: "Slow, heavy, and the reason a wave stops being free." },
@@ -4133,6 +4143,7 @@
                         runHistory: Array.isArray(data.runHistory) ? data.runHistory.slice(-RUN_HISTORY_MAX) : [],
                         tutorialStep: Number.isFinite(data.tutorialStep) ? Math.max(0, Math.floor(data.tutorialStep)) : 0,
                         tipsEnabled: data.tipsEnabled !== false,
+                        shopGroupsOpen: normalizeShopGroups(data.shopGroupsOpen),
                         runModifier: typeof data.runModifier === "string" ? data.runModifier : fresh.runModifier,
                         draftBoons: data.draftBoons && typeof data.draftBoons === "object" ? data.draftBoons : {},
                         fieldTypes: Array.isArray(data.fieldTypes) ? data.fieldTypes : fresh.fieldTypes,
@@ -4175,6 +4186,7 @@
                         runHistory: [],
                         tutorialStep: 0,
                         tipsEnabled: true,
+                        shopGroupsOpen: normalizeShopGroups(null),
                         warChiefKills: 0,
                         bestiary: normalizeBestiary(null),
                         essence: 0,
@@ -4200,6 +4212,22 @@
             // Missing keys become 0 rather than absent - the panel distinguishes "never
             // felled" by the count being 0, so a hole in the map would render as a locked
             // row for a kind the player has actually killed.
+
+            // Which shop groups the player has collapsed. Meta, next to tipsEnabled and
+            // the audio settings rather than in freshRunState(): how you have arranged the
+            // panel is a preference, and losing it every time a run ends would make
+            // collapsing a group pointless.
+            //
+            // Missing means open, so a save written before this existed - and a brand new
+            // one - opens exactly as the markup always did.
+            function normalizeShopGroups(raw) {
+                const out = {};
+                const stored = raw && typeof raw === "object" ? raw : {};
+                for (const key of SHOP_GROUP_KEYS) {
+                    out[key] = stored[key] !== false;
+                }
+                return out;
+            }
             function normalizeBestiary(raw) {
                 const out = {};
                 const stored = raw && typeof raw === "object" ? raw : {};
@@ -5859,6 +5887,56 @@
             function setButtonDisabled(button, disabled) {
                 if (button.disabled !== disabled) {
                     button.disabled = disabled;
+                }
+            }
+
+
+            // Restores each shop group's collapsed state and keeps it saved from then on.
+            //
+            // The `open` attribute is still in the markup, so the panel renders fully open
+            // before any of this runs and a save that says otherwise closes it on the first
+            // frame. That is deliberate: it means a browser that never reaches this code
+            // shows the shop in its old, working state rather than four collapsed headers.
+            function shopGroupEl(key) {
+                return document.querySelector(`.shop-group[data-group="${key}"]`);
+            }
+
+            // Pushes the saved state onto the panel. Separate from initShopGroups() because
+            // it has to run again after a Reset Save: that replaces `save` wholesale with a
+            // fresh one where every group is open, and without this the panel would keep
+            // showing whatever the previous save had collapsed - the two disagreeing, with
+            // nothing to correct them until a reload.
+            function applyShopGroupState() {
+                if (!save.shopGroupsOpen) save.shopGroupsOpen = normalizeShopGroups(null);
+                for (const key of SHOP_GROUP_KEYS) {
+                    const group = shopGroupEl(key);
+                    if (!group) continue;
+                    const wanted = save.shopGroupsOpen[key] !== false;
+                    if (group.open !== wanted) group.open = wanted;
+                }
+            }
+
+            // Called once. The listeners below must not be attached twice, which is the
+            // other half of why applying the state lives in its own function.
+            function initShopGroups() {
+                applyShopGroupState();
+
+                for (const key of SHOP_GROUP_KEYS) {
+                    const group = shopGroupEl(key);
+                    if (!group) continue;
+
+                    // `toggle` fires asynchronously, and assigning `.open` queues one of
+                    // its own - so this listener hears every restore as well as the player.
+                    // Rather than guarding with a flag that has to be cleared at exactly
+                    // the right moment, it compares against what is already stored and does
+                    // nothing when they agree. A restore is a no-op by construction, and a
+                    // real click always differs.
+                    group.addEventListener("toggle", () => {
+                        const next = group.open;
+                        if (save.shopGroupsOpen[key] === next) return;
+                        save.shopGroupsOpen[key] = next;
+                        saveGame();
+                    });
                 }
             }
 
@@ -14916,6 +14994,9 @@
                 game.pendingSniperTurretPlacements = 0;
                 game.pendingSlowTurretPlacements = 0;
                 pauseBtn.textContent = "Pause";
+                // The fresh save has every shop group open again; push that onto the panel,
+                // which is still showing whatever the old save had collapsed.
+                applyShopGroupState();
                 resetSession();
                 saveGame();
                 refreshHud();
@@ -15048,6 +15129,7 @@
 
             initSkillTreeUi();
             buildHotbar();
+            initShopGroups();
 
             cameraState.zoom = Number.isFinite(save.mapZoom) ? clamp(save.mapZoom, MIN_MAP_ZOOM, MAX_MAP_ZOOM) : 1;
 

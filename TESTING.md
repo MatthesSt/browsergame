@@ -41,6 +41,9 @@ If time is short, this is the subset that catches the failures that have actuall
 - [ ] Key is `meadow-gatherer-save-v1`; backup is `meadow-gatherer-save-v1-backup`.
 - [ ] Save is written on every purchase, craft, placement, sale and run end.
 - [ ] `beforeunload` captures a runtime snapshot **only if a run has started**.
+- [ ] **UI preferences survive a run ending**: tips, audio, and which shop groups are
+      collapsed all sit outside `freshRunState()`, next to the meta counters. Losing them
+      on every defeat would make setting them pointless.
 
 ### Migrations (regression-heavy - all three have broken saves before)
 - [ ] **Legacy tower keys**: a save with `depotHp`/`depotPulse` in `runtimeState` loads,
@@ -239,7 +242,26 @@ entirely until its skill is unlocked, and buying it deducts exactly the quoted c
       The shop is stock and upgrades; the spells were never either.
 - [ ] Every recipe scales with the count already owned - crafting the 4th gatherer costs
       more than the 3rd.
-- [ ] Group `<details>` sections open/close and keep their state.
+- [ ] **A collapsed shop group is still collapsed after a reload.** Collapse Economy and
+      Minions, refresh the page, and both must come back collapsed - and Player and Turrets
+      must still be open. State lives in `save.shopGroupsOpen`, keyed by the `data-group`
+      attribute on each `<details>`.
+      Regression: the `open` attribute was hardcoded in the markup and nothing persisted the
+      toggle, so collapsing a group lasted exactly as long as the tab did. This item existed
+      and read "open/close and keep their state", which is why it passed: within one session
+      the `<details>` element keeps its own state with no help, so the only way to see the
+      bug is to **reload**. Test across a refresh, not by clicking twice.
+- [ ] A group collapsed in an older save (or a brand new one) opens: missing means open, so
+      nothing that predates this setting comes back mysteriously shut.
+- [ ] The state is **meta** - it survives a run ending and a Restart Run. Collapse a group,
+      let the tower fall, and it is still collapsed. Only `Reset Save` reopens them.
+- [ ] **`Reset Save` reopens every group immediately, not just in the save file.** Collapse
+      all four, reset, and the panel itself must show four open groups without a reload.
+      `performReset()` swaps `save` wholesale, so the panel has to be told; a check that
+      only reads localStorage afterwards would pass while the visible panel stayed wrong.
+- [ ] Collapsing a group writes the save once, not on every animation frame - the `toggle`
+      handler ignores events whose value already matches what is stored, which is what makes
+      the restore on load a no-op rather than a second write.
 
 ---
 
