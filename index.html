@@ -1654,7 +1654,7 @@
             box-shadow: inset 0 0 0 1px #2b4763;
         }
 
-        /* The map toolbar. Slot 1 is the field manual; the rest are deliberately empty
+        /* The map toolbar. Slot 1 is the bestiary; the rest are deliberately empty
            and visible, because the point of the frame is that things move into it. */
         .hotbar {
             position: absolute;
@@ -1803,7 +1803,7 @@
            corner to stay clear. Keyed off the slot's kind rather than off whether the cost
            element happens to be empty: the badge comes *before* the cost in the markup, so
            a sibling selector cannot reach backwards, and the state would change under the
-           slot every time a spell became free or stopped being it. The manual has no cost
+           slot every time a spell became free or stopped being it. The bestiary has no cost
            row at all and keeps the bottom corner. */
         .hotbar-slot.spell .slot-badge {
             top: 2px;
@@ -1816,7 +1816,7 @@
             height: 8px;
         }
 
-        /* Field manual */
+        /* Bestiary */
         .bestiary-card {
             width: min(760px, 96vw);
         }
@@ -1906,6 +1906,20 @@
 
         .bestiary-stat b {
             font-weight: 700;
+        }
+
+        /* A chip that has its working attached says so - otherwise the tooltip is a
+           secret. Dotted underline is the long-standing convention for "there is more
+           here on hover", and it costs no space in a row that is already tight. */
+        .bestiary-stat.has-formula {
+            cursor: help;
+            border-bottom-style: dashed;
+            border-bottom-color: #5b86b5;
+        }
+
+        .bestiary-stat.has-formula:hover {
+            border-color: #5b86b5;
+            background: #1a324f;
         }
 
         /* The scaling badge. Green would read as "good for you"; this is the enemy
@@ -2118,9 +2132,9 @@
     </div>
 
     <div id="bestiaryPopover" class="popover-backdrop" aria-hidden="true">
-        <div class="popover-card bestiary-card" role="dialog" aria-modal="true" aria-label="Field Manual">
+        <div class="popover-card bestiary-card" role="dialog" aria-modal="true" aria-label="Bestiary">
             <div class="popover-head">
-                <h3>FIELD MANUAL</h3>
+                <h3>BESTIARY</h3>
                 <div class="chip" title="Kinds you have put down at least once"><span class="ico best"></span><span>Catalogued</span><strong id="bestiaryProgress">0/9</strong></div>
                 <div class="popover-head-actions">
                     <button id="closeBestiaryBtn" class="secondary">Close</button>
@@ -2678,7 +2692,7 @@
             };
 
 
-            // The field manual's roster. This is a hand-written list rather than
+            // The bestiary's roster. This is a hand-written list rather than
             // `Object.keys(enemyTypeConfig)` on purpose: two of the nine kinds are never
             // in that table. `boss` is built by spawnBossEnemy() from its own formula and
             // `warchief` is a warden promoted in place by spawnWarChief(), so deriving the
@@ -4249,7 +4263,7 @@
 
 
             // Kill tallies are meta, like warChiefKills and runsPlayed: they sit outside
-            // freshRunState() so a tower falling does not wipe the manual. A collection
+            // freshRunState() so a tower falling does not wipe the bestiary. A collection
             // that resets every death is not a collection.
             //
             // Unknown keys in a stored tally are dropped rather than kept, so a save made
@@ -9432,7 +9446,7 @@
             // ---- Map toolbar ------------------------------------------------------
             //
             // A Minecraft-style hotbar sitting over the map: slot 1 opens the field
-            // manual, slots 2-7 cast the six spells, 8 and 9 are still empty.
+            // bestiary, slots 2-7 cast the six spells, 8 and 9 are still empty.
             //
             // Slots are declared, not hand-wired, so moving something else in later is a
             // row in this array rather than new markup, new CSS and a new listener.
@@ -9444,10 +9458,10 @@
             const HOTBAR_SIZE = 9;
             const HOTBAR_SLOTS = [
                 {
-                    id: "manual",
+                    id: "bestiary",
                     kind: "panel",
                     icon: "📖",
-                    label: "Field Manual",
+                    label: "Bestiary",
                     activate: () => openBestiaryPopover(),
                     isOpen: () => isBestiaryPopoverOpen(),
                     badge: () => bestiaryCatalogued() + "/" + BESTIARY_ORDER.length
@@ -9605,7 +9619,7 @@
                 if (slot.kind === "action") refreshHotbar();
                 return true;
             }
-            // ---- Field manual -----------------------------------------------------
+            // ---- Bestiary ---------------------------------------------------------
 
             // The war chief is not in save.bestiary - see recordBestiaryKill(). Reading
             // the counter that already exists keeps one event on one tally.
@@ -9624,7 +9638,7 @@
             }
 
             // Colours come from enemyTypeConfig wherever there is a row, so a recoloured
-            // enemy recolours its manual entry without anyone remembering to. Boss and
+            // enemy recolours its bestiary entry without anyone remembering to. Boss and
             // war chief are built outside that table, so those two carry their own.
             function bestiaryGlyph(typeKey) {
                 const cfg = enemyTypeConfig[typeKey];
@@ -9635,11 +9649,18 @@
                 };
             }
 
-            function bestiaryStatChip(label, value, percent) {
+            // `title` is set on the whole chip rather than on the little "+n%" span: the
+            // badge is a few characters wide and hovering it exactly is fiddly, and the
+            // base figure is part of what the working explains anyway.
+            function bestiaryStatChip(label, value, percent, formula) {
                 const badge = Number.isFinite(percent) && percent > 0
                     ? ' <span class="scale-up">+' + percent + '%</span>'
                     : "";
-                return '<span class="bestiary-stat">' + label + ' <b>' + value + '</b>' + badge + '</span>';
+                // Escaped because this goes in through innerHTML: an unescaped quote would
+                // end the attribute early and turn the rest of the working into markup.
+                const title = formula ? ' title="' + escapeHtml(formula) + '"' : "";
+                return '<span class="bestiary-stat' + (formula ? ' has-formula' : '') + '"' + title + '>'
+                    + label + ' <b>' + value + '</b>' + badge + '</span>';
             }
 
             function renderBestiary() {
@@ -9667,20 +9688,42 @@
                     const scaling = bestiaryScaling(key);
                     let stats = "";
                     if (scaling && scaling.kind === "absolute") {
-                        // Boss and war chief have no wave-1 base worth quoting - the tier
-                        // is the stat - so these print what the next one will bring.
-                        stats = bestiaryStatChip("HP", scaling.hp)
-                            + (scaling.damage > 0 ? bestiaryStatChip("Dmg", scaling.damage) : "")
-                            + '<span class="bestiary-stat">' + scaling.note + '</span>';
+                        // Boss and war chief have no wave-1 base worth quoting, so these
+                        // print what the next one to arrive will actually bring.
+                        //
+                        // Both carry their working on the HP chip and neither carries a
+                        // tier chip. The boss's tier is the first line of its own working;
+                        // the war chief's tier *is* its kill count, which this row already
+                        // prints in the KILLS column an inch to the left.
+                        //
+                        // Same rule as the branch below: the war chief deals no tower
+                        // damage, so its chip is absent, and an absent chip has to be the
+                        // last one or it moves whatever follows it.
+                        stats = bestiaryStatChip("HP", scaling.hp, null, scaling.hpFormula)
+                            + (scaling.damage > 0 ? bestiaryStatChip("Dmg", scaling.damage) : "");
                     } else if (scaling) {
-                        stats = bestiaryStatChip("HP", entry.hp, scaling.hpPercent)
+                        // HP, then Speed, then Damage - and Damage only when there is any.
+                        //
+                        // Order is the point. Every kind has health and a pace, but three
+                        // of them never touch the tower, and those used to print a
+                        // placeholder "Dmg -" so that Speed would still land in the same
+                        // place. That put a chip carrying no information in the middle of
+                        // the row, and it only half worked anyway. The optional chip goes
+                        // last instead, where its absence shortens the row rather than
+                        // shifting everything after it.
+                        //
+                        // Nothing is lost by dropping the placeholder: each of those three
+                        // says so in its own description line above.
+                        stats = bestiaryStatChip("HP", entry.hp, scaling.hpPercent, scaling.hpFormula)
+                            + bestiaryStatChip("Spd", entry.speed.toFixed(2))
                             + (entry.damage > 0
                                 ? bestiaryStatChip("Dmg", entry.damage, scaling.damagePercent)
-                                : '<span class="bestiary-stat" title="Never attacks the tower">Dmg <b>&mdash;</b></span>')
-                            + bestiaryStatChip("Spd", entry.speed.toFixed(2))
-                            + (scaling.note
-                                ? '<span class="bestiary-stat" title="Anything that never pushes the tower takes the square root of the wave curve">' + scaling.note + '</span>'
                                 : "");
+                        // No "off-wave curve" tag here. The softer curve is already the
+                        // visible thing about these rows - a ghoul reading +131% next to a
+                        // scout's +431% says it more plainly than a label can - and the
+                        // note under the list explains why. The tag was a caption on a
+                        // number that was already speaking.
                     }
 
                     rows.push('<div class="bestiary-row">'
@@ -10197,6 +10240,10 @@
             // down, which is the whole reason ivory is worth hauling.
             const WARCHIEF_PROVOKE_TICKS = 1800;
             const WARCHIEF_BASE_HP = 400;
+            // What each previous kill adds to the next chief. It was written inline in
+            // both spawnWarChief() and the bestiary's working - the same magic number in
+            // two places, one of which exists to describe the other.
+            const WARCHIEF_HP_PER_TIER = 200;
             // Tuned against one unpainted swing a second from a war party: six unpainted
             // defenders land 0.25 a tick and lose ground, the same six painted land 0.75
             // and take it back. Those two numbers are the whole difficulty of the fight.
@@ -10219,7 +10266,7 @@
                 enemy.stroke = "#3a1005";
                 enemy.shape = "diamond";
                 enemy.r = E(22);
-                enemy.hp = WARCHIEF_BASE_HP + tier * 200;
+                enemy.hp = WARCHIEF_BASE_HP + tier * WARCHIEF_HP_PER_TIER;
                 enemy.maxHp = enemy.hp;
                 enemy.regen = WARCHIEF_REGEN_PER_TICK + tier * 0.12;
                 enemy.speed = W(1.05) * ENEMY_SPEED_MULTIPLIER;
@@ -12001,17 +12048,17 @@
             }
 
 
-            // What the field manual prints next to a base stat. There is deliberately no
+            // What the bestiary prints next to a base stat. There is deliberately no
             // single "current multiplier" to read: the five paths below are the five
             // different curves the game actually spawns things on, and they diverge hard.
             // At wave 30 a scout carries +431% health while a ghoul on the same tick
             // carries +131%, because anything that never pushes the tower takes the
             // square root of the curve - see OFFWAVE_HP_SCALE_ROOT. Printing one shared
             // badge on every row would be wrong on five of the nine, and wrong in the
-            // flattering direction, which is the worst way for a manual to be wrong.
+            // flattering direction, which is the worst way for a bestiary to be wrong.
             //
             // Each branch mirrors the arithmetic in the spawner that builds that kind.
-            // If a spawn formula changes, this changes with it or the manual starts
+            // If a spawn formula changes, this changes with it or the bestiary starts
             // lying quietly.
             function bestiaryScaling(typeKey) {
                 const entry = BESTIARY_ENTRIES[typeKey];
@@ -12024,27 +12071,89 @@
                     // chiefs you have already put down, so this row grows with the player
                     // rather than with the run. Shown as an absolute because a percentage
                     // over a base of zero is meaningless.
+                    //
+                    // No tier chip either, for a plainer reason than the boss's: the tier
+                    // *is* the kill count, and this row already prints that in the KILLS
+                    // column immediately to its left. The chip was the same number twice,
+                    // an inch apart.
                     const tier = save.warChiefKills;
-                    const hp = WARCHIEF_BASE_HP + tier * 200;
-                    return { kind: "absolute", hp, damage: 0, note: `tier ${tier}` };
+                    const hp = WARCHIEF_BASE_HP + tier * WARCHIEF_HP_PER_TIER;
+                    return {
+                        kind: "absolute",
+                        hp,
+                        damage: 0,
+                        hpFormula: [
+                            `tier ${tier} = war chiefs felled`,
+                            `${WARCHIEF_BASE_HP} + ${tier} x ${WARCHIEF_HP_PER_TIER} = ${hp} HP`,
+                            "flat: neither the wave curve nor night touches this"
+                        ].join("\n")
+                    };
                 }
 
                 if (entry.scaling === "boss") {
                     // spawnBossEnemy() sizes itself from the wave milestone, not the wave,
-                    // so this steps every ten waves rather than climbing every one.
+                    // so this steps every ten waves rather than climbing every one. Note
+                    // there is no modValue("enemyHpScale") here: the boss does not take
+                    // the run modifier, and neither does the spawner - if that ever
+                    // changes, it changes in both places or this starts lying.
                     const tier = Math.max(1, Math.floor(wave / 10));
-                    const hp = Math.max(1, Math.round((10 + tier * 6) * enemyHpMultiplier(wave) * nightHp));
-                    return { kind: "absolute", hp, damage: 16 + tier * 2, note: `tier ${tier}` };
+                    const full = enemyHpMultiplier(wave);
+                    const base = 10 + tier * 6;
+                    const hp = Math.max(1, Math.round(base * full * nightHp));
+
+                    // No `tier` chip for the boss: the working opens by naming the tier and
+                    // where it came from, so the chip was repeating its own first line.
+                    const steps = [
+                        `tier ${tier} (wave ${wave} / 10)`,
+                        `base: 10 + ${tier} x 6 = ${base}`,
+                        `wave ${wave}: (1 + ${wave} x ${ENEMY_HP_LINEAR_PER_WAVE})`
+                            + ` x ${ENEMY_HP_COMPOUND_PER_WAVE}^${wave} = x${full.toFixed(2)}`
+                    ];
+                    if (nightHp !== 1) steps.push(`night: x${nightHp}`);
+                    steps.push(`= ${hp} HP`);
+
+                    return {
+                        kind: "absolute",
+                        hp,
+                        damage: 16 + tier * 2,
+                        hpFormula: steps.join("\n")
+                    };
                 }
 
                 const full = enemyHpMultiplier(wave);
-                const hpMult = (entry.scaling === "offwave" ? Math.pow(full, OFFWAVE_HP_SCALE_ROOT) : full)
-                    * modValue("enemyHpScale") * nightHp;
+                const offWave = entry.scaling === "offwave";
+                const curve = offWave ? Math.pow(full, OFFWAVE_HP_SCALE_ROOT) : full;
+                const modHp = modValue("enemyHpScale");
+                const hpMult = curve * modHp * nightHp;
+
+                // The working, for the tooltip on the HP chip. Built here rather than in
+                // the renderer, out of the same locals the multiplier was just computed
+                // from - a formula written out a second time somewhere else is a formula
+                // that will eventually disagree with the number beside it.
+                //
+                // Only the terms that are actually doing something are listed: at midday
+                // with no modifier rolled, "x1" lines would be three quarters of the
+                // tooltip and none of the explanation.
+                const steps = [
+                    `wave ${wave}: (1 + ${wave} x ${ENEMY_HP_LINEAR_PER_WAVE})`
+                        + ` x ${ENEMY_HP_COMPOUND_PER_WAVE}^${wave} = x${full.toFixed(2)}`
+                ];
+                // Written as the exponent rather than as "sqrt" so it stays true if
+                // OFFWAVE_HP_SCALE_ROOT is ever retuned away from 0.5.
+                if (offWave) steps.push(`off-wave: x${full.toFixed(2)}^${OFFWAVE_HP_SCALE_ROOT} = x${curve.toFixed(2)}`);
+                if (nightHp !== 1) steps.push(`night: x${nightHp}`);
+                if (modHp !== 1) steps.push(`${runModifier().label}: x${modHp}`);
+                steps.push(`= x${hpMult.toFixed(2)} -> +${Math.round((hpMult - 1) * 100)}%`
+                    + ` (${entry.hp} -> ${Math.max(1, Math.round(entry.hp * hpMult))} HP)`);
+
+                // No `note` on this branch: the percentages themselves are what tell an
+                // off-wave kind apart from a wave enemy. Only the absolute branch above
+                // carries one, where the tier genuinely is not derivable from the figure.
                 return {
                     kind: "percent",
                     hpPercent: Math.round((hpMult - 1) * 100),
                     damagePercent: Math.round((enemyDamageMultiplier(wave) - 1) * 100),
-                    note: entry.scaling === "offwave" ? "off-wave curve" : ""
+                    hpFormula: steps.join("\n")
                 };
             }
             function scaledEnemyHp(baseHp, waveNumber, offWave) {
@@ -12205,7 +12314,7 @@
             // The war chief is not tallied here. save.warChiefKills already exists, is
             // incremented by bankWarChiefKill(), and is load-bearing elsewhere - it prices
             // War Paint and sizes the next war party. A second counter for the same event
-            // would be one refactor away from disagreeing with the first, so the manual
+            // would be one refactor away from disagreeing with the first, so the bestiary
             // reads that field instead and this function leaves the row alone.
             function recordBestiaryKill(enemy) {
                 if (!enemy || !save.bestiary) return;

@@ -110,14 +110,14 @@ If time is short, this is the subset that catches the failures that have actuall
 ### Keyboard
 - [ ] `W`/`A`/`S`/`D` and arrow keys move the player (8-way, diagonals normalised).
 - [ ] `P` or `Esc` toggles pause.
-- [ ] `Esc` closes, in priority order: field manual → skill tree → restart-run popover →
+- [ ] `Esc` closes, in priority order: bestiary → skill tree → restart-run popover →
       reset popover → settings menu → audio panel. Only if none is open does it pause.
 - [ ] `F` cycles game speed 1x → 2x → 3x → 1x.
 - [ ] `T` toggles tips.
 - [ ] `M` toggles music mute.
 - [ ] `+`/`=` and `-`/`_` nudge volume by 10%.
 - [ ] `[` zooms out, `]` zooms in, `0` resets map zoom to 1.
-- [ ] `1` opens the field manual; `2`-`7` cast the six spells. `8` and `9` are undefined
+- [ ] `1` opens the bestiary; `2`-`7` cast the six spells. `8` and `9` are undefined
       slots and must fall through and do nothing rather than being swallowed.
 - [ ] **`0` still resets map zoom.** The toolbar takes `1`-`9` and stops there - there is
       no tenth slot, because `0` was already bound. Press `0` with the toolbar present and
@@ -725,7 +725,7 @@ Each is cast from the bank's aether. Verify cost, gating, cooldown and effect.
 - [ ] A spell whose cost is a **stacking** one (Haste, War Paint, Chill) shows the price of
       the *next* cast, which rises while the effect runs. Cast one, watch the slot's number
       go up, let it lapse, watch it come back down.
-- [ ] Casting from the toolbar **never pauses the run**. Opening the field manual does
+- [ ] Casting from the toolbar **never pauses the run**. Opening the bestiary does
       (§18); a spell is thrown at a wave already walking in. Cast at 1x and confirm enemies
       keep moving through the cast.
 - [ ] Cooldown readouts count down in real time and at 2x/3x speed.
@@ -759,16 +759,16 @@ Each is cast from the bank's aether. Verify cost, gating, cooldown and effect.
 
 ---
 
-## 18. Map toolbar and field manual
+## 18. Map toolbar and bestiary
 
-The toolbar is a hotbar drawn over the bottom of the map. Slot 1 opens the field manual,
+The toolbar is a hotbar drawn over the bottom of the map. Slot 1 opens the bestiary,
 slots 2-7 cast the six spells, and 8-9 stay empty as room for whatever moves in next.
 
 ### The toolbar
 
 - [ ] Nine slots, numbered 1-9, centred over the bottom edge of the map. Slot 1 shows the
-      manual icon and a `n/9` badge; slots 8 and 9 are dashed and inert.
-- [ ] Clicking slot 1 opens the manual. Clicking it again while open does nothing (it does
+      bestiary icon and a `n/9` badge; slots 8 and 9 are dashed and inert.
+- [ ] Clicking slot 1 opens the bestiary. Clicking it again while open does nothing (it does
       not toggle shut) - the Close button, Esc and a backdrop click are the ways out.
 - [ ] **A press that lands anywhere on the toolbar except a live slot reaches the map.**
       The bar's own padding and the 5px gaps between slots must place a turret or start a
@@ -791,7 +791,7 @@ slots 2-7 cast the six spells, and 8-9 stay empty as room for whatever moves in 
 - [ ] Slots 2-7 are Haste, War Paint, Bloom, Waygate, Chill, Mend, in that order, matching
       keys `2`-`7`. Slots 8 and 9 stay empty.
 - [ ] Each shows its icon, its cost as an icon-and-number along the bottom, and a countdown
-      badge in the top corner. The manual's badge stays in the **bottom** corner - it has no
+      badge in the top corner. The bestiary's badge stays in the **bottom** corner - it has no
       cost row to make way for.
 - [ ] **A locked spell keeps its slot.** Unlock spells one at a time and confirm no slot
       ever changes number: Mend must be `7` before and after Chill is unlocked. Regression
@@ -818,10 +818,10 @@ slots 2-7 cast the six spells, and 8-9 stay empty as room for whatever moves in 
       watch its price rise on the same frame the aether leaves the bank.
 - [ ] Keys `2`-`7` cast without the pointer going near the bar; `8` and `9` do nothing.
 
-### The manual
+### The bestiary
 
-- [ ] Opening the manual **pauses a running run**, and closing it resumes - but only if the
-      manual was what paused it. Pause manually, open the manual, close it: the game must
+- [ ] Opening the bestiary **pauses a running run**, and closing it resumes - but only if the
+      bestiary was what paused it. Pause by hand, open the bestiary, close it: the game must
       stay paused. Same contract as the skill tree, with its own resume flag.
 - [ ] A kind never felled shows as `???` with a dark silhouette in the right *shape* and no
       stats. The shape is deliberate: the roster shows how much is left to find.
@@ -834,18 +834,18 @@ slots 2-7 cast the six spells, and 8-9 stay empty as room for whatever moves in 
 ### Kill counts
 
 - [ ] Counts are **meta**: they survive the tower falling. Kill a few things, let the run
-      end, and the manual still reads the same totals. They sit outside `freshRunState()`
+      end, and the bestiary still reads the same totals. They sit outside `freshRunState()`
       for this reason, next to `warChiefKills` and `runsPlayed`.
 - [ ] `Reset Save` clears them (and the undo restores them), the same as every other
       meta counter.
 - [ ] **The wave that kills you is not scored.** `endRun()` clears `game.enemies` directly
       rather than through `defeatEnemyAt()`, so dying with nine enemies on the map must add
       **zero** kills. Note the totals, let the tower fall, compare. A naive check misses
-      this because the summary screen covers the map and the manual is not open at the time.
+      this because the summary screen covers the map and the bestiary is not open at the time.
 - [ ] **The war chief row reads `save.warChiefKills`, not a tally of its own.** Kill a war
-      chief and confirm the manual row and the War Paint price move together - that price
+      chief and confirm the bestiary row and the War Paint price move together - that price
       is `WAR_PAINT_BASE_COST + warChiefKills * 6`, so a second counter would show up as
-      the manual and the shop disagreeing about how many you have killed. Regression risk:
+      the bestiary and the shop disagreeing about how many you have killed. Regression risk:
       counting the war chief in `recordBestiaryKill()` as well would double-count it into a
       field that also sizes the next war party.
 - [ ] Counts persist across a reload without a purchase in between. They ride the same
@@ -863,13 +863,70 @@ slots 2-7 cast the six spells, and 8-9 stay empty as room for whatever moves in 
       same session** - a single row looks perfectly reasonable on its own, and one shared
       multiplier applied to every row would be wrong on five of the nine while still
       looking like a working feature.
-- [ ] Boss and war chief show an **absolute** figure and a tier, not a percentage. The boss
-      steps every ten waves (`(10 + tier*6)` where tier is `floor(wave/10)`), and the war
-      chief is off the wave curve entirely at `WARCHIEF_BASE_HP + tier * 200` where tier is
-      how many you have already killed. Kill a war chief and confirm its row's HP jumps by
-      200 with no wave having passed.
+- [ ] **The percentages carry that on their own - there is no "off-wave curve" tag.**
+      A wave row and an off-wave row differ by a factor of three in the badge, which says
+      it more plainly than a label does, and the note under the list gives the reason. The
+      tag existed and was removed as a caption on a number that was already speaking; do
+      not reinstate it. Only boss and war chief carry a text chip, because their tier is
+      genuinely not derivable from the figure shown.
+- [ ] **Hovering an HP chip shows the working, line by line.** A ghoul at wave 30 by day
+      reads:
+      `wave 30: (1 + 30 x 0.08) x 1.015^30 = x5.31` / `off-wave: x5.31^0.5 = x2.31` /
+      `= x2.31 -> +131% (3 -> 7 HP)`. The chip carries a dashed underline and a help cursor
+      so the tooltip is not a secret.
+- [ ] **Only the terms actually doing something are listed.** By day with no modifier
+      rolled there is no `night:` line and no modifier line - at midday those would be
+      three `x1` rows and no explanation. Check the same kind by day and by night: the
+      night line appears and the total changes with it.
+- [ ] A modifier that scales enemy health names itself in the working (`Thin Ranks: x1.7`),
+      and one that does not touch health adds no line at all.
+- [ ] **The working and the badge cannot disagree.** Both come out of the same locals in
+      `bestiaryScaling()` - the tooltip is not a second copy of the formula written by
+      hand. If they ever differ, the fix is in that function, not in the renderer: a
+      formula restated somewhere else is one that will drift.
+- [ ] The off-wave step is written as an **exponent** (`^0.5`), not as "sqrt", so it stays
+      true if `OFFWAVE_HP_SCALE_ROOT` is ever retuned.
+- [ ] Boss and war chief rows carry no working - they show absolute HP and a tier rather
+      than a bonus, so there is no percentage to explain.
+- [ ] **Chip order is HP, Spd, Dmg - and an optional chip is always the last one.**
+      Ghoul, warden and blight deal no tower damage and show **no Dmg chip at all**; their
+      rows simply end after Spd. War chief likewise ends after its tier.
+      Regression: those rows used to print a placeholder `Dmg -` purely so the Spd chip
+      would land in the same place, which put a chip carrying no information in the middle
+      of the row. An absent chip has to be last, or its absence moves everything after it.
+      Check a zero-damage row **against a damaging one**: a single row looks fine either
+      way, and the misalignment only exists as a difference between rows.
+- [ ] Dropping the placeholder loses nothing - ghoul, warden and blight each say they do
+      not touch the tower in their own description line.
+- [ ] Boss and war chief show an **absolute** figure, not a percentage. The boss steps
+      every ten waves (`(10 + tier*6)` where tier is `floor(wave/10)`), and the war chief is
+      off the wave curve entirely at `WARCHIEF_BASE_HP + tier * WARCHIEF_HP_PER_TIER`
+      (400 + 200 a kill). Kill a war chief and confirm its row's HP jumps by 200 with no
+      wave having passed.
+- [ ] **Neither carries a tier chip; both carry their working on hover.** At wave 30 by day
+      the boss HP chip reads: `tier 3 (wave 30 / 10)` / `base: 10 + 3 x 6 = 28` /
+      `wave 30: (1 + 30 x 0.08) x 1.015^30 = x5.31` / `= 149 HP`. After two war-chief kills
+      that row reads: `tier 2 = war chiefs felled` / `400 + 2 x 200 = 800 HP` /
+      `flat: neither the wave curve nor night touches this`.
+      The chips went for different reasons, and both are worth keeping in mind when adding
+      a row: the boss's tier is the first line of its own working, and the war chief's tier
+      *is* its kill count, which the row already prints in the KILLS column an inch to the
+      left. A chip that restates something already on screen is noise wherever it appears.
+- [ ] **The war chief's HP is flat.** No wave curve, no night scale, no run modifier - the
+      working says so on its third line. `spawnWarChief()` overwrites the health it
+      inherited from the warden it was promoted from, which is what makes it flat; check
+      the row is identical at wave 5 and wave 50, and by night as well as by day.
+- [ ] **The boss does not take the run modifier** either. There is no `enemyHpScale` term in
+      its working, because `spawnBossEnemy()` has none - it applies only the wave curve and
+      the night scale. Roll `Thin Ranks` and confirm the boss figure is unchanged while the
+      wave enemies' badges all rise. If that ever changes it has to change in both places,
+      or the working starts lying.
+- [ ] Cross-check both against the real thing: at wave 30 the boss row must read the HP a
+      boss actually spawns with (149 by day). The bestiary restates the spawners' arithmetic
+      rather than calling it - see §24. `WARCHIEF_HP_PER_TIER` exists so that at least the
+      war chief's per-kill step is one number rather than two copies of it.
 - [ ] At night the badge rises for every kind (`NIGHT_ENEMY_HP_SCALE = 1.35`) and falls
-      again at dawn. Open the manual once by day and once by night on the same wave.
+      again at dawn. Open the bestiary once by day and once by night on the same wave.
 - [ ] A run modifier that scales enemy health (`Thin Ranks`, `enemyHpScale: 1.7`) is in the
       badge. Compare the same kind across two runs with different modifiers.
 - [ ] Before a run starts the badge is absent rather than `+0%` - wave 0 adds nothing.
@@ -1032,9 +1089,9 @@ Each of these has broken the game before, and the failure was silent.
       and, if nothing claimed the key, toggles pause. A new panel that does not add its own
       branch *above* that fallback does not fail loudly - it stays open and pauses the run
       underneath itself.
-- [ ] **The manual mirrors spawn arithmetic it does not call.** `bestiaryScaling()`
+- [ ] **The bestiary mirrors spawn arithmetic it does not call.** `bestiaryScaling()`
       restates the five health curves the spawners use. Changing a spawn formula without
-      changing it leaves the manual confidently wrong - see §18.
+      changing it leaves the bestiary confidently wrong - see §18.
 - [ ] **Positional arguments shift silently.** `setShopButtonContent(button, label,
       levelText, cost)` and `setSkillNodeContent` both take four or five same-typed
       arguments in a row, and passing one too many does not throw - it slides every later
