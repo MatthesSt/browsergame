@@ -2387,6 +2387,9 @@
             const WEATHER_WARNING_TICKS = 600;           // ten seconds of "it is coming"
             const WEATHER_MIN_TICKS = 2400;              // forty seconds
             const WEATHER_MAX_TICKS = 3600;              // sixty seconds
+            // How long the tint takes to arrive and to leave. Measured from the roll, not
+            // from a fixed anchor - see drawWeatherTint.
+            const WEATHER_FADE_TICKS = 120;              // two seconds
             const WEATHER_MIN_GAP_TICKS = 7200;          // two minutes of clear sky
             const WEATHER_MAX_GAP_TICKS = 14400;         // four minutes
             const WEATHER_FIRST_GAP_TICKS = 5400;        // ninety seconds into a run
@@ -2506,6 +2509,7 @@
                     if (game.weatherTicks <= 0) {
                         game.weather = null;
                         game.weatherTicks = 0;
+                        game.weatherDuration = 0;
                         game.weatherGapTicks = Math.floor(random(WEATHER_MIN_GAP_TICKS, WEATHER_MAX_GAP_TICKS));
                         refreshHud();
                     }
@@ -2519,6 +2523,10 @@
                         game.weatherPending = null;
                         game.weatherWarnTicks = 0;
                         game.weatherTicks = Math.floor(random(WEATHER_MIN_TICKS, WEATHER_MAX_TICKS));
+                        // The fade-in has to be measured against the length this weather
+                        // actually rolled, so keep it rather than working back from a
+                        // constant that most rolls are nowhere near.
+                        game.weatherDuration = game.weatherTicks;
                         game.weatherStrikeTimer = LIGHTNING_INTERVAL_TICKS;
                         refreshHud();
                     }
@@ -2752,6 +2760,14 @@
             const PLAYER_STAMINA_MAX = 100;
             const PLAYER_ATTACK_STAMINA_COST = 18;
             const PLAYER_STAMINA_REGEN_PER_TICK = 0.2;
+            // Slack on the pickup test, beyond the point where the player's circle and
+            // the node's silhouette actually touch. Without it the two readings are the
+            // same to within a pixel or two, so a node is collected only by steering
+            // dead through it - and at ten-plus units a tick, threading a field meant
+            // running past resources that visibly brushed past you. Half a player
+            // radius is enough that walking near something picks it up, and still far
+            // short of a vacuum: nodes a body's width away are still missed.
+            const PLAYER_PICKUP_GRACE = W(10);
             const HUNTER_RAMP_DELAY_TICKS = 600;
             const HUNTER_RAMP_STEP_TICKS = 180;
             const HUNTER_RAMP_STEP_BONUS = 0.12;
@@ -3307,6 +3323,7 @@
                 runPeakStored: 0,
                 weather: null,
                 weatherTicks: 0,
+                weatherDuration: 0,
                 weatherPending: null,
                 weatherWarnTicks: 0,
                 weatherGapTicks: WEATHER_FIRST_GAP_TICKS,
@@ -4076,6 +4093,7 @@
                     waveIntroPendingType: game.waveIntroPendingType,
                     weather: game.weather,
                     weatherTicks: game.weatherTicks,
+                    weatherDuration: game.weatherDuration,
                     weatherPending: game.weatherPending,
                     weatherWarnTicks: game.weatherWarnTicks,
                     weatherGapTicks: game.weatherGapTicks,
@@ -4166,6 +4184,12 @@
                 // flash, and a bolt hanging in the air on load would read as a bug.
                 game.weather = weatherById(snapshot.weather) ? snapshot.weather : null;
                 game.weatherTicks = Number.isFinite(snapshot.weatherTicks) ? Math.max(0, snapshot.weatherTicks) : 0;
+                // Older snapshots carry no duration. Falling back to the remaining ticks
+                // reads as "already fully arrived", which is what a restore mid-weather
+                // should look like - never a second fade-in on load.
+                game.weatherDuration = Number.isFinite(snapshot.weatherDuration)
+                    ? Math.max(0, snapshot.weatherDuration)
+                    : game.weatherTicks;
                 game.weatherPending = weatherById(snapshot.weatherPending) ? snapshot.weatherPending : null;
                 game.weatherWarnTicks = Number.isFinite(snapshot.weatherWarnTicks) ? Math.max(0, snapshot.weatherWarnTicks) : 0;
                 game.weatherGapTicks = Number.isFinite(snapshot.weatherGapTicks)
@@ -6378,8 +6402,15 @@
 
                 // Eases in and out over two seconds at each end so weather arrives rather
                 // than switching on.
+                //
+                // Both ends are measured against the length this weather rolled. Anchoring
+                // the fade-in to WEATHER_MAX_TICKS instead - a constant nine rolls in ten
+                // are hundreds of ticks short of - meant `elapsed` started somewhere in the
+                // middle of the ramp, so the wash and the fog vignette snapped to full
+                // strength in a single frame and the view appeared to jump.
+                const elapsed = Math.max(0, game.weatherDuration - game.weatherTicks);
                 const fade = Math.min(1,
-                    Math.min(game.weatherTicks, WEATHER_MAX_TICKS - game.weatherTicks, 120) / 120);
+                    Math.min(elapsed, game.weatherTicks, WEATHER_FADE_TICKS) / WEATHER_FADE_TICKS);
                 const alpha = weather.tintAlpha * Math.max(0, fade);
                 if (alpha <= 0) return;
 
@@ -10140,6 +10171,7 @@
                 game.runPeakStored = 0;
                 game.weather = null;
                 game.weatherTicks = 0;
+                game.weatherDuration = 0;
                 game.weatherPending = null;
                 game.weatherWarnTicks = 0;
                 game.weatherGapTicks = WEATHER_FIRST_GAP_TICKS;
@@ -11826,7 +11858,7 @@
 
                     if (carried >= maxCarry) continue;
 
-                    const hitRadius = game.player.r + node.size * 0.6;
+                    const hitRadius = game.player.r + node.size * 0.6 + PLAYER_PICKUP_GRACE;
                     if (distanceSq(game.player, node) <= hitRadius * hitRadius) {
                         game.inventory[node.type] += 1;
                         carried += 1;
