@@ -464,10 +464,6 @@
             border-color: #5d7ea3;
         }
 
-        .shop-group.spells {
-            border-color: #9e5f7d;
-        }
-
         .shop-controls {
             display: grid;
             gap: 8px;
@@ -1478,6 +1474,79 @@
             font-size: 0.78rem;
         }
 
+        /* The settings menu at the top right. Same shape as the audio menu on the left,
+           but anchored to its right edge - it sits at the end of the bar, so a panel
+           hanging off the left corner would run off the side of the window. */
+        .settings-menu {
+            position: relative;
+            display: inline-flex;
+        }
+
+        .settings-menu > button {
+            min-width: 38px;
+            padding: 8px 12px;
+            font-size: 1rem;
+            line-height: 1;
+        }
+
+        .settings-panel {
+            position: absolute;
+            top: calc(100% + 8px);
+            right: 0;
+            z-index: 20;
+            display: grid;
+            gap: 10px;
+            padding: 12px;
+            width: 290px;
+            border-radius: 14px;
+            background: #14283ff2;
+            border: 1px solid #3a5676;
+            box-shadow: 0 12px 28px #02060db3;
+            text-align: left;
+        }
+
+        .settings-panel[hidden] {
+            display: none;
+        }
+
+        .settings-panel-divider {
+            height: 1px;
+            background: #3a5676;
+            margin: 2px 0;
+        }
+
+        .settings-item-head {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 10px;
+            font-size: 0.8rem;
+            font-weight: 700;
+        }
+
+        .settings-item-head button {
+            padding: 4px 12px;
+            font-size: 0.78rem;
+        }
+
+        /* Both of these throw work away, and the two are easy to confuse - which is the
+           whole reason they now sit behind one menu with their difference written out
+           rather than as two bare words in the top bar. */
+        .settings-item-desc {
+            margin: 6px 0 0;
+            font-size: 0.72rem;
+            line-height: 1.45;
+            opacity: 0.72;
+        }
+
+        .settings-item-desc strong {
+            opacity: 0.95;
+        }
+
+        .settings-item.unavailable {
+            opacity: 0.5;
+        }
+
         .volume-control {
             transition: opacity 200ms ease;
         }
@@ -1546,6 +1615,274 @@
             box-shadow: inset 0 0 0 1px #2b4763;
         }
 
+        /* The map toolbar. Slot 1 is the field manual; the rest are deliberately empty
+           and visible, because the point of the frame is that things move into it. */
+        .hotbar {
+            position: absolute;
+            left: 50%;
+            bottom: 12px;
+            transform: translateX(-50%);
+            z-index: 3;
+            display: flex;
+            gap: 5px;
+            padding: 5px;
+            border-radius: 12px;
+            border: 1px solid #35527299;
+            /* Opacity rather than a backdrop-filter, for the same reason the bag chip
+               gives above: this sits over a canvas that repaints every frame. */
+            background: #08141fe6;
+            box-shadow: 0 4px 14px #02060d66;
+            /* The inverse of the bag chip. That one is never interactive so it opts out
+               of pointer events entirely; this one has to be clickable, so the bar itself
+               still opts out and only the slots opt back in. If the bar kept pointer
+               events, its padding and the gaps between slots would be a dead strip across
+               the bottom of the map that swallows turret placement and camera drags -
+               invisible, and only reachable by aiming near the bottom edge. */
+            pointer-events: none;
+        }
+
+        .hotbar-slot {
+            pointer-events: auto;
+            position: relative;
+            width: 46px;
+            height: 46px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 0;
+            border-radius: 9px;
+            border: 1px solid #34506e;
+            background: #13263d;
+            color: #e8f1fb;
+            font-family: inherit;
+            cursor: pointer;
+            transition: border-color 120ms ease, background 120ms ease, transform 120ms ease;
+        }
+
+        .hotbar-slot:hover {
+            border-color: #5b86b5;
+            background: #1a324f;
+        }
+
+        .hotbar-slot.open {
+            border-color: #8fc4ff;
+            background: #1f3c5e;
+        }
+
+        .hotbar-slot.empty {
+            cursor: default;
+            border-style: dashed;
+            border-color: #2a405899;
+            background: #0d1b2b99;
+        }
+
+        .hotbar-slot.empty:hover {
+            border-color: #2a405899;
+            background: #0d1b2b99;
+        }
+
+        .hotbar-slot .slot-key {
+            position: absolute;
+            top: 2px;
+            left: 5px;
+            font-size: 0.6rem;
+            font-weight: 700;
+            opacity: 0.5;
+            letter-spacing: 0.02em;
+        }
+
+        .hotbar-slot .slot-icon {
+            font-size: 1.25rem;
+            line-height: 1;
+        }
+
+        .hotbar-slot .slot-badge {
+            position: absolute;
+            right: 3px;
+            bottom: 2px;
+            font-size: 0.62rem;
+            font-weight: 700;
+            color: #ffd166;
+        }
+
+        /* A locked spell keeps its slot so the numbers never resequence - it just stops
+           looking like something you can press. */
+        .hotbar-slot.locked {
+            cursor: default;
+            border-color: #2a405899;
+            background: #0d1b2b99;
+        }
+
+        .hotbar-slot.locked .slot-icon {
+            opacity: 0.22;
+            filter: grayscale(1);
+        }
+
+        /* Cannot pay for it, or it would do nothing right now (tower already full, no
+           minions to recall). The slot stays pressable - the cast simply refuses - so
+           this reads as "not now" rather than "not yours". */
+        .hotbar-slot.unaffordable .slot-icon,
+        .hotbar-slot.unaffordable .slot-cost {
+            opacity: 0.4;
+        }
+
+        .hotbar-slot.cooling .slot-icon {
+            opacity: 0.35;
+        }
+
+        .hotbar-slot.cooling .slot-badge {
+            color: #9fb6cd;
+        }
+
+        /* Running right now. The badge counts the effect down rather than the cooldown. */
+        .hotbar-slot.active {
+            border-color: #6ee7a8;
+            background: #14332a;
+        }
+
+        .hotbar-slot.active .slot-badge {
+            color: #6ee7a8;
+        }
+
+        .hotbar-slot .slot-cost {
+            position: absolute;
+            left: 0;
+            right: 0;
+            bottom: 2px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 2px;
+            font-size: 0.6rem;
+            font-weight: 700;
+            line-height: 1;
+            color: #cfe0f2;
+            pointer-events: none;
+        }
+
+        /* The cost sits along the bottom of a spell slot, so its badge moves to the top
+           corner to stay clear. Keyed off the slot's kind rather than off whether the cost
+           element happens to be empty: the badge comes *before* the cost in the markup, so
+           a sibling selector cannot reach backwards, and the state would change under the
+           slot every time a spell became free or stopped being it. The manual has no cost
+           row at all and keeps the bottom corner. */
+        .hotbar-slot.spell .slot-badge {
+            top: 2px;
+            right: 4px;
+            bottom: auto;
+        }
+
+        .hotbar-slot .slot-cost .res-icon {
+            width: 8px;
+            height: 8px;
+        }
+
+        /* Field manual */
+        .bestiary-card {
+            width: min(760px, 96vw);
+        }
+
+        .bestiary-list {
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+            max-height: min(62vh, 560px);
+            overflow-y: auto;
+            padding: 2px;
+        }
+
+        .bestiary-row {
+            display: grid;
+            grid-template-columns: 34px minmax(120px, 1.1fr) 62px 1fr;
+            align-items: center;
+            gap: 10px;
+            padding: 7px 10px;
+            border-radius: 9px;
+            border: 1px solid #2b4763;
+            background: #101f31;
+        }
+
+        .bestiary-row.locked {
+            opacity: 0.5;
+            border-style: dashed;
+        }
+
+        .bestiary-glyph {
+            width: 18px;
+            height: 18px;
+            justify-self: center;
+            border: 2px solid #0006;
+        }
+
+        .bestiary-glyph.circle { border-radius: 50%; }
+        .bestiary-glyph.square { border-radius: 3px; }
+        .bestiary-glyph.diamond { border-radius: 3px; transform: rotate(45deg); }
+
+        .bestiary-name {
+            font-weight: 700;
+            font-size: 0.86rem;
+        }
+
+        .bestiary-note {
+            display: block;
+            font-weight: 400;
+            font-size: 0.7rem;
+            opacity: 0.65;
+            margin-top: 2px;
+        }
+
+        .bestiary-kills {
+            text-align: right;
+            font-weight: 700;
+            font-size: 0.95rem;
+            font-variant-numeric: tabular-nums;
+        }
+
+        .bestiary-kills small {
+            display: block;
+            font-size: 0.58rem;
+            font-weight: 600;
+            opacity: 0.55;
+            letter-spacing: 0.06em;
+        }
+
+        .bestiary-stats {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 4px 6px;
+            font-size: 0.72rem;
+        }
+
+        .bestiary-stat {
+            display: inline-flex;
+            align-items: baseline;
+            gap: 4px;
+            padding: 2px 7px;
+            border-radius: 999px;
+            border: 1px solid #34506e;
+            background: #13263d;
+            white-space: nowrap;
+            font-variant-numeric: tabular-nums;
+        }
+
+        .bestiary-stat b {
+            font-weight: 700;
+        }
+
+        /* The scaling badge. Green would read as "good for you"; this is the enemy
+           getting stronger, so it takes the warning colour. */
+        .bestiary-stat .scale-up {
+            color: #ff9d6b;
+            font-weight: 700;
+        }
+
+        .bestiary-foot {
+            margin-top: 10px;
+            font-size: 0.72rem;
+            opacity: 0.7;
+            line-height: 1.5;
+        }
+
         .help {
             font-size: 0.9rem;
             opacity: 0.75;
@@ -1605,7 +1942,26 @@
             </div>
             <div class="controls">
                 <button id="openSkillTreeBtn" class="secondary icon-title-btn" title="Open Skill Tree"><span class="ico skill" aria-hidden="true"></span><span>Skill Tree</span></button>
-                <button id="resetBtn" class="secondary">Reset Save</button>
+                <div class="settings-menu">
+                    <button id="settingsBtn" class="secondary" title="Settings - restart the run or reset the save" aria-haspopup="true" aria-expanded="false" aria-label="Settings">⚙</button>
+                    <div id="settingsPanel" class="settings-panel" hidden>
+                        <div class="settings-item">
+                            <div class="settings-item-head">
+                                <span>Restart Run</span>
+                                <button id="restartRunBtn" class="secondary">Restart</button>
+                            </div>
+                            <p class="settings-item-desc">Starts again at wave 1. Your <strong>skill tree, essence and records carry over</strong> - only what this run built is lost. The run still counts and still records the wave it reached.</p>
+                        </div>
+                        <div class="settings-panel-divider" role="separator"></div>
+                        <div class="settings-item">
+                            <div class="settings-item-head">
+                                <span>Reset Save</span>
+                                <button id="resetBtn" class="secondary">Reset</button>
+                            </div>
+                            <p class="settings-item-desc">Wipes <strong>everything</strong> - the skill tree, essence, best-run records and the run itself. A backup is kept, so you can undo it straight afterwards.</p>
+                        </div>
+                    </div>
+                </div>
             </div>
         </section>
 
@@ -1613,6 +1969,7 @@
             <div class="map-frame">
                 <canvas id="game" width="1920" height="1080" aria-label="Meadow Gatherer game area"></canvas>
                 <div class="chip resource-bundle bag-bundle bag-overlay" aria-hidden="true" title="Bag materials: Wood / Stone / Crystal / Amber / Aether / Ivory"><span class="ico bag"></span><span>Bag</span><span class="bag-cap-inline" title="Bag capacity used / maximum"><span>Cap</span><strong id="capacity">10</strong></span><span class="shop-btn-costs hud-bank-costs"><span class="cost-chip"><span class="res-icon wood"></span><strong id="bagWoodHud">0</strong></span><span class="cost-chip"><span class="res-icon stone"></span><strong id="bagStoneHud">0</strong></span><span class="cost-chip"><span class="res-icon crystal"></span><strong id="bagCrystalHud">0</strong></span><span class="cost-chip"><span class="res-icon amber"></span><strong id="bagAmberHud">0</strong></span><span class="cost-chip"><span class="res-icon aether"></span><strong id="bagAetherHud">0</strong></span><span class="cost-chip"><span class="res-icon ivory"></span><strong id="bagIvoryHud">0</strong></span></span></div>
+                <div id="hotbar" class="hotbar" role="toolbar" aria-label="Map toolbar"></div>
             </div>
             <div class="shop-dock">
                 <aside class="shop" aria-label="Shop panel">
@@ -1675,18 +2032,6 @@
                                 </div>
                             </details>
 
-                            <details class="shop-group spells" open>
-                                <summary class="shop-group-title">Spells</summary>
-                                <div class="shop-controls">
-                                    <button id="minionHasteBtn" class="secondary shop-btn">Haste Spell</button>
-                                    <button id="warPaintBtn" class="secondary shop-btn">War Paint</button>
-                                    <button id="bloomSpellBtn" class="secondary shop-btn">Bloom</button>
-                                    <button id="waygateSpellBtn" class="secondary shop-btn">Waygate</button>
-                                    <button id="chillSpellBtn" class="secondary shop-btn">Chill</button>
-                                    <button id="mendSpellBtn" class="secondary shop-btn">Mend Tower</button>
-                                </div>
-                            </details>
-
                         </div>
                     </div>
                     <div id="leaderboardPane" class="shop-pane" role="tabpanel" aria-labelledby="shopTabLeaderboardBtn" hidden>
@@ -1724,6 +2069,22 @@
                 </div>
             </div>
             <div id="skillTreeControls" class="shop-controls"></div>
+        </div>
+    </div>
+
+    <div id="bestiaryPopover" class="popover-backdrop" aria-hidden="true">
+        <div class="popover-card bestiary-card" role="dialog" aria-modal="true" aria-label="Field Manual">
+            <div class="popover-head">
+                <h3>FIELD MANUAL</h3>
+                <div class="chip" title="Kinds you have put down at least once"><span class="ico best"></span><span>Catalogued</span><strong id="bestiaryProgress">0/9</strong></div>
+                <div class="popover-head-actions">
+                    <button id="closeBestiaryBtn" class="secondary">Close</button>
+                </div>
+            </div>
+            <div id="bestiaryList" class="bestiary-list"></div>
+            <p class="bestiary-foot">Base stats are what a kind spawns with at wave&nbsp;1. The orange figure is
+               how much the current wave adds on top - it is read per kind, because they do not share one curve:
+               anything that never pushes the tower takes a much softer climb than a wave enemy does.</p>
         </div>
     </div>
 
@@ -1891,20 +2252,11 @@
             const defenderPostSummaryEl = document.getElementById("defenderPostSummary");
             const defenderPostListEl = document.getElementById("defenderPostList");
             const minionSpeedBtn = document.getElementById("minionSpeedBtn");
-            const minionHasteBtn = document.getElementById("minionHasteBtn");
-            const warPaintBtn = document.getElementById("warPaintBtn");
-            const bloomSpellBtn = document.getElementById("bloomSpellBtn");
-            const waygateSpellBtn = document.getElementById("waygateSpellBtn");
-            const chillSpellBtn = document.getElementById("chillSpellBtn");
-            const mendSpellBtn = document.getElementById("mendSpellBtn");
-            const spellButtons = {
-                mend: mendSpellBtn,
-                waygate: waygateSpellBtn,
-                chill: chillSpellBtn,
-                bloom: bloomSpellBtn
-            };
             const minionCapBtn = document.getElementById("minionCapBtn");
             const resetBtn = document.getElementById("resetBtn");
+            const settingsBtn = document.getElementById("settingsBtn");
+            const settingsPanelEl = document.getElementById("settingsPanel");
+            const restartRunBtn = document.getElementById("restartRunBtn");
             const gameSpeedBtn = document.getElementById("gameSpeedBtn");
             const nextWaveChipEl = document.getElementById("nextWaveChip");
             const resetPopoverEl = document.getElementById("resetPopover");
@@ -1945,6 +2297,11 @@
             const skillTreeZoomReadout = document.getElementById("skillTreeZoomReadout");
             const skillTreePopoverEl = document.getElementById("skillTreePopover");
             const skillTreeControlsEl = document.getElementById("skillTreeControls");
+            const hotbarEl = document.getElementById("hotbar");
+            const bestiaryPopoverEl = document.getElementById("bestiaryPopover");
+            const bestiaryListEl = document.getElementById("bestiaryList");
+            const bestiaryProgressEl = document.getElementById("bestiaryProgress");
+            const closeBestiaryBtn = document.getElementById("closeBestiaryBtn");
 
             const BASE_VIEW_W = W(1920);
             const BASE_VIEW_H = W(1080);
@@ -2245,6 +2602,7 @@
                 suppressClick: false
             };
             let resumeAfterSkillTreeClose = false;
+            let resumeAfterBestiaryClose = false;
             let rafId = null;
 
             const materialConfig = {
@@ -2274,6 +2632,33 @@
                 blight: { key: "blight", color: "#a06bd8", stroke: "#331a4d", r: E(12), hp: 4, speed: W(1.45) * ENEMY_SPEED_MULTIPLIER, damage: 0, shape: "diamond", minionFocus: false, minionShotRange: 0, minionShotCooldown: 0, laserColor: "#c9a2ff", claimsSpawner: true }
             };
 
+
+            // The field manual's roster. This is a hand-written list rather than
+            // `Object.keys(enemyTypeConfig)` on purpose: two of the nine kinds are never
+            // in that table. `boss` is built by spawnBossEnemy() from its own formula and
+            // `warchief` is a warden promoted in place by spawnWarChief(), so deriving the
+            // roster from the config would silently drop the two kills worth bragging
+            // about. Adding an enemy means adding a row here too.
+            //
+            // Declared beside enemyTypeConfig rather than next to the panel that draws it
+            // because loadSave() normalises save.bestiary against BESTIARY_ORDER and runs
+            // long before the UI section exists - see the temporal-dead-zone note in
+            // TESTING.md §23.
+            //
+            // `scaling` names which curve the kind's health actually follows, because they
+            // do not share one. See bestiaryScaling().
+            const BESTIARY_ORDER = ["scout", "brute", "wisp", "hunter", "ghoul", "warden", "blight", "boss", "warchief"];
+            const BESTIARY_ENTRIES = {
+                scout:    { name: "Scout",     scaling: "wave",     hp: 1,  damage: 5,  speed: 1.9,  note: "Fast and frail. Walks the shortest line to the tower." },
+                brute:    { name: "Brute",     scaling: "wave",     hp: 4,  damage: 14, speed: 0.95, note: "Slow, heavy, and the reason a wave stops being free." },
+                wisp:     { name: "Wisp",      scaling: "wave",     hp: 2,  damage: 9,  speed: 1.35, note: "Middling at everything. Arrives in numbers." },
+                hunter:   { name: "Hunter",    scaling: "wave",     hp: 2,  damage: 3,  speed: 2.0,  note: "Ignores the tower to shoot minions, and outruns them." },
+                ghoul:    { name: "Ghoul",     scaling: "offwave",  hp: 3,  damage: 0,  speed: 0.42, note: "Crawls the meadows on its own clock. Mauls gatherers, never the tower." },
+                warden:   { name: "Warden",    scaling: "offwave",  hp: 5,  damage: 0,  speed: 1.15, note: "Tribe. Holds ground across the river and nothing else." },
+                blight:   { name: "Blight",    scaling: "offwave",  hp: 4,  damage: 0,  speed: 1.45, note: "Claims a field and eats it a node at a time until killed." },
+                boss:     { name: "Boss",      scaling: "boss",     hp: 16, damage: 18, speed: 0.94, color: "#ffb347", shape: "square",  note: "Every tenth wave. Tier rises with the milestone." },
+                warchief: { name: "War Chief", scaling: "warchief", hp: 0,  damage: 0,  speed: 1.05, color: "#ff7043", shape: "diamond", note: "Provoked, not spawned. Hold all four tribe fields." }
+            };
             // Blights arrive on their own schedule rather than as part of a wave's
             // count, so choking the economy stays a separate pressure from the push
             // on the tower.
@@ -3718,6 +4103,7 @@
                         bestRunWave: Number.isFinite(data.bestRunWave) ? Math.max(0, Math.floor(data.bestRunWave)) : 0,
                         runsPlayed: Number.isFinite(data.runsPlayed) ? Math.max(0, Math.floor(data.runsPlayed)) : 0,
                         warChiefKills: Number.isFinite(data.warChiefKills) ? Math.max(0, Math.floor(data.warChiefKills)) : 0,
+                        bestiary: normalizeBestiary(data.bestiary),
                         essence: Number.isFinite(data.essence) ? Math.max(0, Math.floor(data.essence)) : START_BUDGET.essence,
                         globalMultiplierLevel: Number.isFinite(data.globalMultiplierLevel) ? Math.max(0, Math.floor(data.globalMultiplierLevel)) : fresh.globalMultiplierLevel,
                         worldAge: Number.isFinite(data.worldAge) ? data.worldAge : fresh.worldAge,
@@ -3790,6 +4176,7 @@
                         tutorialStep: 0,
                         tipsEnabled: true,
                         warChiefKills: 0,
+                        bestiary: normalizeBestiary(null),
                         essence: 0,
                         unlockedSkills: blank,
                         musicMuted: true,
@@ -3803,6 +4190,25 @@
                 }
             }
 
+
+            // Kill tallies are meta, like warChiefKills and runsPlayed: they sit outside
+            // freshRunState() so a tower falling does not wipe the manual. A collection
+            // that resets every death is not a collection.
+            //
+            // Unknown keys in a stored tally are dropped rather than kept, so a save made
+            // while an enemy existed cannot resurrect a row the roster no longer has.
+            // Missing keys become 0 rather than absent - the panel distinguishes "never
+            // felled" by the count being 0, so a hole in the map would render as a locked
+            // row for a kind the player has actually killed.
+            function normalizeBestiary(raw) {
+                const out = {};
+                const stored = raw && typeof raw === "object" ? raw : {};
+                for (const key of BESTIARY_ORDER) {
+                    const n = stored[key];
+                    out[key] = Number.isFinite(n) ? Math.max(0, Math.floor(n)) : 0;
+                }
+                return out;
+            }
             function normalizeUnlockedSkills(raw) {
                 const normalized = {};
                 for (const skillId of SKILL_TREE_ORDER) {
@@ -4396,7 +4802,6 @@
                 ensureMinionIdentityAndCounters();
                 ensureEnemyIdentityAndCounter();
 
-                startBtn.textContent = "Restart Run";
                 refreshHud();
                 return true;
             }
@@ -5184,6 +5589,15 @@
                 bloom: "Bloom"
             };
 
+
+            // One glyph per spell for the toolbar. Kept beside the labels so a new spell
+            // is one edit away from having both.
+            const SPELL_ICONS = {
+                mend: "🛠",
+                waygate: "🌀",
+                chill: "❄",
+                bloom: "🌱"
+            };
             // The line under a spell's name while it is castable: what it would do now,
             // or why casting it right now would be a waste.
             function spellStatusText(key) {
@@ -5356,8 +5770,26 @@
                 return `${(num / 1000000000000).toFixed(1)}T`;
             }
 
+            // Under an hour this is mm:ss. Past it the shape has to change, because the
+            // three stacking spells have no ceiling: recasting Haste enough times reaches
+            // "100:00", which reads as a hundred seconds rather than a hundred minutes.
+            //
+            // Deliberately not hh:mm. "01:40" is the same two-field shape as 1m40s and
+            // means something forty times larger, so switching silently at the hour mark
+            // would make the readout ambiguous rather than fix it - and the ambiguity would
+            // only appear once someone had banked an hour, which almost nobody does early.
+            // The unit letter is the whole point: "1h40" cannot be misread as mm:ss.
+            // Seconds are dropped at that range because they are noise, and the result is
+            // narrower than "1:40:00" - which matters in a 46px toolbar slot.
+            const COUNTDOWN_HOUR_SECONDS = 3600;
+
             function formatWaveCountdown(ticks) {
                 const totalSeconds = Math.max(0, Math.ceil(ticks / 60));
+                if (totalSeconds >= COUNTDOWN_HOUR_SECONDS) {
+                    const hours = Math.floor(totalSeconds / COUNTDOWN_HOUR_SECONDS);
+                    const minutes = Math.floor((totalSeconds % COUNTDOWN_HOUR_SECONDS) / 60);
+                    return `${hours}h${String(minutes).padStart(2, "0")}`;
+                }
                 const minutes = Math.floor(totalSeconds / 60);
                 const seconds = totalSeconds % 60;
                 return `${String(minutes).padStart(2, "0")}:${String(seconds).padStart(2, "0")}`;
@@ -5458,6 +5890,8 @@
             function refreshHud() {
                 const currentInventoryCount = inventoryCount();
                 const currentBagCapacity = bagCapacity();
+                refreshHotbar();
+                refreshRunControls();
 
                 setHudNumber("bagWood", bagWoodHudEl, game.inventory.wood);
                 setHudNumber("bagStone", bagStoneHudEl, game.inventory.stone);
@@ -5534,8 +5968,6 @@
                 const traderUnlocked = canUseUpgrade("trader");
                 const minionSpeedUnlocked = canUseUpgrade("minionSpeed");
                 const minionCapacityUnlocked = canUseUpgrade("minionCapacity");
-                const minionHasteUnlocked = canUseUpgrade("minionHaste");
-                const warPaintUnlocked = canUseUpgrade("warPaint");
 
                 const speedCost = speedRecipe();
                 const bagCost = bagRecipe();
@@ -5549,7 +5981,7 @@
                 setShopButtonContent(spawnerCrystalBtn, "Crystal Spawner", `Lv ${save.spawnerCrystalLevel}`, crystalSpawnerCost);
                 const amberSpawnerCost = spawnerRecipe("amber");
                 setShopButtonContent(spawnerAmberBtn, "Amber Spawner", `Lv ${save.spawnerAmberLevel}`, amberSpawnerCost);
-                const totalTurretsOwned = placedTurretCount();
+                const totalTurretsOwned = ownedTurretCount();
                 const turretCapacity = maxTurrets();
                 if (turretGroupCountEl) {
                     const turretGroupCountText = `${totalTurretsOwned}/${turretCapacity}`;
@@ -5603,40 +6035,6 @@
                 // it is how much each one hauls. The number it buys is spelled out for
                 // the same reason the turret cap spells its own out.
                 setShopButtonContent(minionCapBtn, "Minion Load", `Lv ${save.minionCapacityLevel} carries ${minionCarryCapacity()}`, minionCapCost);
-                // While it runs the button counts the spell down in place of its pitch.
-                const hasteRunning = minionHasteActive();
-                setShopButtonContent(
-                    minionHasteBtn,
-                    warPaintBtn,
-                    "Haste Spell",
-                    hasteRunning ? `Active ${formatWaveCountdown(game.minionHasteTicks)}` : `x${MINION_HASTE_MULTIPLIER} for 1:00`,
-                    minionHasteRecipe()
-                );
-
-                const paintRunning = warPaintActive();
-                setShopButtonContent(
-                    warPaintBtn,
-                    "War Paint",
-                    paintRunning ? `Active ${formatWaveCountdown(game.warPaintTicks)}` : `x${WAR_PAINT_DAMAGE} damage, half taken`,
-                    warPaintRecipe()
-                );
-
-                // Every spell button reads the same way: what it would do, or how long
-                // until it can do it again.
-                for (const spellKey of SPELL_KEYS) {
-                    const button = spellButtons[spellKey];
-                    if (!button) continue;
-                    const def = SPELL_DEFS[spellKey];
-                    const unlocked = canUseUpgrade(def.skill);
-                    const cooldown = spellCooldownTicks(spellKey);
-                    const status = cooldown > 0
-                        ? `Ready ${formatWaveCountdown(cooldown)}`
-                        : spellStatusText(spellKey);
-                    setShopButtonContent(button, SPELL_LABELS[spellKey], status, spellRecipe(spellKey));
-                    setButtonVisible(button, unlocked);
-                    setButtonDisabled(button, !spellCastable(spellKey));
-                }
-
                 setButtonVisible(speedBtn, speedUnlocked);
                 setButtonVisible(bagBtn, bagUnlocked);
                 setButtonVisible(spawnerWoodBtn, spawnerWoodUnlocked);
@@ -5658,8 +6056,6 @@
                 setButtonVisible(defenderPostPanelEl, defenderUnlocked);
                 setButtonVisible(minionSpeedBtn, minionSpeedUnlocked);
                 setButtonVisible(minionCapBtn, minionCapacityUnlocked);
-                setButtonVisible(minionHasteBtn, minionHasteUnlocked);
-                setButtonVisible(warPaintBtn, warPaintUnlocked);
 
                 setButtonDisabled(speedBtn, !speedUnlocked);
                 setButtonDisabled(bagBtn, !bagUnlocked);
@@ -5674,8 +6070,6 @@
                 setButtonDisabled(defenderBtn, !defenderUnlocked);
                 setButtonDisabled(minionSpeedBtn, !minionSpeedUnlocked);
                 setButtonDisabled(minionCapBtn, !minionCapacityUnlocked);
-                setButtonDisabled(minionHasteBtn, !minionHasteUnlocked || !hasBankForCost(minionHasteRecipe()));
-                setButtonDisabled(warPaintBtn, !warPaintUnlocked || !hasBankForCost(warPaintRecipe()));
 
                 refreshShopGroupVisibility();
 
@@ -8809,6 +9203,375 @@
             shopTabShopBtn.addEventListener("click", () => setShopTab("shop"));
             shopTabLeaderboardBtn.addEventListener("click", () => setShopTab("leaderboard"));
 
+            // ---- Spells as toolbar slots ------------------------------------------
+            //
+            // The six spells used to be shop buttons in a `<details>` two clicks from the
+            // map. They were never shop stock: they are cost-and-cooldown abilities cast
+            // during a fight, which is what a hotbar is for.
+            //
+            // They come in two shapes and this table is what flattens them. Four of them
+            // (mend, waygate, chill, bloom) go through SPELL_DEFS and share castSpell(),
+            // spellCastable(), spellRecipe() and a real cooldown. Haste and War Paint
+            // predate that and have their own cast/recipe pair with no cooldown at all -
+            // they stack duration instead, and price the next cast off the clock they are
+            // already holding. Rather than teach the bar about both, every spell is given
+            // the same six questions to answer here, and the bar only ever asks those.
+            const HOTBAR_SPELL_ORDER = ["haste", "warPaint", "bloom", "waygate", "chill", "mend"];
+            const HOTBAR_SPELLS = {
+                haste: {
+                    label: "Haste",
+                    icon: "⚡",
+                    skill: "minionHaste",
+                    recipe: () => minionHasteRecipe(),
+                    cooldown: () => 0,
+                    activeTicks: () => game.minionHasteTicks,
+                    castable: () => canUseUpgrade("minionHaste") && hasBankForCost(minionHasteRecipe()),
+                    cast: () => castMinionHaste(),
+                    status: () => (minionHasteActive()
+                        ? `Active ${formatWaveCountdown(game.minionHasteTicks)}`
+                        : `x${MINION_HASTE_MULTIPLIER} minion speed for 1:00`)
+                },
+                warPaint: {
+                    label: "War Paint",
+                    icon: "🎨",
+                    skill: "warPaint",
+                    recipe: () => warPaintRecipe(),
+                    cooldown: () => 0,
+                    activeTicks: () => game.warPaintTicks,
+                    castable: () => canUseUpgrade("warPaint") && hasBankForCost(warPaintRecipe()),
+                    cast: () => castWarPaint(),
+                    status: () => (warPaintActive()
+                        ? `Active ${formatWaveCountdown(game.warPaintTicks)}`
+                        : `x${WAR_PAINT_DAMAGE} damage, half taken`)
+                }
+            };
+
+            // The four uniform ones are generated rather than typed out, so a fifth entry
+            // in SPELL_DEFS reaches the bar without being transcribed into a second list
+            // that can disagree with the first.
+            for (const key of SPELL_KEYS) {
+                const def = SPELL_DEFS[key];
+                if (!def) continue;
+                HOTBAR_SPELLS[key] = {
+                    label: SPELL_LABELS[key],
+                    icon: SPELL_ICONS[key],
+                    skill: def.skill,
+                    recipe: () => spellRecipe(key),
+                    cooldown: () => spellCooldownTicks(key),
+                    activeTicks: () => (key === "chill" ? game.chillTicks : 0),
+                    castable: () => spellCastable(key),
+                    cast: () => castSpell(key),
+                    status: () => spellStatusText(key)
+                };
+            }
+
+            // ---- Map toolbar ------------------------------------------------------
+            //
+            // A Minecraft-style hotbar sitting over the map: slot 1 opens the field
+            // manual, slots 2-7 cast the six spells, 8 and 9 are still empty.
+            //
+            // Slots are declared, not hand-wired, so moving something else in later is a
+            // row in this array rather than new markup, new CSS and a new listener.
+            //
+            // Two kinds of slot, and the difference matters. A `panel` slot opens
+            // something and pauses the run while it is up; an `action` slot fires and the
+            // run keeps going. Casting must never pause - a spell is something you throw
+            // at a wave that is already walking in.
+            const HOTBAR_SIZE = 9;
+            const HOTBAR_SLOTS = [
+                {
+                    id: "manual",
+                    kind: "panel",
+                    icon: "📖",
+                    label: "Field Manual",
+                    activate: () => openBestiaryPopover(),
+                    isOpen: () => isBestiaryPopoverOpen(),
+                    badge: () => bestiaryCatalogued() + "/" + BESTIARY_ORDER.length
+                },
+                // Filtered rather than trusted. A key in the order list with no entry
+                // behind it would throw here, and this runs in the module body - not
+                // inside loadSave()'s catch - so the whole game would fail to parse over
+                // one bad string. Dropping the slot resequences the bar, which is bad;
+                // a blank page is worse, and the console says which one went missing.
+                ...HOTBAR_SPELL_ORDER.map((key) => {
+                    const spell = HOTBAR_SPELLS[key];
+                    if (!spell) {
+                        console.warn(`Toolbar: no spell registered for "${key}" - slot dropped.`);
+                        return null;
+                    }
+                    return {
+                        id: "spell-" + key,
+                        kind: "action",
+                        icon: spell.icon,
+                        label: spell.label,
+                        spell,
+                        activate: () => spell.cast()
+                    };
+                }).filter(Boolean)
+            ];
+
+            // Built once. refreshHotbar() then edits the slots in place: refreshHud() runs
+            // every four ticks, and rebuilding innerHTML at that rate over a canvas would
+            // both churn layout and drop the hover state out from under the cursor.
+            function buildHotbar() {
+                if (!hotbarEl) return;
+                let html = "";
+                for (let i = 0; i < HOTBAR_SIZE; i += 1) {
+                    const slot = HOTBAR_SLOTS[i];
+                    const keyLabel = i + 1;
+                    if (!slot) {
+                        html += '<div class="hotbar-slot empty" aria-hidden="true"><span class="slot-key">' + keyLabel + '</span></div>';
+                        continue;
+                    }
+                    html += '<button type="button" class="hotbar-slot ' + (slot.kind === "action" ? "spell" : "panel") + '" data-slot="' + slot.id + '"'
+                        + ' aria-label="' + slot.label + '">'
+                        + '<span class="slot-key">' + keyLabel + '</span>'
+                        + '<span class="slot-icon" aria-hidden="true">' + slot.icon + '</span>'
+                        + '<span class="slot-badge"></span>'
+                        + '<span class="slot-cost"></span></button>';
+                }
+                hotbarEl.innerHTML = html;
+                refreshHotbar();
+            }
+
+            // A spell slot's cost, as the same icon-and-number chip the shop uses. Only
+            // ever one resource, so this stops at the first non-zero rather than looping
+            // out a strip that would not fit in 46px.
+            function hotbarCostMarkup(cost) {
+                for (const type of RESOURCE_TYPES) {
+                    const amount = costAmount(cost, type);
+                    if (amount <= 0) continue;
+                    return '<span class="res-icon ' + type + '"></span>' + amount;
+                }
+                return "";
+            }
+
+            function refreshHotbar() {
+                // Bails before touching HOTBAR_SLOTS rather than after. The bar div exists in
+                // the markup from the first parse, so a hotbarEl check alone would not stop a
+                // refreshHud() that somehow ran before the slot table was initialised - and a
+                // module-scope const read too early throws rather than reading undefined. An
+                // empty bar means buildHotbar() has not run yet, which is the same condition
+                // and is safe to test.
+                if (!hotbarEl || hotbarEl.childElementCount === 0) return;
+                for (const slot of HOTBAR_SLOTS) {
+                    const el = hotbarEl.querySelector('[data-slot="' + slot.id + '"]');
+                    if (!el) continue;
+                    if (slot.kind === "action") refreshSpellSlot(el, slot);
+                    else refreshPanelSlot(el, slot);
+                }
+            }
+
+            function refreshPanelSlot(el, slot) {
+                const open = slot.isOpen ? slot.isOpen() : false;
+                el.classList.toggle("open", open);
+                el.setAttribute("aria-expanded", open ? "true" : "false");
+                setHotbarText(el, ".slot-badge", slot.badge ? slot.badge() : "");
+                setHotbarTitle(el, slot.label);
+            }
+
+            // A locked spell keeps its slot rather than vanishing from the bar. The shop
+            // hid its buttons, which was right for a list that reflows; it is wrong here,
+            // because a bar that resequences as you unlock things moves every spell you
+            // had already learned the number for. The slot greys out and says what would
+            // unlock it instead.
+            function refreshSpellSlot(el, slot) {
+                const spell = slot.spell;
+                const unlocked = canUseUpgrade(spell.skill);
+                const cooldown = unlocked ? spell.cooldown() : 0;
+                const active = unlocked ? spell.activeTicks() > 0 : false;
+                const castable = unlocked && spell.castable() && cooldown <= 0;
+
+                el.classList.toggle("locked", !unlocked);
+                el.classList.toggle("cooling", cooldown > 0);
+                el.classList.toggle("active", active);
+                el.classList.toggle("unaffordable", unlocked && !castable && cooldown <= 0);
+                // aria-disabled, not the `disabled` property. A disabled button receives no
+                // mouse events in Chrome, which kills its tooltip - and a locked slot's
+                // tooltip is the only thing telling you it exists and how to unlock it.
+                // Nothing is risked by leaving it pressable: every cast path re-checks the
+                // skill itself, so a click on a locked slot already does nothing.
+                el.setAttribute("aria-disabled", unlocked ? "false" : "true");
+
+                if (!unlocked) {
+                    setHotbarText(el, ".slot-badge", "");
+                    setHotbarHtml(el, ".slot-cost", "");
+                    setHotbarTitle(el, slot.label + " - locked. Unlock it in the skill tree.");
+                    return;
+                }
+
+                // The badge is the clock: time left on the cooldown, or time left on the
+                // effect while it runs. Both are countdowns, and a spell is never in both
+                // states at once - the two that stack duration have no cooldown, and the
+                // ones with a cooldown have no duration.
+                const badge = cooldown > 0
+                    ? formatWaveCountdown(cooldown)
+                    : (active ? formatWaveCountdown(spell.activeTicks()) : "");
+                setHotbarText(el, ".slot-badge", badge);
+                setHotbarHtml(el, ".slot-cost", hotbarCostMarkup(spell.recipe()));
+                setHotbarTitle(el, slot.label + " - " + spell.status());
+            }
+
+            // Every write below is guarded by a read. refreshHud() runs 15 times a second
+            // and these sit over a canvas: assigning the same string back would dirty the
+            // element and cost a layout pass for nothing.
+            function setHotbarText(el, selector, text) {
+                const target = el.querySelector(selector);
+                if (target && target.textContent !== text) target.textContent = text;
+            }
+
+            function setHotbarHtml(el, selector, html) {
+                const target = el.querySelector(selector);
+                if (target && target.innerHTML !== html) target.innerHTML = html;
+            }
+
+            function setHotbarTitle(el, title) {
+                if (el.title !== title) el.title = title;
+            }
+
+            function activateHotbarSlot(index) {
+                const slot = HOTBAR_SLOTS[index];
+                if (!slot || typeof slot.activate !== "function") return false;
+                // Re-pressing an open panel does nothing rather than toggling shut: the
+                // Close button, Esc and a backdrop click are the ways out.
+                if (slot.isOpen && slot.isOpen()) return false;
+                slot.activate();
+                // A cast changes the bank and the cooldown; the bar must not wait up to
+                // four ticks to say so.
+                if (slot.kind === "action") refreshHotbar();
+                return true;
+            }
+            // ---- Field manual -----------------------------------------------------
+
+            // The war chief is not in save.bestiary - see recordBestiaryKill(). Reading
+            // the counter that already exists keeps one event on one tally.
+            function bestiaryKills(typeKey) {
+                if (typeKey === "warchief") return save.warChiefKills || 0;
+                if (!save.bestiary) return 0;
+                return save.bestiary[typeKey] || 0;
+            }
+
+            function bestiaryCatalogued() {
+                let n = 0;
+                for (const key of BESTIARY_ORDER) {
+                    if (bestiaryKills(key) > 0) n += 1;
+                }
+                return n;
+            }
+
+            // Colours come from enemyTypeConfig wherever there is a row, so a recoloured
+            // enemy recolours its manual entry without anyone remembering to. Boss and
+            // war chief are built outside that table, so those two carry their own.
+            function bestiaryGlyph(typeKey) {
+                const cfg = enemyTypeConfig[typeKey];
+                const entry = BESTIARY_ENTRIES[typeKey];
+                return {
+                    color: (cfg && cfg.color) || (entry && entry.color) || "#8ea9c4",
+                    shape: (cfg && cfg.shape) || (entry && entry.shape) || "circle"
+                };
+            }
+
+            function bestiaryStatChip(label, value, percent) {
+                const badge = Number.isFinite(percent) && percent > 0
+                    ? ' <span class="scale-up">+' + percent + '%</span>'
+                    : "";
+                return '<span class="bestiary-stat">' + label + ' <b>' + value + '</b>' + badge + '</span>';
+            }
+
+            function renderBestiary() {
+                if (!bestiaryListEl) return;
+
+                const rows = [];
+                for (const key of BESTIARY_ORDER) {
+                    const entry = BESTIARY_ENTRIES[key];
+                    if (!entry) continue;
+                    const kills = bestiaryKills(key);
+                    const glyph = bestiaryGlyph(key);
+
+                    // Never felled: a silhouette with the shape but not the colour, so the
+                    // roster still shows how much is left without giving the entry away.
+                    if (kills <= 0) {
+                        rows.push('<div class="bestiary-row locked">'
+                            + '<span class="bestiary-glyph ' + glyph.shape + '" style="background:#22374d"></span>'
+                            + '<span class="bestiary-name">???<span class="bestiary-note">Never felled.</span></span>'
+                            + '<span class="bestiary-kills">0<small>KILLS</small></span>'
+                            + '<span class="bestiary-stats"></span>'
+                            + '</div>');
+                        continue;
+                    }
+
+                    const scaling = bestiaryScaling(key);
+                    let stats = "";
+                    if (scaling && scaling.kind === "absolute") {
+                        // Boss and war chief have no wave-1 base worth quoting - the tier
+                        // is the stat - so these print what the next one will bring.
+                        stats = bestiaryStatChip("HP", scaling.hp)
+                            + (scaling.damage > 0 ? bestiaryStatChip("Dmg", scaling.damage) : "")
+                            + '<span class="bestiary-stat">' + scaling.note + '</span>';
+                    } else if (scaling) {
+                        stats = bestiaryStatChip("HP", entry.hp, scaling.hpPercent)
+                            + (entry.damage > 0
+                                ? bestiaryStatChip("Dmg", entry.damage, scaling.damagePercent)
+                                : '<span class="bestiary-stat" title="Never attacks the tower">Dmg <b>&mdash;</b></span>')
+                            + bestiaryStatChip("Spd", entry.speed.toFixed(2))
+                            + (scaling.note
+                                ? '<span class="bestiary-stat" title="Anything that never pushes the tower takes the square root of the wave curve">' + scaling.note + '</span>'
+                                : "");
+                    }
+
+                    rows.push('<div class="bestiary-row">'
+                        + '<span class="bestiary-glyph ' + glyph.shape + '" style="background:' + glyph.color + '"></span>'
+                        + '<span class="bestiary-name">' + entry.name + '<span class="bestiary-note">' + entry.note + '</span></span>'
+                        + '<span class="bestiary-kills">' + kills + '<small>KILLS</small></span>'
+                        + '<span class="bestiary-stats">' + stats + '</span>'
+                        + '</div>');
+                }
+
+                bestiaryListEl.innerHTML = rows.join("");
+                if (bestiaryProgressEl) {
+                    bestiaryProgressEl.textContent = bestiaryCatalogued() + "/" + BESTIARY_ORDER.length;
+                }
+            }
+
+            function isBestiaryPopoverOpen() {
+                return bestiaryPopoverEl && bestiaryPopoverEl.classList.contains("open");
+            }
+
+            // Pauses while open, exactly as the skill tree does and for the same reason:
+            // a panel you have to read while a wave walks in is not readable. The resume
+            // flag is per popover so closing this one cannot resume a run the skill tree
+            // paused.
+            function openBestiaryPopover() {
+                if (!bestiaryPopoverEl) return;
+                if (isBestiaryPopoverOpen()) return;
+
+                if (game.running) {
+                    togglePause();
+                    resumeAfterBestiaryClose = true;
+                } else {
+                    resumeAfterBestiaryClose = false;
+                }
+
+                bestiaryPopoverEl.classList.add("open");
+                bestiaryPopoverEl.setAttribute("aria-hidden", "false");
+                renderBestiary();   // the HUD pass is throttled; be current on open
+                refreshHotbar();
+            }
+
+            function closeBestiaryPopover() {
+                if (!bestiaryPopoverEl) return;
+                if (!isBestiaryPopoverOpen()) return;
+
+                bestiaryPopoverEl.classList.remove("open");
+                bestiaryPopoverEl.setAttribute("aria-hidden", "true");
+                refreshHotbar();
+
+                if (resumeAfterBestiaryClose && game.started && !game.running) {
+                    togglePause();
+                }
+                resumeAfterBestiaryClose = false;
+            }
+
             function isSkillTreePopoverOpen() {
                 return skillTreePopoverEl && skillTreePopoverEl.classList.contains("open");
             }
@@ -9947,6 +10710,13 @@
             function placePendingTurretAt(x, y) {
                 const turretType = nextPendingTurretType();
                 if (!turretType) return false;
+                // Having one in the store is not the same as having room for it.
+                // syncTurretsFromSave() only ever builds min(cap, owned) turrets, so a
+                // placement past the cap survives until the next delivery or reload and
+                // then vanishes off the map - which reads as a turret being eaten rather
+                // than as a limit. Post-fix this is unreachable in normal play (owned can
+                // no longer exceed the cap); it is here for saves that already went over.
+                if (game.turrets.length >= maxTurrets()) return false;
 
                 const point = clampTurretPoint(x, y);
                 if (!canPlaceTurretAt(point.x, point.y)) return false;
@@ -9995,8 +10765,34 @@
             const TURRET_SELL_RATE = 0.75;
             const TURRET_PICK_RADIUS = W(20);
 
-            function placedTurretCount() {
+            // Everything you own, placed or still boxed in the store - `save.turrets` and
+            // its two siblings are incremented when a caravan gets home, not when a turret
+            // is put on the map. It was called placedTurretCount() and it never counted
+            // placements; the name is what let the cap be checked against the wrong number
+            // (see turretsInTransit).
+            function ownedTurretCount() {
                 return save.turrets + save.sniperTurrets + save.slowTurrets;
+            }
+
+            // Turrets that are bought but not home yet. The cap has to be checked against
+            // these too: an idle caravan asks "is there room?" at the moment it sets off,
+            // so without counting the ones already in carts, every trader standing at the
+            // tower answers yes to the same last slot and they all leave to buy it. Three
+            // caravans out at 14 of 15 is how a save ends up reading 17/15.
+            function turretsInTransit() {
+                let count = 0;
+                for (const minion of game.minionUnits) {
+                    if (!minion || minion.role !== "trader") continue;
+                    // Riding home in the cart, or the goods to pay for one are already
+                    // spent and on their way to the city. Either way the slot is claimed.
+                    if (minion.carryTurret) {
+                        count += 1;
+                        continue;
+                    }
+                    const route = tradeRouteByKey(minion.tradeCarryRoute);
+                    if (route && route.turret) count += 1;
+                }
+                return count;
             }
 
             function ownedCountForTurretType(type) {
@@ -11040,6 +11836,53 @@
                 return 1 + Math.max(0, waveNumber) * ENEMY_DAMAGE_LINEAR_PER_WAVE;
             }
 
+
+            // What the field manual prints next to a base stat. There is deliberately no
+            // single "current multiplier" to read: the five paths below are the five
+            // different curves the game actually spawns things on, and they diverge hard.
+            // At wave 30 a scout carries +431% health while a ghoul on the same tick
+            // carries +131%, because anything that never pushes the tower takes the
+            // square root of the curve - see OFFWAVE_HP_SCALE_ROOT. Printing one shared
+            // badge on every row would be wrong on five of the nine, and wrong in the
+            // flattering direction, which is the worst way for a manual to be wrong.
+            //
+            // Each branch mirrors the arithmetic in the spawner that builds that kind.
+            // If a spawn formula changes, this changes with it or the manual starts
+            // lying quietly.
+            function bestiaryScaling(typeKey) {
+                const entry = BESTIARY_ENTRIES[typeKey];
+                if (!entry) return null;
+                const wave = game.waveNumber;
+                const nightHp = isNight() ? NIGHT_ENEMY_HP_SCALE : 1;
+
+                if (entry.scaling === "warchief") {
+                    // Flat, and not on the wave curve at all: the tier is how many war
+                    // chiefs you have already put down, so this row grows with the player
+                    // rather than with the run. Shown as an absolute because a percentage
+                    // over a base of zero is meaningless.
+                    const tier = save.warChiefKills;
+                    const hp = WARCHIEF_BASE_HP + tier * 200;
+                    return { kind: "absolute", hp, damage: 0, note: `tier ${tier}` };
+                }
+
+                if (entry.scaling === "boss") {
+                    // spawnBossEnemy() sizes itself from the wave milestone, not the wave,
+                    // so this steps every ten waves rather than climbing every one.
+                    const tier = Math.max(1, Math.floor(wave / 10));
+                    const hp = Math.max(1, Math.round((10 + tier * 6) * enemyHpMultiplier(wave) * nightHp));
+                    return { kind: "absolute", hp, damage: 16 + tier * 2, note: `tier ${tier}` };
+                }
+
+                const full = enemyHpMultiplier(wave);
+                const hpMult = (entry.scaling === "offwave" ? Math.pow(full, OFFWAVE_HP_SCALE_ROOT) : full)
+                    * modValue("enemyHpScale") * nightHp;
+                return {
+                    kind: "percent",
+                    hpPercent: Math.round((hpMult - 1) * 100),
+                    damagePercent: Math.round((enemyDamageMultiplier(wave) - 1) * 100),
+                    note: entry.scaling === "offwave" ? "off-wave curve" : ""
+                };
+            }
             function scaledEnemyHp(baseHp, waveNumber, offWave) {
                 const full = enemyHpMultiplier(waveNumber);
                 const mult = offWave ? Math.pow(full, OFFWAVE_HP_SCALE_ROOT) : full;
@@ -11189,10 +12032,29 @@
                 }
             }
 
+
+            // The one place a kill is counted. Every enemy that dies leaves the world
+            // through defeatEnemyAt(), and endRun() deliberately does not go through it -
+            // it clears game.enemies outright, so the wave that killed you is not scored
+            // as nine kills on the way down.
+            //
+            // The war chief is not tallied here. save.warChiefKills already exists, is
+            // incremented by bankWarChiefKill(), and is load-bearing elsewhere - it prices
+            // War Paint and sizes the next war party. A second counter for the same event
+            // would be one refactor away from disagreeing with the first, so the manual
+            // reads that field instead and this function leaves the row alone.
+            function recordBestiaryKill(enemy) {
+                if (!enemy || !save.bestiary) return;
+                const key = enemy.type;
+                if (key === "warchief") return;
+                if (!Object.prototype.hasOwnProperty.call(save.bestiary, key)) return;
+                save.bestiary[key] += 1;
+            }
             function defeatEnemyAt(index) {
                 const enemy = game.enemies[index];
                 if (!enemy) return;
                 save.essence += essenceFromEnemy(enemy);
+                recordBestiaryKill(enemy);
                 if (enemy.type === "warchief") bankWarChiefKill(enemy);
                 releaseSpawnerClaims(enemy.id);
                 game.enemies.splice(index, 1);
@@ -11241,7 +12103,6 @@
                 game.waveRemainingSpawns = 0;
                 game.waveSpawnTimer = 0;
                 game.waveIntroPendingType = null;
-                startBtn.textContent = "New Run";
 
                 Object.assign(save, freshRunState(save.unlockedSkills));
                 // Nothing left to resume: the next visit starts a run instead.
@@ -11991,7 +12852,10 @@
 
                         // A turret order is refused outright when there is nowhere left
                         // to put one, rather than being carried across the map and wasted.
-                        if (route.turret && placedTurretCount() >= maxTurrets()) continue;
+                        // Counted with what is already in a cart: this runs per idle
+                        // caravan, so checking only what is home lets every one of them
+                        // claim the same free slot on the same tick.
+                        if (route.turret && ownedTurretCount() + turretsInTransit() >= maxTurrets()) continue;
 
                         const price = tradeRoutePrice(route);
                         const worthGoing = route.turret ? true : tradePayoutFor(route, price) > 0;
@@ -13171,6 +14035,14 @@
             window.addEventListener("keydown", (e) => {
                 if (isTypingTarget(e.target)) return;
                 const key = e.key.toLowerCase();
+                // Must sit above the `p`/`escape` pause branch below. Escape falls through
+                // to togglePause() when nothing claims it, so a panel that does not claim
+                // it here closes nothing and pauses the run instead.
+                if (key === "escape" && isBestiaryPopoverOpen()) {
+                    e.preventDefault();
+                    closeBestiaryPopover();
+                    return;
+                }
                 if (key === "escape" && isSkillTreePopoverOpen()) {
                     e.preventDefault();
                     closeSkillTreePopover();
@@ -13184,6 +14056,11 @@
                 if (key === "escape" && isResetPopoverOpen()) {
                     e.preventDefault();
                     setResetPopoverOpen(false);
+                    return;
+                }
+                if (key === "escape" && isSettingsPanelOpen()) {
+                    e.preventDefault();
+                    setSettingsPanelOpen(false);
                     return;
                 }
                 if (key === "escape" && isAudioPanelOpen()) {
@@ -13219,6 +14096,17 @@
                     e.preventDefault();
                     setMapZoom(cameraState.zoom * MAP_ZOOM_STEP);
                     return;
+                }
+                // Hotbar slots. 1-9 only: `0` is already the map-zoom reset immediately
+                // below, so there is no tenth slot to be had without taking a binding that
+                // is documented in the controls list.
+                if (key.length === 1 && key >= "1" && key <= "9") {
+                    const slotIndex = Number(key) - 1;
+                    if (slotIndex < HOTBAR_SLOTS.length) {
+                        e.preventDefault();
+                        activateHotbarSlot(slotIndex);
+                        return;
+                    }
                 }
                 if (key === "0") {
                     e.preventDefault();
@@ -13427,7 +14315,6 @@
 
             function beginRun() {
                 game.running = true;
-                startBtn.textContent = "Restart Run";
                 startMusic();
                 applyMusicVolume();
                 refreshHud();
@@ -13466,7 +14353,11 @@
                     // The run already ended and was cleared; just set the next one up.
                     startRun();
                 } else {
-                    // Abandoning a live run costs the same as losing it, so ask first.
+                    // Unreachable while refreshRunControls() hides this button mid-run,
+                    // and kept deliberately: it is the branch that would fire if the
+                    // button were ever visible in a state this does not expect, and it
+                    // asks rather than restarting on the spot. Abandoning a live run costs
+                    // the same as losing it.
                     setRunRestartPopoverOpen(true);
                     return;
                 }
@@ -13900,22 +14791,6 @@
                 refreshHud();
             });
 
-            warPaintBtn.addEventListener("click", () => {
-                castWarPaint();
-            });
-
-            minionHasteBtn.addEventListener("click", () => {
-                castMinionHaste();
-            });
-
-            for (const spellKey of SPELL_KEYS) {
-                const button = spellButtons[spellKey];
-                if (!button) continue;
-                button.addEventListener("click", () => {
-                    castSpell(spellKey);
-                });
-            }
-
             minionCapBtn.addEventListener("click", () => {
                 if (!canUseUpgrade("minionCapacity")) return;
                 const recipe = minionCapacityRecipe();
@@ -14006,7 +14881,6 @@
                 game.pendingBasicTurretPlacements = 0;
                 game.pendingSniperTurretPlacements = 0;
                 game.pendingSlowTurretPlacements = 0;
-                startBtn.textContent = "Start Run";
                 pauseBtn.textContent = "Pause";
                 resetSession();
                 saveGame();
@@ -14014,6 +14888,66 @@
                 render();
                 showUndoToast("Save reset. Previous save kept as a backup.");
             }
+
+            function isSettingsPanelOpen() {
+                return settingsPanelEl && !settingsPanelEl.hidden;
+            }
+
+            function setSettingsPanelOpen(open) {
+                if (!settingsPanelEl) return;
+                settingsPanelEl.hidden = !open;
+                settingsBtn.setAttribute("aria-expanded", String(open));
+                if (open) refreshRunControls();   // be current on open, not 4 ticks stale
+            }
+
+            // The primary button and the two entries in the settings menu are three views
+            // of one piece of state, so they are decided in one place rather than by
+            // assignments scattered through beginRun/endRun/performReset/the snapshot
+            // restore - which is how the label and the action drifted apart before.
+            //
+            // Mid-run the primary button is hidden outright. It used to relabel itself to
+            // "Restart Run", which put the one irreversible action in the run at the exact
+            // spot the eye goes for "start" - and left nothing in the top bar saying what
+            // the difference between throwing away a run and throwing away the save was.
+            // Pause is the control a live run needs; restarting is a settings decision.
+            function refreshRunControls() {
+                const liveRun = game.started && !game.runOver;
+                setButtonVisible(startBtn, !liveRun);
+                if (!game.started) startBtn.textContent = "Start Run";
+                else if (game.runOver) startBtn.textContent = "New Run";
+
+                if (restartRunBtn) {
+                    // Nothing to restart before a run has begun, or once one has ended -
+                    // the primary button is the way into both of those.
+                    setButtonDisabled(restartRunBtn, !liveRun);
+                    const item = restartRunBtn.closest(".settings-item");
+                    if (item) item.classList.toggle("unavailable", !liveRun);
+                    restartRunBtn.title = liveRun
+                        ? "End this run and start a new one at wave 1"
+                        : "No run in progress";
+                }
+            }
+
+            settingsBtn.addEventListener("click", (e) => {
+                e.stopPropagation();
+                setSettingsPanelOpen(!isSettingsPanelOpen());
+            });
+
+            settingsPanelEl.addEventListener("click", (e) => {
+                e.stopPropagation();
+            });
+
+            // Same outside-click dismissal the audio menu uses. Registered separately so
+            // closing one menu never depends on the other still existing.
+            document.addEventListener("click", () => {
+                if (isSettingsPanelOpen()) setSettingsPanelOpen(false);
+            });
+
+            restartRunBtn.addEventListener("click", () => {
+                if (!game.started || game.runOver) return;
+                setSettingsPanelOpen(false);
+                setRunRestartPopoverOpen(true);
+            });
 
             resetBtn.addEventListener("click", () => {
                 setResetPopoverOpen(true);
@@ -14036,6 +14970,24 @@
 
             dismissUndoBtn.addEventListener("click", () => {
                 undoToastEl.hidden = true;
+            });
+
+
+            hotbarEl.addEventListener("click", (e) => {
+                const btn = e.target.closest(".hotbar-slot");
+                if (!btn || !btn.dataset.slot) return;
+                const index = HOTBAR_SLOTS.findIndex((slot) => slot.id === btn.dataset.slot);
+                if (index !== -1) activateHotbarSlot(index);
+            });
+
+            closeBestiaryBtn.addEventListener("click", () => {
+                closeBestiaryPopover();
+            });
+
+            bestiaryPopoverEl.addEventListener("click", (e) => {
+                if (e.target === bestiaryPopoverEl) {
+                    closeBestiaryPopover();
+                }
             });
 
             openSkillTreeBtn.addEventListener("click", () => {
@@ -14061,6 +15013,7 @@
             });
 
             initSkillTreeUi();
+            buildHotbar();
 
             cameraState.zoom = Number.isFinite(save.mapZoom) ? clamp(save.mapZoom, MIN_MAP_ZOOM, MAX_MAP_ZOOM) : 1;
 

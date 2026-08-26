@@ -54,6 +54,42 @@ If time is short, this is the subset that catches the failures that have actuall
 - [ ] Turret placements are clamped to the current cap and to the map edges on load.
 - [ ] Turret `level` clamps to 0-5, `priority` falls back to `closest` if unrecognised.
 
+### The settings menu (top right)
+
+- [ ] The gear button at the top right opens a panel holding **Restart Run** and
+      **Reset Save**, each with a sentence saying what it costs. There is no bare
+      `Reset Save` button in the top bar any more.
+- [ ] The panel closes on a click outside it, on `Esc`, and after either action is chosen.
+      A click *inside* it must not close it.
+- [ ] The panel is anchored to its **right** edge. It sits at the end of the bar, so a
+      panel hanging off the left corner would run off the side of the window - check at a
+      narrow window width, not just a maximised one.
+- [ ] **The two descriptions state the actual difference**: Restart Run keeps the skill
+      tree, essence and records; Reset Save wipes them and keeps only an undo backup.
+      This is the entire reason they were moved behind one menu - as two words in a top bar
+      they were indistinguishable.
+- [ ] Both still route through their existing confirm popovers - neither acts on one click.
+
+### The primary button
+
+- [ ] **Mid-run the Start button is hidden, not relabelled.** Start a run and confirm the
+      top-left button disappears, leaving Pause as the run control; end the run and confirm
+      it returns as `New Run`; reset the save and confirm it returns as `Start Run`.
+      Regression risk: it used to relabel itself to `Restart Run` while a run was live,
+      which put the one irreversible in-run action exactly where the eye goes for "start".
+      Its label was assigned from four scattered places (`beginRun`, `endRun`,
+      `performReset`, the snapshot restore); it is now decided only by
+      `refreshRunControls()`. If a fifth caller ever sets `startBtn.textContent` directly,
+      the label and the state can disagree again.
+- [ ] **Restart Run in the menu is disabled before a run starts and after one ends**, and
+      the row dims with it. The primary button is the way into both of those states.
+      Check on a **fresh save** (never started) as well as after a defeat - testing only
+      the after-defeat case misses the never-started one, and they reach the disabled state
+      by different fields (`game.started` vs `game.runOver`).
+- [ ] Opening the menu refreshes its state immediately rather than waiting for the next
+      4-tick HUD pass - lose a run with the menu already open, reopen it, and Restart must
+      already read as unavailable.
+
 ### Reset and undo
 - [ ] `Reset Save` opens a confirm popover listing what will be lost; Esc and a
       backdrop click both close it without resetting.
@@ -71,13 +107,18 @@ If time is short, this is the subset that catches the failures that have actuall
 ### Keyboard
 - [ ] `W`/`A`/`S`/`D` and arrow keys move the player (8-way, diagonals normalised).
 - [ ] `P` or `Esc` toggles pause.
-- [ ] `Esc` closes, in priority order: skill tree → restart-run popover → reset popover →
-      audio panel. Only if none is open does it pause.
+- [ ] `Esc` closes, in priority order: field manual → skill tree → restart-run popover →
+      reset popover → settings menu → audio panel. Only if none is open does it pause.
 - [ ] `F` cycles game speed 1x → 2x → 3x → 1x.
 - [ ] `T` toggles tips.
 - [ ] `M` toggles music mute.
 - [ ] `+`/`=` and `-`/`_` nudge volume by 10%.
 - [ ] `[` zooms out, `]` zooms in, `0` resets map zoom to 1.
+- [ ] `1` opens the field manual; `2`-`7` cast the six spells. `8` and `9` are undefined
+      slots and must fall through and do nothing rather than being swallowed.
+- [ ] **`0` still resets map zoom.** The toolbar takes `1`-`9` and stops there - there is
+      no tenth slot, because `0` was already bound. Press `0` with the toolbar present and
+      confirm the zoom snaps to 1x rather than the keypress being eaten.
 - [ ] **None of the above fire while typing** in the name field or a defender rename box.
 - [ ] Losing window focus (`blur`) clears held keys - the player must not walk forever.
 - [ ] Key handling is case-insensitive.
@@ -183,7 +224,10 @@ entirely until its skill is unlocked, and buying it deducts exactly the quoted c
 - [ ] **Economy**: Wood / Stone / Crystal / Amber Spawner, Global Multiplier
       (+10% per level, costs essence only).
 - [ ] **Turrets**: Turret Store (buy via caravan), Turret Capacity (+3 per level from a
-      base of 15). The group header shows `placed/cap`.
+      base of 15). The group header shows `owned/cap` - owned counts turrets still in the
+      store as well as placed ones, so buying one and not placing it still moves the
+      number. It read `placed/cap` here, which is what the counter behind it used to be
+      called; it never counted placements.
 - [ ] **Minions**: Craft Gatherer, Gatherer Focus, Craft Trader, Trade Routes,
       Craft Defender, Defender Posts, Minion Speed, Minion Load. There is **no** Far Bank
       panel - the gatherer's focus decides which bank it works (see §7).
@@ -191,7 +235,8 @@ entirely until its skill is unlocked, and buying it deducts exactly the quoted c
       called Capacity: it sits under "Turret Capacity", which *is* a maximum count, and
       the same word for two different things had testers reading it as a limit on how many
       minions they could own. It also raises trader cargo (`24 + level * 6`).
-- [ ] **Spells**: Haste, War Paint, Bloom, Waygate, Chill, Mend Tower.
+- [ ] **There is no Spells group in the shop.** All six moved to the map toolbar (§18).
+      The shop is stock and upgrades; the spells were never either.
 - [ ] Every recipe scales with the count already owned - crafting the 4th gatherer costs
       more than the 3rd.
 - [ ] Group `<details>` sections open/close and keep their state.
@@ -264,7 +309,7 @@ are read fresh every time (`bagCapacity()`, `scaledRespawnTicks()`) or self-inva
       `const save = loadSave()`. Below it, the const is in its temporal dead zone, the
       throw is swallowed by loadSave's `catch`, and the save is silently wiped. Verify by
       loading a real save and checking `meadow-gatherer-save-v1-unreadable` was **not**
-      written. See §23.
+      written. See §24.
 
 ---
 
@@ -301,7 +346,7 @@ and are killed by ghouls/hunters/the war chief.
       nothing. Check all three causes; they take different routes through the code.
 - [ ] A full round trip banks ivory in roughly 11,000 ticks (~3 minutes at 1x) from a
       standing start at the tower. If it never arrives, check the run is actually running
-      before blaming the pathing - see §23.
+      before blaming the pathing - see §24.
 - [ ] Re-pointing a gatherer mid-crossing does not strand it - it finishes the crossing
       and turns around on the far jetty.
 - [ ] A focus/far-bank choice is stored per slot and survives reload.
@@ -351,7 +396,33 @@ and are killed by ghouls/hunters/the war chief.
       the turret.
 - [ ] Placement is refused within 26 units of another turret, inside the tower, in the
       river, or outside the map (12-unit edge padding).
-- [ ] Placement is refused outright when the cap is reached (base 15 + 3/level).
+- [ ] **A caravan will not set off for a turret unless a slot is free, counting the ones
+      already in carts.** With the cap at 15 and 14 owned, exactly **one** caravan leaves
+      for a turret however many are standing idle at the tower.
+      Regression: the guard read `placedTurretCount()`, which despite the name returned
+      turrets *owned* - `save.turrets` is incremented when a caravan gets home, not when a
+      turret goes on the map - and nothing counted turrets already bought and in transit.
+      Every idle caravan evaluated the same `14 >= 15` on the same tick, all of them left,
+      and three of them took the owned count to 17 against a cap of 15, so the turret group
+      header read `17/15`. Why a naive check misses it: with **one** trader the old guard
+      was correct, and one trader is how the route gets tested. Reproducing needs two or
+      more traders idle at the tower, both set to a turret route, with the bank able to
+      cover both orders at once.
+- [ ] **Placement is refused once `game.turrets.length` reaches the cap** (base 15 +
+      3/level), *even when the store still holds turrets*.
+      Regression: `placePendingTurretAt()` had no cap test whatsoever - it checked only
+      that the store was non-empty. Over-cap stock could therefore be placed on the map and
+      was then silently deleted the next time `syncTurretsFromSave()` ran (any delivery, or
+      a reload), because that only ever builds `min(cap, owned)` turrets - which reads as a
+      turret being eaten rather than as a limit being enforced. This item existed before
+      and did not catch it, because the cap is normally reached *by placing*, and then the
+      store empties on the same click that fills the last slot - so the refusal looked
+      correct for the wrong reason. To test it you need stock in hand **and** the map
+      already full, which since the buy-side fix only happens on a save that went over the
+      cap before it (owned can no longer exceed the cap in normal play). Force it by
+      editing `save.turrets` above the cap and reloading.
+- [ ] Turrets over the cap in an old save are **kept, not refunded** - they sit in the
+      store and become placeable if the cap is later raised.
 - [ ] **Upgrade**: left-click a placed turret, max level 5, cost 18 + 14 per level.
 - [ ] **Priority**: shift+click cycles Nearest → Toughest → Closest to tower, and the
       turret actually retargets accordingly.
@@ -579,7 +650,26 @@ Each is cast from the bank's aether. Verify cost, gating, cooldown and effect.
       cooldown, x0.45 enemy speed for 10s, stacking. Greyed with "No enemies".
 - [ ] **Bloom** (`bloomSpell`): 10 aether, 90s cooldown, refills every field **a blight is
       not sitting on**.
-- [ ] Every spell button hides until its skill is unlocked and disables when unaffordable.
+- [ ] **Every spell is cast from the map toolbar, not the shop** - slots 2-7, keys `2`-`7`,
+      in the order Haste, War Paint, Bloom, Waygate, Chill, Mend. See §18 for the slot
+      behaviour; the costs and effects above are what each one must still do from there.
+- [ ] **The Haste slot shows its real cost: 10 aether, rising by 1 per banked minute.**
+      Regression: the old shop button called `setShopButtonContent(minionHasteBtn,
+      warPaintBtn, "Haste Spell", status, recipe)` - one argument too many, so every
+      parameter shifted one place right. The button rendered `[object HTMLButtonElement]`
+      as its title, put "Haste Spell" in the level slot, and passed the *status string*
+      where the recipe belonged; `costAmount()` read `undefined` off it for every resource
+      and the button advertised **`Free`**. Two reasons a naive check missed it: the button
+      only renders once `minionHaste` is unlocked, so a fresh save never shows it at all,
+      and `setButtonDisabled` used the correct recipe - so the button still greyed out when
+      you could not afford it, which reads as a working cost. Check the number, not the
+      enabled state.
+- [ ] A spell whose cost is a **stacking** one (Haste, War Paint, Chill) shows the price of
+      the *next* cast, which rises while the effect runs. Cast one, watch the slot's number
+      go up, let it lapse, watch it come back down.
+- [ ] Casting from the toolbar **never pauses the run**. Opening the field manual does
+      (§18); a spell is thrown at a wave already walking in. Cast at 1x and confirm enemies
+      keep moving through the cast.
 - [ ] Cooldown readouts count down in real time and at 2x/3x speed.
 - [ ] Aetherfall halves every cooldown's remaining time rate.
 
@@ -592,13 +682,146 @@ Each is cast from the bank's aether. Verify cost, gating, cooldown and effect.
 - [ ] Bag strip with `Cap used/max`.
 - [ ] Tower HP chip, Wave chip, Incoming countdown + next-wave hint, Tribe chip,
       Fields chip, Prog, Best run.
+- [ ] **Every countdown reads mm:ss below one hour and `Nh MM` at or above it.** The
+      boundary is exact: 3599s shows `59:59`, 3600s shows `1h00`. `formatWaveCountdown()`
+      is shared by the wave break, spell cooldowns and the toolbar badges, so check it in
+      all three places after touching it.
+      Regression: it was mm:ss unconditionally, and the three stacking spells have no
+      ceiling - Haste banks a minute per cast, so a hundred casts reached `100:00`, which
+      reads as a hundred *seconds*. Two traps here. The first is that you cannot reach this
+      by playing normally: it needs ~100 recasts, so every ordinary session shows a
+      perfectly correct clock. The second is the fix that looks obvious and is worse -
+      plain `hh:mm` would render 100 minutes as `01:40`, the same two-field shape as 1m40s
+      and forty times the value, so the readout would become ambiguous exactly where it
+      used to be merely ugly. The unit letter is the load-bearing part; do not "tidy" it
+      back into a colon.
 - [ ] Numbers refresh every 4 ticks and use short notation for large values.
 - [ ] Chips pulse/cue on change (deposit, tower hit, minion loss).
 - [ ] The HUD is readable at 1x, 2x and 3x game speed.
 
 ---
 
-## 18. Tutorial and tips
+## 18. Map toolbar and field manual
+
+The toolbar is a hotbar drawn over the bottom of the map. Slot 1 opens the field manual,
+slots 2-7 cast the six spells, and 8-9 stay empty as room for whatever moves in next.
+
+### The toolbar
+
+- [ ] Nine slots, numbered 1-9, centred over the bottom edge of the map. Slot 1 shows the
+      manual icon and a `n/9` badge; slots 8 and 9 are dashed and inert.
+- [ ] Clicking slot 1 opens the manual. Clicking it again while open does nothing (it does
+      not toggle shut) - the Close button, Esc and a backdrop click are the ways out.
+- [ ] **A press that lands anywhere on the toolbar except a live slot reaches the map.**
+      The bar's own padding and the 5px gaps between slots must place a turret or start a
+      camera drag exactly as bare map does. Regression risk: the bar is positioned over the
+      canvas, so giving the container `pointer-events` would make its whole 46px-tall strip
+      a dead zone that silently swallows clicks. Test by aiming at the **gaps between
+      slots** and at the bar's outer padding, not at the slots themselves - clicking a slot
+      works either way, and clicking the middle of the map works either way, so both of the
+      obvious checks pass while the bug is present.
+- [ ] The badge count updates without the bar being rebuilt: hover slot 1, kill an enemy of
+      a kind never felled before, and the hover highlight must survive the count changing.
+      Regression risk: `refreshHud()` runs every 4 ticks, so rebuilding `innerHTML` there
+      would drop the hover state roughly 15 times a second - visible only while the cursor
+      is actually resting on the slot.
+- [ ] The toolbar is legible at 1x, 2x and 3x game speed and at every map zoom - it is
+      screen-anchored, so zoom must not move or scale it.
+
+### Spell slots (2-7)
+
+- [ ] Slots 2-7 are Haste, War Paint, Bloom, Waygate, Chill, Mend, in that order, matching
+      keys `2`-`7`. Slots 8 and 9 stay empty.
+- [ ] Each shows its icon, its cost as an icon-and-number along the bottom, and a countdown
+      badge in the top corner. The manual's badge stays in the **bottom** corner - it has no
+      cost row to make way for.
+- [ ] **A locked spell keeps its slot.** Unlock spells one at a time and confirm no slot
+      ever changes number: Mend must be `7` before and after Chill is unlocked. Regression
+      risk: the shop hid unlocked-only buttons, which is right for a list that reflows and
+      wrong for a bar you aim at by number - carrying `setButtonVisible` over would
+      resequence every spell you had already learned the position of. A locked slot greys
+      out and its tooltip says to unlock it in the skill tree.
+- [ ] **A locked slot still shows that tooltip on hover.** It is set with `aria-disabled`,
+      not the `disabled` property, because Chrome delivers no mouse events to a disabled
+      button and the tooltip - the only thing naming the spell and saying how to get it -
+      would silently never appear. Hover a locked slot in Chrome specifically; in some other
+      browsers a disabled button *does* show its title, so this passes elsewhere while
+      failing where most people play.
+- [ ] The badge counts **down** and shows the right clock: a cooldown for Mend, Waygate and
+      Bloom, and the remaining effect for the three that stack (Haste, War Paint, Chill).
+      No spell is ever in both states - the stacking ones have no cooldown.
+- [ ] A badge past an hour reads `1h40`, not `100:00` - see §17. Cast Haste ~100 times and
+      confirm the slot stays legible and the number stays inside the 46px slot.
+- [ ] A running spell's slot turns green (`.active`) and its badge counts the effect out.
+- [ ] A spell that cannot be cast right now - unaffordable, or Mend at full tower HP, or
+      Waygate with no minions - dims but **stays pressable**, and pressing it does nothing.
+      The cast paths re-check for themselves; the slot is not the guard.
+- [ ] Casting updates the slot immediately, not on the next 4-tick HUD pass. Cast Chill and
+      watch its price rise on the same frame the aether leaves the bank.
+- [ ] Keys `2`-`7` cast without the pointer going near the bar; `8` and `9` do nothing.
+
+### The manual
+
+- [ ] Opening the manual **pauses a running run**, and closing it resumes - but only if the
+      manual was what paused it. Pause manually, open the manual, close it: the game must
+      stay paused. Same contract as the skill tree, with its own resume flag.
+- [ ] A kind never felled shows as `???` with a dark silhouette in the right *shape* and no
+      stats. The shape is deliberate: the roster shows how much is left to find.
+- [ ] Nine kinds are listed: scout, brute, wisp, hunter, ghoul, warden, blight, boss,
+      war chief. **Boss and war chief must both be present.** Regression risk: neither is
+      in `enemyTypeConfig` - the boss is built by `spawnBossEnemy()` and the war chief is a
+      warden promoted in place by `spawnWarChief()` - so a roster derived from that table
+      lists seven and looks complete. Count the rows; do not eyeball the list.
+
+### Kill counts
+
+- [ ] Counts are **meta**: they survive the tower falling. Kill a few things, let the run
+      end, and the manual still reads the same totals. They sit outside `freshRunState()`
+      for this reason, next to `warChiefKills` and `runsPlayed`.
+- [ ] `Reset Save` clears them (and the undo restores them), the same as every other
+      meta counter.
+- [ ] **The wave that kills you is not scored.** `endRun()` clears `game.enemies` directly
+      rather than through `defeatEnemyAt()`, so dying with nine enemies on the map must add
+      **zero** kills. Note the totals, let the tower fall, compare. A naive check misses
+      this because the summary screen covers the map and the manual is not open at the time.
+- [ ] **The war chief row reads `save.warChiefKills`, not a tally of its own.** Kill a war
+      chief and confirm the manual row and the War Paint price move together - that price
+      is `WAR_PAINT_BASE_COST + warChiefKills * 6`, so a second counter would show up as
+      the manual and the shop disagreeing about how many you have killed. Regression risk:
+      counting the war chief in `recordBestiaryKill()` as well would double-count it into a
+      field that also sizes the next war party.
+- [ ] Counts persist across a reload without a purchase in between. They ride the same
+      path essence does - the `beforeunload` snapshot and the save on run end - rather than
+      writing to localStorage on every death.
+
+### The scaling badge
+
+- [ ] Base stats are wave-1 values. The orange `+n%` beside one is what the **current**
+      wave adds, and it is read per kind.
+- [ ] **Off-wave kinds show a much smaller increase than wave enemies at the same wave.**
+      At wave 30 a scout reads about `+431%` health while a ghoul, warden or blight reads
+      about `+131%`, because `OFFWAVE_HP_SCALE_ROOT = 0.5` puts anything that never pushes
+      the tower on the square root of the curve. Check a ghoul row and a scout row **in the
+      same session** - a single row looks perfectly reasonable on its own, and one shared
+      multiplier applied to every row would be wrong on five of the nine while still
+      looking like a working feature.
+- [ ] Boss and war chief show an **absolute** figure and a tier, not a percentage. The boss
+      steps every ten waves (`(10 + tier*6)` where tier is `floor(wave/10)`), and the war
+      chief is off the wave curve entirely at `WARCHIEF_BASE_HP + tier * 200` where tier is
+      how many you have already killed. Kill a war chief and confirm its row's HP jumps by
+      200 with no wave having passed.
+- [ ] At night the badge rises for every kind (`NIGHT_ENEMY_HP_SCALE = 1.35`) and falls
+      again at dawn. Open the manual once by day and once by night on the same wave.
+- [ ] A run modifier that scales enemy health (`Thin Ranks`, `enemyHpScale: 1.7`) is in the
+      badge. Compare the same kind across two runs with different modifiers.
+- [ ] Before a run starts the badge is absent rather than `+0%` - wave 0 adds nothing.
+- [ ] **If a spawn formula changes, `bestiaryScaling()` changes with it.** It mirrors the
+      arithmetic in the spawners rather than calling them, so the two can drift silently.
+      Sanity-check a row against a real enemy's health bar at the same wave.
+
+---
+
+## 19. Tutorial and tips
 
 - [ ] Six steps in order: gather → bank → open the skill tree → craft a gatherer →
       unlock defenders/slings → survive wave 1.
@@ -612,7 +835,7 @@ Each is cast from the bank's aether. Verify cost, gating, cooldown and effect.
 
 ---
 
-## 19. Audio and settings
+## 20. Audio and settings
 
 - [ ] Settings panel opens from `♪`, closes on Esc, on a click outside, and stays open on
       a click inside.
@@ -625,7 +848,7 @@ Each is cast from the bank's aether. Verify cost, gating, cooldown and effect.
 
 ---
 
-## 20. Camera and rendering
+## 21. Camera and rendering
 
 - [ ] Zoom clamps to 0.25x-1x; the camera clamps to the map so no void is ever visible.
 - [ ] Resizing the window refits the canvas; **with the game paused or over, the frame
@@ -637,7 +860,7 @@ Each is cast from the bank's aether. Verify cost, gating, cooldown and effect.
 
 ---
 
-## 21. Leaderboard
+## 22. Leaderboard
 
 ### Client
 - [ ] With no server reachable, the **tab is hidden entirely** and the game plays
@@ -682,7 +905,7 @@ Each is cast from the bank's aether. Verify cost, gating, cooldown and effect.
 
 ---
 
-## 22. Known non-goals
+## 23. Known non-goals
 
 These are deliberate. Do not file them as bugs.
 
@@ -695,7 +918,7 @@ These are deliberate. Do not file them as bugs.
 
 ---
 
-## 23. Fragile spots - check these after any refactor
+## 24. Fragile spots - check these after any refactor
 
 Each of these has broken the game before, and the failure was silent.
 
@@ -717,3 +940,38 @@ Each of these has broken the game before, and the failure was silent.
       in a harness has to answer those, or the whole world stands still and reads exactly
       like a pathing bug in whatever you happened to be watching.
 - [ ] Both audio buses stay independent.
+- [ ] **Anything drawn over the canvas is a click sink until proven otherwise.** The map
+      is the game's largest control surface - turret placement, sale, upgrade and camera
+      drag all begin with a press on it - so every overlay has to declare what it does with
+      pointer events, and the two overlays currently there declare *opposite* things: the
+      bag chip is never interactive and opts out entirely, while the map toolbar opts the
+      container out and its slots back in. Copying either one into a new overlay without
+      reading which case it is gives a transparent dead region. It is invisible, and it
+      only bites when the player aims at that part of the map.
+- [ ] **`Esc` falls through to pause.** The keydown chain closes each open panel in turn
+      and, if nothing claimed the key, toggles pause. A new panel that does not add its own
+      branch *above* that fallback does not fail loudly - it stays open and pauses the run
+      underneath itself.
+- [ ] **The manual mirrors spawn arithmetic it does not call.** `bestiaryScaling()`
+      restates the five health curves the spawners use. Changing a spawn formula without
+      changing it leaves the manual confidently wrong - see §18.
+- [ ] **Positional arguments shift silently.** `setShopButtonContent(button, label,
+      levelText, cost)` and `setSkillNodeContent` both take four or five same-typed
+      arguments in a row, and passing one too many does not throw - it slides every later
+      argument along and renders `[object HTMLButtonElement]`, a status string where a cost
+      belongs, and a `Free` price tag. This shipped on the Haste button (see §16). After
+      touching any of these call sites, read the *rendered* button, not the code.
+- [ ] **A `disabled` button is invisible to the mouse.** Chrome delivers no events to one,
+      so its `title` never appears. Anywhere a tooltip is the only explanation for why a
+      control is unavailable, gate it with `aria-disabled` and a guard in the handler
+      instead - see the locked toolbar slots in §18.
+- [ ] **A limit checked per actor, against only what has already arrived.** Several
+      minions run the same decision on the same tick, so a guard that reads finished state
+      ("do I own fewer than the cap?") lets every one of them claim the same last slot.
+      Anything already paid for and in flight has to count towards the limit at the moment
+      the *next* one is authorised - see `turretsInTransit()` and §8. This is invisible
+      with one minion, which is how such a route gets tested.
+- [ ] **A counter whose name disagrees with what it counts.** `placedTurretCount()`
+      returned turrets *owned*, and the turret cap was checked against it precisely because
+      the name said what the caller wanted to hear. When a count feeds a limit, read the
+      body before trusting the identifier.
