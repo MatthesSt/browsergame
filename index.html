@@ -2326,7 +2326,7 @@
 
             const tower = { x: -W(108) / 2, y: -W(88) / 2, w: W(108), h: W(88) };
             const TOWER_MAX_HP = 100;
-            const START_BUDGET = { wood: 40, stone: 30, crystal: 0, amber: 0, aether: 0, essence: 0 };            
+            const START_BUDGET = { wood: 40, stone: 30, crystal: 0, amber: 0, aether: 0, essence: 0 };
             const START_WAVE_COUNT = 1;
             const WAVE_START_DELAY = 3600;
             const WAVE_BREAK_TICKS = 320;
@@ -7868,20 +7868,49 @@
                     layerCtx.fill();
                 }
 
-                // A network of trails worn between the tower and the spawners: the ground
-                // remembers where everyone walks. Every route is deterministic, so the
-                // same paths turn up in every session, and all of it is baked in, so the
-                // whole network costs nothing to draw.
+                // A network of trails worn between each settlement and the fields it
+                // works: the ground remembers where everyone walks. Every route is
+                // deterministic, so the same paths turn up in every session, and all of it
+                // is baked in, so the whole network costs nothing to draw.
+                //
+                // Nothing walks over water, so this is two networks and not one: the
+                // meadow's, hung off the tower, and the tribe's, hung off their camp. The
+                // only thing joining them is a trunk down to each jetty - every walk that
+                // wants the other bank collapses onto the single crossing, because that is
+                // the only place there is to cross.
                 const toLayerX = (worldX) => (worldX - world.minX) / GROUND_MACRO_SCALE;
                 const toLayerY = (worldY) => (worldY - world.minY) / GROUND_MACRO_SCALE;
-                const towerLayerX = toLayerX(0);
-                const towerLayerY = toLayerY(0);
-                const towerPoint = { x: towerLayerX, y: towerLayerY };
-                const spawnerPoints = spawners.map((spawner) => ({ x: toLayerX(spawner.x), y: toLayerY(spawner.y) }));
+                const toLayer = (point) => ({ x: toLayerX(point.x), y: toLayerY(point.y) });
+                // Not named `tower`: the module-scope `tower` is the building's rect, and a
+                // local point shadowing it is a trap for anyone who reaches for `tower.w`.
+                const towerHub = { x: TOWER_CENTER_X, y: TOWER_CENTER_Y };
+
+                // How wide a berth a wandering waypoint keeps from the centre line. The
+                // widest stroke is 17 layer units (136 world) and blurred on top of that,
+                // so a waypoint parked on the bank itself would still bleed into the
+                // water. Deliberately wider than FERRY_DOCK_OFFSET: a route *ending* at a
+                // jetty has to be allowed to finish there, so only the waypoints in
+                // between are held back.
+                const TRAIL_RIVER_CLEARANCE = RIVER_HALF_WIDTH + W(110);
+                const holdBackFromRiver = (worldX, worldY, bank) => {
+                    if (!nearRiverBounds(worldX, worldY, TRAIL_RIVER_CLEARANCE)) return { x: worldX, y: worldY };
+                    const near = nearestRiverPoint(worldX, worldY);
+                    // Signed distance along the bank normal, positive on the tower's side -
+                    // the same sign convention `bankOf` uses, so `bank` reads straight off
+                    // the spawner.
+                    const side = (worldX - near.x) * near.normalX + (worldY - near.y) * near.normalY;
+                    if (side * bank >= TRAIL_RIVER_CLEARANCE) return { x: worldX, y: worldY };
+                    return {
+                        x: near.x + near.normalX * TRAIL_RIVER_CLEARANCE * bank,
+                        y: near.y + near.normalY * TRAIL_RIVER_CLEARANCE * bank
+                    };
+                };
 
                 // Waypoints swung off the straight line, so a trail wanders towards where
-                // it is going instead of being surveyed there.
-                const routeBetween = (from, to, seed) => {
+                // it is going instead of being surveyed there - then pushed back onto the
+                // route's own bank, because a sway of up to 0.18 of the leg is easily
+                // enough to fling a midpoint into a river the two ends both keep clear of.
+                const routeBetween = (from, to, seed, bank) => {
                     const legs = 3;
                     const dx = to.x - from.x;
                     const dy = to.y - from.y;
@@ -7889,10 +7918,14 @@
                     for (let leg = 1; leg < legs; leg += 1) {
                         const t = leg / legs;
                         const sway = (terrainNoise(seed, leg) - 0.5) * 0.36;
-                        points.push({
-                            x: clamp(from.x + dx * t - dy * sway, 0, layer.width),
-                            y: clamp(from.y + dy * t + dx * sway, 0, layer.height)
-                        });
+                        const layerX = clamp(from.x + dx * t - dy * sway, 0, layer.width);
+                        const layerY = clamp(from.y + dy * t + dx * sway, 0, layer.height);
+                        const held = holdBackFromRiver(
+                            layerX * GROUND_MACRO_SCALE + world.minX,
+                            layerY * GROUND_MACRO_SCALE + world.minY,
+                            bank
+                        );
+                        points.push(toLayer(held));
                     }
                     points.push(to);
                     return points;
@@ -7900,26 +7933,100 @@
 
                 const routes = [];
 
-                // A few neighbouring fields are linked directly, so the network is not a
-                // plain wheel - but most pairs are left unconnected.
-                const ring = spawnerPoints
-                    .map((point, i) => ({ point, index: i, angle: Math.atan2(spawners[i].y, spawners[i].x) }))
-                    .sort((a, b) => a.angle - b.angle);
-                const ringLinked = new Set();
-                ring.forEach((entry, i) => {
-                    if (terrainNoise(157.7, i) < 0.9) return;
-                    const next = ring[(i + 1) % ring.length];
-                    routes.push(routeBetween(entry.point, next.point, 163.1 + i));
-                    ringLinked.add(entry.index);
-                    ringLinked.add(next.index);
-                });
+                // One wheel per bank. `fields` only ever holds ground on `bank`, so no
+                // route built here can have its two ends on opposite sides of the water.
+                const buildTrailNetwork = (hub, fields, bank, seed) => {
+                    // A few neighbouring fields are linked directly, so the network is not
+                    // a plain wheel - but most pairs are left unconnected. Neighbouring is
+                    // measured in bearing from the hub the wheel hangs off, not from the
+                    // origin: the tribe's fields ring their camp, not your tower.
+                    const ring = fields
+                        .map((field, i) => ({
+                            point: toLayer(field),
+                            index: i,
+                            angle: Math.atan2(field.y - hub.y, field.x - hub.x)
+                        }))
+                        .sort((a, b) => a.angle - b.angle);
+                    const ringLinked = new Set();
+                    ring.forEach((entry, i) => {
+                        if (terrainNoise(seed + 16.4, i) < 0.9) return;
+                        const next = ring[(i + 1) % ring.length];
+                        routes.push(routeBetween(entry.point, next.point, seed + 21.7 + i, bank));
+                        ringLinked.add(entry.index);
+                        ringLinked.add(next.index);
+                    });
 
-                // Most fields are walked to straight from the tower, but one that already
-                // hangs off a neighbour's trail is left without its own spoke.
-                spawnerPoints.forEach((point, i) => {
-                    if (ringLinked.has(i) && terrainNoise(149.7, i) > 0.72) return;
-                    routes.push(routeBetween(towerPoint, point, 141.3 + i));
-                });
+                    // Most fields are walked to straight from the hub, but one that already
+                    // hangs off a neighbour's trail is left without its own spoke.
+                    const hubPoint = toLayer(hub);
+                    ring.forEach((entry) => {
+                        if (ringLinked.has(entry.index) && terrainNoise(seed + 8.6, entry.index) > 0.72) return;
+                        routes.push(routeBetween(hubPoint, entry.point, seed + entry.index, bank));
+                    });
+                };
+
+                const homeFields = spawners.filter((spawner) => spawner.bank === 1);
+                const farFields = spawners.filter((spawner) => spawner.bank === -1);
+                buildTrailNetwork(towerHub, homeFields, 1, 141.3);
+                buildTrailNetwork(tribeCamp, farFields, -1, 263.9);
+
+                // How near a field a trunk has to pass before it forks there instead of
+                // carrying on past: the field's own disc, plus half the widest stroke (17
+                // layer units, so 68 world), plus a stride of slack - a trail shaving a rim
+                // reads as a second path over the same ground just as much as one straight
+                // over the middle does.
+                const TRUNK_BRANCH_SLACK = W(68) + W(120);
+                const trunkBranchReach = (field) =>
+                    (SPAWN_RADIUS_BY_TIER[field.tier] || SPAWN_RADIUS_BY_TIER[1]) + TRUNK_BRANCH_SLACK;
+
+                // Where the walk to the crossing leaves the network it shares. The home
+                // jetty lies at bearing -147.4 from the tower and the western crystal field
+                // at -150: 2.6 degrees apart. A trunk surveyed straight out of the hub
+                // therefore leaves alongside that field's own spoke and passes W(84) from
+                // its centre - well inside the W(251) disc - so the field ends up with two
+                // near-parallel trails drawn over it, which is what no path worn by feet
+                // has ever looked like. Feet fork at the last thing on the way.
+                //
+                // Furthest along wins, not nearest to the line: the fork belongs at the
+                // last stop before the water, so the stretch the two walks share is as long
+                // as it really is.
+                const crossingBranch = (hub, fields, dock) => {
+                    const dx = dock.x - hub.x;
+                    const dy = dock.y - hub.y;
+                    const lengthSq = dx * dx + dy * dy || 1;
+                    let branch = hub;
+                    let branchT = 0;
+                    for (const field of fields) {
+                        const t = ((field.x - hub.x) * dx + (field.y - hub.y) * dy) / lengthSq;
+                        // Behind the hub or past the jetty is not on the way.
+                        if (t <= branchT || t >= 1) continue;
+                        const offX = field.x - (hub.x + dx * t);
+                        const offY = field.y - (hub.y + dy * t);
+                        const reach = trunkBranchReach(field);
+                        if (offX * offX + offY * offY > reach * reach) continue;
+                        branch = field;
+                        branchT = t;
+                    }
+                    return branch;
+                };
+
+                // The two trunks down to the water, and the only routes on the map that go
+                // anywhere near it. Each stops dead at its jetty, because the next stretch
+                // of that journey is by boat.
+                //
+                // Worn before `boat` is ever bought, on purpose: this is the reach the
+                // river passes closest to the tower and both sides have always come down
+                // to it here, which is why the jetty gets built here and not somewhere
+                // else. A path arriving at bare bank reads as the crossing waiting to be
+                // built rather than as a mistake.
+                routes.push(routeBetween(
+                    toLayer(crossingBranch(towerHub, homeFields, FERRY_DOCKS.home)),
+                    toLayer(FERRY_DOCKS.home), 171.9, 1
+                ));
+                routes.push(routeBetween(
+                    toLayer(crossingBranch(tribeCamp, farFields, FERRY_DOCKS.far)),
+                    toLayer(FERRY_DOCKS.far), 183.1, -1
+                ));
 
                 // Blurred at bake time so the edges melt into the ground instead of
                 // reading as drawn lines. Ignored where the filter is unsupported.
@@ -7945,18 +8052,27 @@
                 layerCtx.filter = "none";
                 layerCtx.globalAlpha = 1;
 
-                // Trodden clearing where all the trails meet.
-                const clearingRadius = W(620) / GROUND_MACRO_SCALE;
-                const clearing = layerCtx.createRadialGradient(
-                    towerLayerX, towerLayerY, clearingRadius * 0.2,
-                    towerLayerX, towerLayerY, clearingRadius
-                );
-                clearing.addColorStop(0, "#352c1c33");
-                clearing.addColorStop(1, `${GROUND_BASE_COLOR}00`);
-                layerCtx.fillStyle = clearing;
-                layerCtx.beginPath();
-                layerCtx.arc(towerLayerX, towerLayerY, clearingRadius, 0, Math.PI * 2);
-                layerCtx.fill();
+                // Trodden ground where trails meet, scaled to how much walking each hub
+                // gathers: eight fields' worth at the tower, four at the camp, and a
+                // landing at each jetty that everything crossing has to funnel through.
+                // The landings are what make the crossing read as the crossing from a
+                // distance, before any of the decking is in view.
+                const treadGround = (point, radius, color) => {
+                    const x = toLayerX(point.x);
+                    const y = toLayerY(point.y);
+                    const layerRadius = radius / GROUND_MACRO_SCALE;
+                    const clearing = layerCtx.createRadialGradient(x, y, layerRadius * 0.2, x, y, layerRadius);
+                    clearing.addColorStop(0, color);
+                    clearing.addColorStop(1, `${GROUND_BASE_COLOR}00`);
+                    layerCtx.fillStyle = clearing;
+                    layerCtx.beginPath();
+                    layerCtx.arc(x, y, layerRadius, 0, Math.PI * 2);
+                    layerCtx.fill();
+                };
+                treadGround(towerHub, W(620), "#352c1c33");
+                treadGround(tribeCamp, W(430), "#352c1c2b");
+                treadGround(FERRY_DOCKS.home, W(260), "#352c1c26");
+                treadGround(FERRY_DOCKS.far, W(260), "#352c1c26");
 
                 return layer;
             }
