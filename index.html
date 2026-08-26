@@ -3218,7 +3218,6 @@
 
             const WAVE_SIZE_MAX = 34;
             const ACTIVE_ENEMY_MAX = 24;
-            const WAVE_SIZE_BASE = 2;
             // How a wave gets harder. Before this, every knob that made a wave worse was
             // capped - size at 18, concurrent at 12, the spawn gap at 44 ticks - and enemy
             // health was a constant per type, so a scout on wave 300 had the same 1 HP as
@@ -3238,9 +3237,6 @@
             // enough to make one a wall.
             const OFFWAVE_HP_SCALE_ROOT = 0.5;
             const HUD_REFRESH_INTERVAL_TICKS = 4;
-            const EARLY_SPAWN_GRACE_TICKS = 1800;
-            const EARLY_SPAWN_GRACE_BONUS = 160;
-            const HUNTER_UNLOCK_TICKS = 1500;
             const PLAYER_STAMINA_MAX = 100;
             const PLAYER_ATTACK_STAMINA_COST = 18;
             const PLAYER_STAMINA_REGEN_PER_TICK = 0.2;
@@ -5253,7 +5249,16 @@
                     return;
                 }
 
-                const renderKey = held.map((entry) => `${entry.type}:${storedTurretCount(entry.type)}`).join("|")
+                // The owned count belongs in the key even though no row prints it: the
+                // armed row prints a sell-back price, and that price is
+                // `base + (owned - 1) * step`. Owned moves without stored moving - selling
+                // a *placed* turret drops it and leaves the store untouched - so keying on
+                // stored alone let the row keep a price that was no longer the one
+                // sellStoredTurret() would pay. The panel did re-render; it early-returned
+                // on a key that had not noticed.
+                const renderKey = held
+                    .map((entry) => `${entry.type}:${storedTurretCount(entry.type)}:${ownedCountForTurretType(entry.type)}`)
+                    .join("|")
                     + `|sel:${game.selectedTurretType}`;
                 if (turretStockListEl.dataset.renderKey === renderKey) return;
                 turretStockListEl.dataset.renderKey = renderKey;
@@ -8739,30 +8744,6 @@
                 return path;
             }
 
-            // The centre line itself, optionally shifted sideways - the current lanes and
-            // the foam along either edge are drawn from the same points as the water.
-            function traceRiver(targetCtx, offset = 0) {
-                targetCtx.beginPath();
-                for (let i = 0; i < RIVER_PATH.length; i += 1) {
-                    const point = RIVER_PATH[i];
-                    let x = point.x;
-                    let y = point.y;
-
-                    if (offset !== 0) {
-                        const from = RIVER_PATH[Math.max(0, i - 1)];
-                        const to = RIVER_PATH[Math.min(RIVER_PATH.length - 1, i + 1)];
-                        const dx = to.x - from.x;
-                        const dy = to.y - from.y;
-                        const length = Math.sqrt(dx * dx + dy * dy) || 1;
-                        x += (-dy / length) * offset;
-                        y += (dx / length) * offset;
-                    }
-
-                    if (i === 0) targetCtx.moveTo(x, y);
-                    else targetCtx.lineTo(x, y);
-                }
-            }
-
             // The map is eight screens wide, so on any given frame most of what there is
             // to draw is behind the camera. Everything drawn in world space gets a box
             // test first - it is the difference between a few hundred canvas calls a
@@ -10102,12 +10083,6 @@
             const TRIBE_CAPTURE_MAX_BODIES = 3;
             const TRIBE_CAPTURE_CONTEST = 2;
             const TRIBE_CAPTURE_BLEED = 1;
-
-            function tribeFieldIndices() {
-                const indices = [];
-                for (let i = MEADOW_SPAWNER_COUNT; i < spawners.length; i += 1) indices.push(i);
-                return indices;
-            }
 
             function countTribeFieldsHeld() {
                 let held = 0;
@@ -11561,15 +11536,6 @@
                 ctx.fill();
             }
 
-            function drawTriangle(x, y, size, color) {
-                ctx.fillStyle = color;
-                ctx.beginPath();
-                ctx.moveTo(x, y - size);
-                ctx.lineTo(x + size * 0.9, y + size * 0.8);
-                ctx.lineTo(x - size * 0.9, y + size * 0.8);
-                ctx.closePath();
-                ctx.fill();
-            }
 
             function traceNodeShape(node, shape, scale) {
                 const half = node.size * 0.5 * scale;

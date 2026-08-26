@@ -487,7 +487,17 @@ and are killed by ghouls/hunters/the war chief.
 - [ ] **Sell**: right-click refunds and plays the sell sting; the count and the
       placement list both decrement.
 - [ ] **Cancel a stored turret**: refunds exactly what the caravan paid, so a
-      buy/cancel loop is worth nothing either way.
+      buy/cancel loop is worth nothing either way - **and the price on the button is the
+      price you get**.
+      Regression: the Turret Store's `dataset.renderKey` was built from the *stored* count,
+      but the armed row prints a sell-back price computed from the *owned* count
+      (`base + (owned - 1) * step`). Selling a **placed** turret drops owned and leaves
+      stored alone, so the key did not change, the render early-returned, and the row kept
+      quoting a price `sellStoredTurret()` would no longer pay. To reproduce you need all
+      three at once: the store panel **open**, that turret type **armed**, and a *placed*
+      turret of the same type sold on the map. Selling from the store instead moves both
+      counts, so the key changes and the panel looks correct - which is why the obvious
+      test passes.
 - [ ] `Rapid Fire` skill: +30% fire rate on slings and catapults. `Keen Slings` boon:
       +20% fire rate.
 - [ ] Fog halves turret range; frost widens slow fields by 1.5x.
@@ -1070,6 +1080,11 @@ Each of these has broken the game before, and the failure was silent.
 - [ ] **Spawner type fall-through**: `spawnerLevelFor` returns the amber level for
       anything it does not recognise - ivory must be handled before that fall-through.
 - [ ] Refunds quoted at a different tier than the purchase must not walk Prog negative.
+- [ ] **A render cache keyed on less than it draws.** Several panels skip re-rendering when
+      a `dataset.renderKey` matches. The key has to name every value the markup interpolates,
+      not just the ones the rows visibly list - the Turret Store printed a price derived from
+      a count that was not in its key (§8). The failure is silent and looks like a panel that
+      simply did not update, which is indistinguishable from one that had nothing to update.
 - [ ] `keys` must be cleared on blur, on run end and on reset.
 - [ ] **A "frozen" entity is usually a stopped clock.** `tickGame()` opens with
       `if (!game.running) return`, and `game.running` goes false on a run end *and* on a
