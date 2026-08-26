@@ -184,8 +184,9 @@ entirely until its skill is unlocked, and buying it deducts exactly the quoted c
       (+10% per level, costs essence only).
 - [ ] **Turrets**: Turret Store (buy via caravan), Turret Capacity (+3 per level from a
       base of 15). The group header shows `placed/cap`.
-- [ ] **Minions**: Craft Gatherer, Gatherer Focus, Far Bank, Craft Trader, Trade Routes,
-      Craft Defender, Defender Posts, Minion Speed, Minion Load.
+- [ ] **Minions**: Craft Gatherer, Gatherer Focus, Craft Trader, Trade Routes,
+      Craft Defender, Defender Posts, Minion Speed, Minion Load. There is **no** Far Bank
+      panel - the gatherer's focus decides which bank it works (see §7).
 - [ ] **"Minion Load" reads `Lv N carries M`**, where M is `1 + level`. It must not be
       called Capacity: it sits under "Turret Capacity", which *is* a maximum count, and
       the same word for two different things had testers reading it as a limit on how many
@@ -289,8 +290,18 @@ and are killed by ghouls/hunters/the war chief.
       Regression: the focus used to be accepted and then silently ignored (the gatherer
       falls back to the nearest node of anything), so the row read "Ivory" while the minion
       hauled wood. A stalled minion would have been obvious; this was not.
-- [ ] **Far Bank**: only selectable once `boat` is unlocked. Set to `far`, the gatherer
-      rides the ferry and works the tribe's ivory fields.
+- [ ] **Asking for ivory is the whole instruction.** With `boat` unlocked and at least one
+      tribe field taken, a gatherer set to Ivory walks to the jetty, crosses, works the far
+      fields and ferries each load home on its own. There is no second posting to set.
+      Regression: this used to need a separate Far Bank assignment as well, so two controls
+      described the same thing and the focus quietly lost to the posting.
+- [ ] **It falls back to the near bank whenever there is no ivory to be had** - fields still
+      the tribe's, nodes eaten by a blight, or the river up in the rain. It works the meadow
+      like any other gatherer rather than waiting at the jetty for a crossing that pays
+      nothing. Check all three causes; they take different routes through the code.
+- [ ] A full round trip banks ivory in roughly 11,000 ticks (~3 minutes at 1x) from a
+      standing start at the tower. If it never arrives, check the run is actually running
+      before blaming the pathing - see §23.
 - [ ] Re-pointing a gatherer mid-crossing does not strand it - it finishes the crossing
       and turns around on the far jetty.
 - [ ] A focus/far-bank choice is stored per slot and survives reload.
@@ -700,4 +711,9 @@ Each of these has broken the game before, and the failure was silent.
       anything it does not recognise - ivory must be handled before that fall-through.
 - [ ] Refunds quoted at a different tier than the purchase must not walk Prog negative.
 - [ ] `keys` must be cleared on blur, on run end and on reset.
+- [ ] **A "frozen" entity is usually a stopped clock.** `tickGame()` opens with
+      `if (!game.running) return`, and `game.running` goes false on a run end *and* on a
+      draft or event popover opening - every 5 and 7 waves. Anything driving the simulation
+      in a harness has to answer those, or the whole world stands still and reads exactly
+      like a pathing bug in whatever you happened to be watching.
 - [ ] Both audio buses stay independent.

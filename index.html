@@ -1660,10 +1660,6 @@
                                         <summary id="gathererFocusSummary" class="secondary shop-btn gatherer-focus-summary">Gatherer Focus</summary>
                                         <div id="gathererFocusList" class="gatherer-focus-list"></div>
                                     </details>
-                                    <details id="farBankPanel" class="gatherer-focus-panel">
-                                        <summary id="farBankSummary" class="secondary shop-btn gatherer-focus-summary">Far Bank</summary>
-                                        <div id="farBankList" class="gatherer-focus-list"></div>
-                                    </details>
                                     <button id="traderBtn" class="secondary shop-btn">Craft Trader</button>
                                     <details id="traderRoutePanel" class="gatherer-focus-panel">
                                         <summary id="traderRouteSummary" class="secondary shop-btn gatherer-focus-summary">Trade Routes</summary>
@@ -1886,9 +1882,6 @@
             const gathererFocusPanelEl = document.getElementById("gathererFocusPanel");
             const gathererFocusSummaryEl = document.getElementById("gathererFocusSummary");
             const gathererFocusListEl = document.getElementById("gathererFocusList");
-            const farBankPanelEl = document.getElementById("farBankPanel");
-            const farBankSummaryEl = document.getElementById("farBankSummary");
-            const farBankListEl = document.getElementById("farBankList");
             const traderBtn = document.getElementById("traderBtn");
             const traderRoutePanelEl = document.getElementById("traderRoutePanel");
             const traderRouteSummaryEl = document.getElementById("traderRouteSummary");
@@ -2015,7 +2008,7 @@
                 speed: { label: "Unlock Player Speed", desc: "Comes with the first level - you are faster the moment it is bought", cost: { wood: 12 }, requires: [] },
                 bag: { label: "Unlock Bag Capacity", desc: "Carry four more each level - the first comes with the unlock", cost: { wood: 10, stone: 8 }, requires: ["speed"] },
                 gatherer: { label: "Unlock Gatherers", desc: "Craft minions that work the fields and bank for you while you do", cost: { wood: 14, stone: 10 }, requires: ["bag"] },
-                gathererFocus: { label: "Unlock Gatherer Focus", desc: "Send each gatherer after one resource instead of whatever is nearest", cost: { stone: 12, crystal: 4 }, requires: ["minionCapacity"] },
+                gathererFocus: { label: "Unlock Gatherer Focus", desc: "Send each gatherer after one resource instead of whatever is nearest. Once the boat is built, asking for ivory ferries them across on their own", cost: { stone: 12, crystal: 4 }, requires: ["minionCapacity"] },
                 defender: { label: "Unlock Defenders", desc: "Craft minions that hold a post and fight whatever walks onto it - they guard the tower until you give them ground", cost: { wood: 14, stone: 14 }, requires: [] },
                 minionSpeed: { label: "Unlock Minion Speed", desc: "Every gatherer, caravan and defender moves faster - a fifth quicker each level", cost: { stone: 12, crystal: 4 }, requires: ["gatherer", "trader"] },
                 minionCapacity: { label: "Unlock Minion Load", desc: "Gatherers haul one more per trip each level, caravans six more - it is not a limit on how many you can own", cost: { wood: 14, amber: 3 }, requires: ["gatherer"] },
@@ -2187,7 +2180,6 @@
                 traderRoute: "trader",
                 boat: "boat",
                 warPaint: "warPaint",
-                farBankAssign: "boat",
                 defender: "defender",
                 minionSpeed: "minionSpeed",
                 minionCapacity: "minionCapacity",
@@ -3668,7 +3660,6 @@
                     draftBoons: {},
                     gathererFocusBySlot: {},
                     gathererFocusCursor: 0,
-                    farBankBySlot: {},
                     defenderNameBySlot: {},
                     traderRouteBySlot: {},
                     defenderPostBySlot: {}
@@ -3703,9 +3694,6 @@
                         : {};
                     const traderRouteBySlot = data.traderRouteBySlot && typeof data.traderRouteBySlot === "object"
                         ? data.traderRouteBySlot
-                        : {};
-                    const farBankBySlot = data.farBankBySlot && typeof data.farBankBySlot === "object"
-                        ? data.farBankBySlot
                         : {};
                     const defenderNameBySlot = data.defenderNameBySlot && typeof data.defenderNameBySlot === "object"
                         ? data.defenderNameBySlot
@@ -3766,7 +3754,6 @@
                         bagLevel: Number.isFinite(data.bagLevel) ? data.bagLevel : fresh.bagLevel,
                         gathererFocusBySlot,
                         gathererFocusCursor,
-                        farBankBySlot,
                         defenderNameBySlot,
                         traderRouteBySlot,
                         defenderPostBySlot,
@@ -4865,6 +4852,12 @@
                     .join("");
             }
 
+            // The picker spells the crossing out; the row keeps the short form so it still
+            // fits beside the gatherer's name.
+            function gathererPriorityOptionLabel(priority) {
+                return priority === "ivory" ? "Ivory - sends them across the river" : gathererPriorityLabel(priority);
+            }
+
             function gathererPriorityLabel(priority) {
                 if (priority === "wood") return "Wood";
                 if (priority === "stone") return "Stone";
@@ -5036,7 +5029,7 @@
                 if (gathererFocusListEl.dataset.renderKey === renderKey) return;
                 gathererFocusListEl.dataset.renderKey = renderKey;
 
-                const options = gathererPriorityModes().map((mode) => ({ value: mode, label: gathererPriorityLabel(mode) }));
+                const options = gathererPriorityModes().map((mode) => ({ value: mode, label: gathererPriorityOptionLabel(mode) }));
 
                 gathererFocusListEl.innerHTML = workers
                     .map((minion, index) => {
@@ -5049,48 +5042,10 @@
                     .join("");
             }
 
-            function farBankSummaryText() {
-                const sent = workerMinionsSortedBySlot().filter((minion) => minion.farBank).length;
-                return sent > 0 ? `Far Bank (${sent})` : "Far Bank";
-            }
 
             // Which side of the water each gatherer works. Kept apart from Gatherer Focus
             // on purpose: focus is what it picks up, this is where it goes, and a minion
             // sent over stays over until it is called back.
-            function renderFarBankList() {
-                if (!farBankListEl) return;
-                const workers = workerMinionsSortedBySlot();
-                if (workers.length === 0) {
-                    if (farBankListEl.dataset.renderKey !== "empty") {
-                        farBankListEl.dataset.renderKey = "empty";
-                        farBankListEl.innerHTML = '<div class="gatherer-focus-empty">No gatherers to send yet.</div>';
-                    }
-                    return;
-                }
-
-                const renderKey = workers
-                    .map((minion, index) => `${index}:${minion.slotIndex}:${minion.farBank ? 1 : 0}:${minion.ferryState || "-"}`)
-                    .join("|") + `|open:${game.openMinionPicker}`;
-                if (farBankListEl.dataset.renderKey === renderKey) return;
-                farBankListEl.dataset.renderKey = renderKey;
-
-                const options = [
-                    { value: "home", label: "Home bank - the meadow" },
-                    { value: "far", label: "Far bank - across the river" }
-                ];
-
-                farBankListEl.innerHTML = workers
-                    .map((minion, index) => {
-                        const slot = Number.isFinite(minion.slotIndex) ? minion.slotIndex : index;
-                        const open = isMinionPickerOpen("farBank", slot);
-                        const crossing = minion.ferryState === "crossing";
-                        const label = crossing ? "Crossing" : (minion.farBank ? "Far bank" : "Home bank");
-                        const idle = minion.farBank ? "" : " route-idle";
-                        return `<button class="secondary shop-btn gatherer-focus-row${open ? " picker-open" : ""}${idle}" data-far-bank-slot="${slot}"><span class="shop-btn-title"><span>Gatherer ${index + 1}</span><span class="shop-btn-level">${label} ${open ? "&#9652;" : "&#9662;"}</span></span></button>`
-                            + minionPickerMarkup("farBank", slot, options, minion.farBank ? "far" : "home");
-                    })
-                    .join("");
-            }
 
             function formatSkillRequirement(skillId) {
                 const def = SKILL_TREE_DEFS[skillId];
@@ -5575,7 +5530,6 @@
                 const globalMultUnlocked = canUseUpgrade("globalMultiplier");
                 const gathererUnlocked = canUseUpgrade("gatherer");
                 const gathererFocusUnlocked = canUseUpgrade("gathererFocus");
-                const farBankUnlocked = canUseUpgrade("farBankAssign");
                 const defenderUnlocked = canUseUpgrade("defender");
                 const traderUnlocked = canUseUpgrade("trader");
                 const minionSpeedUnlocked = canUseUpgrade("minionSpeed");
@@ -5623,13 +5577,6 @@
                     }
                 }
                 if (gathererFocusPanelEl && gathererFocusPanelEl.open) renderGathererFocusList();
-                if (farBankSummaryEl) {
-                    const nextFarBankSummary = farBankSummaryText();
-                    if (farBankSummaryEl.textContent !== nextFarBankSummary) {
-                        farBankSummaryEl.textContent = nextFarBankSummary;
-                    }
-                }
-                if (farBankPanelEl && farBankPanelEl.open) renderFarBankList();
                 const traderRecipe = traderMinionRecipe();
                 setShopButtonContent(traderBtn, "Craft Trader", `Owned ${save.traderMinions}`, traderRecipe);
                 if (traderRouteSummaryEl) {
@@ -5705,7 +5652,6 @@
                 setButtonVisible(globalMultBtn, globalMultUnlocked);
                 setButtonVisible(craftBtn, gathererUnlocked);
                 setButtonVisible(gathererFocusPanelEl, gathererFocusUnlocked);
-                setButtonVisible(farBankPanelEl, farBankUnlocked);
                 setButtonVisible(traderBtn, traderUnlocked);
                 setButtonVisible(traderRoutePanelEl, traderUnlocked);
                 setButtonVisible(defenderBtn, defenderUnlocked);
@@ -9586,13 +9532,6 @@
                             }
                         }
 
-                        const savedFarBank = slotKey && save.farBankBySlot
-                            ? save.farBankBySlot[slotKey]
-                            : undefined;
-                        minion.farBank = Boolean(savedFarBank !== undefined ? savedFarBank : minion.farBank);
-                        if (save.farBankBySlot && slotKey !== null && save.farBankBySlot[slotKey] === undefined) {
-                            save.farBankBySlot[slotKey] = minion.farBank;
-                        }
                     }
                 }
 
@@ -9734,9 +9673,6 @@
                 const savedRoute = role === "trader" && save.traderRouteBySlot
                     ? save.traderRouteBySlot[String(resolvedSlot)]
                     : null;
-                const savedFarBank = role === "worker" && save.farBankBySlot
-                    ? save.farBankBySlot[String(resolvedSlot)]
-                    : false;
                 const unit = {
                     id: game.nextMinionId,
                     slotIndex: resolvedSlot,
@@ -9761,7 +9697,6 @@
                     gathererPriority: role === "worker" ? normalizedGathererPriority(savedPriority) : "auto",
                     // A minion is born at the tower, so it starts on the home bank with
                     // no business across the water until it is told otherwise.
-                    farBank: Boolean(savedFarBank),
                     bank: 1,
                     ferryState: null,
                     ferryLanding: 1,
@@ -11958,15 +11893,25 @@
 
                     if (minion.state === "idle") {
                         const preferredType = minion.carryLoad > 0 ? minion.carryType : gathererPreferredTypeFor(minion);
-                        // A gatherer works the bank it was sent to and nothing else. One
-                        // sent across keeps working over there until it is called back,
-                        // rather than paying for the crossing twice over one node - and
-                        // one called back walks to the dock, because home has the only
-                        // nodes it can now see.
-                        const workBank = isSkillUnlocked("boat") && minion.farBank ? -1 : 1;
-                        let nodeIndex = pickClosestActiveNodeIndex(minion, preferredType, workBank);
-                        if (nodeIndex === -1 && preferredType && minion.carryLoad <= 0) {
-                            nodeIndex = pickClosestActiveNodeIndex(minion, null, workBank);
+                        // Ivory grows on the tribe's ground and nowhere else, so asking a
+                        // gatherer for ivory is asking to be ferried. The focus is the
+                        // whole instruction: there used to be a second posting to set
+                        // alongside it, which meant two controls saying the same thing and
+                        // one of them silently losing.
+                        //
+                        // With no ivory to be had - fields still the tribe's, eaten by a
+                        // blight, or the river up - it falls straight through to the near
+                        // bank and works like any other gatherer rather than standing at
+                        // the jetty waiting for a crossing that pays nothing.
+                        let nodeIndex = -1;
+                        if (preferredType === "ivory" && isSkillUnlocked("boat") && ferryOpen()) {
+                            nodeIndex = pickClosestActiveNodeIndex(minion, "ivory", -1);
+                        }
+                        if (nodeIndex === -1) {
+                            nodeIndex = pickClosestActiveNodeIndex(minion, preferredType, 1);
+                            if (nodeIndex === -1 && preferredType && minion.carryLoad <= 0) {
+                                nodeIndex = pickClosestActiveNodeIndex(minion, null, 1);
+                            }
                         }
                         if (nodeIndex === -1) {
                             if (minion.carryLoad > 0) {
@@ -13639,42 +13584,10 @@
 
             // The lists are only built while their panel is open, so opening one has to
             // ask for a refresh: while the game is paused nothing else will.
-            for (const panel of [gathererFocusPanelEl, farBankPanelEl, traderRoutePanelEl, defenderPostPanelEl, turretStockPanelEl]) {
+            for (const panel of [gathererFocusPanelEl, traderRoutePanelEl, defenderPostPanelEl, turretStockPanelEl]) {
                 if (panel) panel.addEventListener("toggle", () => { if (panel.open) refreshHud(); });
             }
 
-            farBankListEl.addEventListener("click", (event) => {
-                if (!canUseUpgrade("farBankAssign")) return;
-
-                const optionBtn = event.target.closest("button[data-picker-value]");
-                if (optionBtn) {
-                    const slot = Number.parseInt(optionBtn.dataset.pickerSlot, 10);
-                    const farBank = optionBtn.dataset.pickerValue === "far";
-                    const workers = workerMinionsSortedBySlot();
-                    const selected = workers.find((minion) => minion.slotIndex === slot);
-                    if (!selected) return;
-
-                    selected.farBank = farBank;
-                    if (!save.farBankBySlot || typeof save.farBankBySlot !== "object") {
-                        save.farBankBySlot = {};
-                    }
-                    save.farBankBySlot[String(slot)] = farBank;
-                    // Re-pointed mid-river it rides the crossing out and turns round on
-                    // the far jetty: there is no stepping off half way.
-                    closeMinionPicker();
-                    saveGame();
-                    refreshHud();
-                    return;
-                }
-
-                const rowBtn = event.target.closest("button[data-far-bank-slot]");
-                if (!rowBtn) return;
-                const slot = Number.parseInt(rowBtn.dataset.farBankSlot, 10);
-                if (!Number.isFinite(slot)) return;
-
-                toggleMinionPicker("farBank", slot);
-                refreshHud();
-            });
 
             traderBtn.addEventListener("click", () => {
                 if (!canUseUpgrade("trader")) return;
