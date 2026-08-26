@@ -2013,7 +2013,7 @@
             ];
             const SKILL_TREE_DEFS = {
                 speed: { label: "Unlock Player Speed", desc: "Comes with the first level - you are faster the moment it is bought", cost: { wood: 12 }, requires: [] },
-                bag: { label: "Unlock Bag Capacity", cost: { wood: 10, stone: 8 }, requires: ["speed"] },
+                bag: { label: "Unlock Bag Capacity", desc: "Carry four more each level - the first comes with the unlock", cost: { wood: 10, stone: 8 }, requires: ["speed"] },
                 gatherer: { label: "Unlock Gatherers", cost: { wood: 14, stone: 10 }, requires: ["bag"] },
                 gathererFocus: { label: "Unlock Gatherer Focus", cost: { stone: 12, crystal: 4 }, requires: ["minionCapacity"] },
                 defender: { label: "Unlock Defenders", cost: { wood: 14, stone: 14 }, requires: [] },
@@ -2034,10 +2034,10 @@
                 minionArmor2: { label: "Unlock Minion Plating", desc: "Doubles minion health again, 4x in total", cost: { stone: 180, crystal: 90, amber: 60, essence: 80 }, requires: ["minionArmor"] },
                 minionArmor: { label: "Unlock Minion Armor", desc: "Doubles the health of every gatherer and defender", cost: { stone: 90, crystal: 48, amber: 48 }, requires: ["turret"] },
                 turretHaste: { label: "Unlock Rapid Fire", desc: "All slings and catapults loose 30% faster", cost: { crystal: 240, amber: 140, essence: 50 }, requires: ["slowTurret"] },
-                spawnerWood: { label: "Unlock Wood Spawner", cost: { wood: 12, stone: 18 }, requires: [] },
-                spawnerStone: { label: "Unlock Stone Spawner", cost: { wood: 22, stone: 12 }, requires: ["spawnerWood"] },
-                spawnerCrystal: { label: "Unlock Crystal Spawner", cost: { wood: 20, amber: 6 }, requires: ["spawnerStone"] },
-                spawnerAmber: { label: "Unlock Amber Spawner", cost: { stone: 20, crystal: 6 }, requires: ["spawnerCrystal"] },
+                spawnerWood: { label: "Unlock Wood Spawner", desc: "Wood regrows faster and the meadow holds more of it - first level included", cost: { wood: 12, stone: 18 }, requires: [] },
+                spawnerStone: { label: "Unlock Stone Spawner", desc: "Stone regrows faster and the meadow holds more of it - first level included", cost: { wood: 22, stone: 12 }, requires: ["spawnerWood"] },
+                spawnerCrystal: { label: "Unlock Crystal Spawner", desc: "Crystal regrows faster and the meadow holds more of it - first level included", cost: { wood: 20, amber: 6 }, requires: ["spawnerStone"] },
+                spawnerAmber: { label: "Unlock Amber Spawner", desc: "Amber regrows faster and the meadow holds more of it - first level included", cost: { stone: 20, crystal: 6 }, requires: ["spawnerCrystal"] },
                 globalMultiplier: { label: "Unlock Global Mult", cost: { essence: 5 }, requires: ["spawnerAmber"] }
             };
             const SKILL_TREE_TIERS = {
@@ -2152,7 +2152,15 @@
             // that line would be in its temporal dead zone - and loadSave's catch turns a
             // throw into a silently wiped save. Same trap as GAME_SPEEDS.
             const SKILL_UNLOCK_LEVELS = {
-                speed: { field: "speedLevel", level: 1, sync: () => { game.player.speed = playerSpeedValue(); } }
+                speed: { field: "speedLevel", level: 1, sync: () => { game.player.speed = playerSpeedValue(); } },
+                bag: { field: "bagLevel", level: 1 },
+                // No sync on any of these four: activeNodeCapFor keys its cache on the
+                // spawner level, so it recomputes itself, and scaledRespawnTicks reads the
+                // level every time it is asked. Aether has no unlock to hang a grant on.
+                spawnerWood: { field: "spawnerWoodLevel", level: 1 },
+                spawnerStone: { field: "spawnerStoneLevel", level: 1 },
+                spawnerCrystal: { field: "spawnerCrystalLevel", level: 1 },
+                spawnerAmber: { field: "spawnerAmberLevel", level: 1 }
             };
 
             const UPGRADE_SKILL_BY_CONTROL = {

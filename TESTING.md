@@ -118,6 +118,8 @@ If time is short, this is the subset that catches the failures that have actuall
       bought up to Lv 4 is back to Lv 1, not Lv 0 and not Lv 4.
 - [ ] A player who never unlocked `speed` stays at level 0 and base speed 3.5 forever.
 - [ ] Bag capacity 10, +4 per Bag level, +4 per `Deep Bags` boon.
+- [ ] **Unlocking `bag` grants level 1**: capacity 10 -> 14 on the click, and the floor is
+      re-applied every run (see §6).
 - [ ] Walking over a node picks it up; a full bag picks up nothing.
 - [ ] **Pickup reach** is `player.r + node.size * 0.6 + PLAYER_PICKUP_GRACE` (~44 units,
       an 87-unit corridor). Walking *near* a node collects it; the grace is half a player
@@ -151,6 +153,15 @@ If time is short, this is the subset that catches the failures that have actuall
 - [ ] Respawn base ticks: wood 240, stone 320, crystal 460, amber 540, aether 1200,
       ivory 1800.
 - [ ] Spawner upgrades speed up wood/stone/crystal/amber only.
+- [ ] **Unlocking a spawner skill grants level 1** of that spawner: respawn drops 4%
+      (wood 240 -> 230 ticks) the moment it is bought, and the floor returns every run.
+- [ ] The **node cap is unchanged at spawner level 1** and first moves at level 2. That is
+      the existing rounding, not a broken grant: the cap is
+      `round(11 x baseRespawn / currentRespawn)`, and `round(11 x 240/230) = round(11.48)`
+      is still 11. The ladder runs 11, 11, 12, 13, 13, 14, 15 for levels 0-6. Do not
+      "fix" it by rounding up - that would raise every field's cap at every level.
+- [ ] Aether has no unlock, so it gets no grant: `spawnerAetherLevel` stays 0.
+- [ ] Ivory is untouched by all of this - flat 1800-tick respawn, no level, no grant.
 - [ ] **Ivory never speeds up and never gets a multiplier** - not from spawner levels, not
       from Global Multiplier, not from run modifiers. Check both banking paths.
 - [ ] Aether has no shop spawner upgrade.
@@ -209,6 +220,11 @@ entirely until its skill is unlocked, and buying it deducts exactly the quoted c
 One table drives this. A row is `skillId: { field, level, sync? }`, and adding one must be
 the **only** change needed - if a new grant needs edits anywhere else, the mechanism has
 regressed. Re-check the whole block after adding a row.
+
+Granted today: `speed`, `bag`, and the four spawners (`spawnerWood`, `spawnerStone`,
+`spawnerCrystal`, `spawnerAmber`) - all at level 1. Only `speed` needs a `sync`; the rest
+are read fresh every time (`bagCapacity()`, `scaledRespawnTicks()`) or self-invalidate
+(`activeNodeCapForType` keys its cache on the level).
 
 - [ ] `applyUnlockLevels()` is applied in all four places run state is built: the unlock
       click, `freshRunState()` (so `startRun` and `endRun` keep it), the `loadSave()`
