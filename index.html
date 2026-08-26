@@ -2012,7 +2012,7 @@
                 "globalMultiplier"
             ];
             const SKILL_TREE_DEFS = {
-                speed: { label: "Unlock Player Speed", cost: { wood: 12 }, requires: [] },
+                speed: { label: "Unlock Player Speed", desc: "Comes with the first level - you are faster the moment it is bought", cost: { wood: 12 }, requires: [] },
                 bag: { label: "Unlock Bag Capacity", cost: { wood: 10, stone: 8 }, requires: ["speed"] },
                 gatherer: { label: "Unlock Gatherers", cost: { wood: 14, stone: 10 }, requires: ["bag"] },
                 gathererFocus: { label: "Unlock Gatherer Focus", cost: { stone: 12, crystal: 4 }, requires: ["minionCapacity"] },
@@ -2130,6 +2130,31 @@
                 defenseHaste: 163,
                 economy: 20
             };
+            // ---- Levels an unlock hands over -------------------------------------
+            //
+            // A skill that only opens a shop button reads as nothing happening. A tester
+            // bought "Unlock Player Speed" believing he had bought a speed upgrade, and he
+            // was right to: the unlock opened the ladder and the first rung still cost
+            // extra, so the purchase he made changed nothing he could feel. An entry here
+            // means the unlock carries that many levels with it.
+            //
+            // `field` is the run-state key on `save`; `sync` is anything derived that has
+            // to be recomputed on the click rather than at the next run start, and may be
+            // omitted when nothing is.
+            //
+            // These are FLOORS, re-applied wherever a run's state is rebuilt - not one-off
+            // bumps at unlock time. The level fields are run state and the unlocks are
+            // meta, so a one-off bump would last exactly one run and then read as the same
+            // "nothing happened" the grant exists to remove.
+            //
+            // Declared up here rather than beside applyUnlockLevels: loadSave() applies
+            // these and runs while the module body is still initialising, so a const below
+            // that line would be in its temporal dead zone - and loadSave's catch turns a
+            // throw into a silently wiped save. Same trap as GAME_SPEEDS.
+            const SKILL_UNLOCK_LEVELS = {
+                speed: { field: "speedLevel", level: 1, sync: () => { game.player.speed = playerSpeedValue(); } }
+            };
+
             const UPGRADE_SKILL_BY_CONTROL = {
                 speed: "speed",
                 bag: "bag",
@@ -3302,6 +3327,27 @@
 
             const save = loadSave();
 
+            // A row whose `field` or `skillId` is misspelled grants nothing and says
+            // nothing: applyUnlockLevels would happily write a key no shop button reads.
+            // This table is meant to grow, so the typo gets caught out loud instead.
+            //
+            // Runs here rather than beside the table because it needs a built save to
+            // check field names against, and `save` is the first moment one exists.
+            (function validateUnlockLevels() {
+                for (const skillId of Object.keys(SKILL_UNLOCK_LEVELS)) {
+                    const grant = SKILL_UNLOCK_LEVELS[skillId];
+                    if (!SKILL_TREE_DEFS[skillId]) {
+                        console.error(`SKILL_UNLOCK_LEVELS: "${skillId}" is not a skill in SKILL_TREE_DEFS`);
+                    }
+                    if (!(grant.field in save)) {
+                        console.error(`SKILL_UNLOCK_LEVELS.${skillId}: "${grant.field}" is not a field on the save`);
+                    }
+                    if (!Number.isFinite(grant.level) || grant.level < 1) {
+                        console.error(`SKILL_UNLOCK_LEVELS.${skillId}: level must be a number of 1 or more`);
+                    }
+                }
+            }());
+
             const game = {
                 running: false,
                 started: false,
@@ -3523,8 +3569,35 @@
             // wiped and built again from nothing, while essence and the skill tree carry
             // over. One source of truth for what a new run starts with, so run-start
             // bonuses have a single place to apply.
-            function freshRunState() {
-                return {
+            // Raises every granted level on `state` to its floor. Pure data: it never
+            // touches `game`, because loadSave() calls it long before there is one.
+            //
+            // Takes the unlocked-skills map as an argument rather than reading `save` -
+            // loadSave() runs before the module-scope `save` const is assigned, where even
+            // `typeof save` throws rather than reading undefined.
+            //
+            // A floor only ever raises. A player who bought their way past it keeps the
+            // level they paid for.
+            function applyUnlockLevels(state, unlockedSkills) {
+                if (!state || !unlockedSkills) return state;
+                for (const skillId of Object.keys(SKILL_UNLOCK_LEVELS)) {
+                    if (!unlockedSkills[skillId]) continue;
+                    const grant = SKILL_UNLOCK_LEVELS[skillId];
+                    const current = Number.isFinite(state[grant.field]) ? state[grant.field] : 0;
+                    state[grant.field] = Math.max(current, grant.level);
+                }
+                return state;
+            }
+
+            // The derived values that would otherwise wait for the next run start. Only
+            // the unlock click needs this; startRun() recomputes all of it anyway.
+            function syncUnlockGrants(skillId) {
+                const grant = SKILL_UNLOCK_LEVELS[skillId];
+                if (grant && typeof grant.sync === "function") grant.sync();
+            }
+
+            function freshRunState(unlockedSkills) {
+                return applyUnlockLevels({
                     stored: 0,
                     worldAge: 0,
                     bankWood: START_BUDGET.wood,
@@ -3562,7 +3635,7 @@
                     defenderNameBySlot: {},
                     traderRouteBySlot: {},
                     defenderPostBySlot: {}
-                };
+                }, unlockedSkills);
             }
 
             function loadSave() {
@@ -3607,7 +3680,11 @@
                         ? Math.max(0, Math.floor(data.gathererFocusCursor))
                         : 0;
                     const unlockedSkills = normalizeUnlockedSkills(data.unlockedSkills);
-                    return {
+                    // Applied on the way out rather than field by field: a save written
+                    // before a grant existed carries the old level with the skill already
+                    // owned, and adding a row to SKILL_UNLOCK_LEVELS must not also mean
+                    // remembering to edit this list.
+                    return applyUnlockLevels({
                         stored: Number.isFinite(data.stored) ? data.stored : fresh.stored,
                         // Records are per run now. An older save's `bestStored` was a
                         // lifetime total, which is not a run score, so it is dropped
@@ -3665,7 +3742,7 @@
                         mapZoom: Number.isFinite(data.mapZoom) ? clamp(data.mapZoom, MIN_MAP_ZOOM, MAX_MAP_ZOOM) : 1,
                         coordOrigin: "tower",
                         runtimeState: data.runtimeState && typeof data.runtimeState === "object" ? data.runtimeState : null
-                    };
+                    }, unlockedSkills);
                 } catch (err) {
                     // Reaching here means a saved game could not be read and the player is
                     // about to be handed a brand new one. That is the most destructive
@@ -3679,7 +3756,8 @@
                     } catch (ignored) {
                         // Storage is refusing us either way; nothing further to try.
                     }
-                    return {
+                    const blank = normalizeUnlockedSkills(null);
+                    return applyUnlockLevels({
                         ...fresh,
                         bestRunScore: 0,
                         bestRunWave: 0,
@@ -3689,7 +3767,7 @@
                         tipsEnabled: true,
                         warChiefKills: 0,
                         essence: 0,
-                        unlockedSkills: normalizeUnlockedSkills(null),
+                        unlockedSkills: blank,
                         musicMuted: true,
                         musicVolume: 1,
                         sfxMuted: true,
@@ -3697,7 +3775,7 @@
                         mapZoom: 1,
                         coordOrigin: "tower",
                         runtimeState: null
-                    };
+                    }, blank);
                 }
             }
 
@@ -3735,6 +3813,8 @@
                 if (!hasBankForCost(def.cost)) return false;
                 spendBankForCost(def.cost);
                 save.unlockedSkills[skillId] = true;
+                applyUnlockLevels(save, save.unlockedSkills);
+                syncUnlockGrants(skillId);
                 syncMinionHealthToSkills();
                 saveGame();
                 refreshHud();
@@ -10215,7 +10295,7 @@
             // resetSession() alone must not do this: it also runs on boot, where the
             // saved run is meant to be picked up rather than thrown away.
             function startRun() {
-                Object.assign(save, freshRunState());
+                Object.assign(save, freshRunState(save.unlockedSkills));
                 rollRunLayout();
                 resetSession();
                 saveGame();
@@ -10994,7 +11074,7 @@
                 game.waveIntroPendingType = null;
                 startBtn.textContent = "New Run";
 
-                Object.assign(save, freshRunState());
+                Object.assign(save, freshRunState(save.unlockedSkills));
                 // Nothing left to resume: the next visit starts a run instead.
                 clearRuntimeSnapshot();
 

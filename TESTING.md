@@ -104,6 +104,19 @@ If time is short, this is the subset that catches the failures that have actuall
 ## 3. Player, bag and banking
 
 - [ ] Base speed 3.5, +0.4 per Player Speed level, +0.5 per `Fleet Foot` boon.
+- [ ] **Unlocking `speed` in the skill tree grants level 1 with it**, so the purchase is
+      felt on the click: `speedLevel` 0 -> 1, speed 3.5 -> 3.9, the shop reads `Lv 1`, and
+      `game.player.speed` updates immediately rather than at the next run.
+      Regression: the unlock only revealed the shop button, so a tester who bought
+      "Unlock Player Speed" correctly reported buying a speed upgrade and getting nothing.
+- [ ] **The granted level survives into every later run.** `speedLevel` is run state and
+      the skill is meta, so the grant is a floor re-applied by `freshRunState()`, not a
+      one-off bump. Check run **two**, not just the unlock: bumping only at unlock time
+      passes every check made in the first minute and reverts the moment a run ends.
+      The mechanism is `SKILL_UNLOCK_LEVELS` - see §6.
+- [ ] Levels bought on top are run state and *do* reset - after a new run, a player who
+      bought up to Lv 4 is back to Lv 1, not Lv 0 and not Lv 4.
+- [ ] A player who never unlocked `speed` stays at level 0 and base speed 3.5 forever.
 - [ ] Bag capacity 10, +4 per Bag level, +4 per `Deep Bags` boon.
 - [ ] Walking over a node picks it up; a full bag picks up nothing.
 - [ ] **Pickup reach** is `player.r + node.size * 0.6 + PLAYER_PICKUP_GRACE` (~44 units,
@@ -188,6 +201,35 @@ entirely until its skill is unlocked, and buying it deducts exactly the quoted c
       `warPaint` needs `boat`; `mendSpell` needs `chillSpell` needs `minionHaste`;
       `turretHaste` and `turretCap` both need `slowTurret`.
 - [ ] Skills and essence survive a run ending. Everything else does not.
+- [ ] A node that carries a granted level says so in its description, so the player knows
+      before buying, not only after.
+
+### Unlock-granted levels (`SKILL_UNLOCK_LEVELS`)
+
+One table drives this. A row is `skillId: { field, level, sync? }`, and adding one must be
+the **only** change needed - if a new grant needs edits anywhere else, the mechanism has
+regressed. Re-check the whole block after adding a row.
+
+- [ ] `applyUnlockLevels()` is applied in all four places run state is built: the unlock
+      click, `freshRunState()` (so `startRun` and `endRun` keep it), the `loadSave()`
+      success path, and the unreadable-save fallback. Missing any one of them means the
+      grant survives some transitions and not others.
+- [ ] **The floor only ever raises.** A player above it keeps the level they paid for -
+      `speedLevel: 7` stays 7, it is not clamped to the granted 1.
+- [ ] `sync` is optional, runs **only** on the unlock click, and never touches `game` from
+      `applyUnlockLevels` - `loadSave()` calls that long before there is a `game`.
+- [ ] **A save that unlocked the skill before its grant existed gets the level on load**,
+      and everything else in it survives - `bestRunScore`, `essence`, `bagLevel`, the lot.
+- [ ] **The typo guard fires.** A row naming a field that is not on the save, a `skillId`
+      that is not in `SKILL_TREE_DEFS`, or a `level` below 1 logs a `console.error` naming
+      the row at boot. Without it a misspelled row writes a save key nothing reads and
+      grants nothing, silently. Break a row on purpose once and confirm you see it.
+- [ ] Regression risk: `loadSave()` applies these floors and runs while the module body is
+      still initialising, so `SKILL_UNLOCK_LEVELS` must stay declared **above**
+      `const save = loadSave()`. Below it, the const is in its temporal dead zone, the
+      throw is swallowed by loadSave's `catch`, and the save is silently wiped. Verify by
+      loading a real save and checking `meadow-gatherer-save-v1-unreadable` was **not**
+      written. See §23.
 
 ---
 
