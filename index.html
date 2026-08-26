@@ -9681,7 +9681,7 @@
                         // damage, so its chip is absent, and an absent chip has to be the
                         // last one or it moves whatever follows it.
                         stats = bestiaryStatChip("HP", scaling.hp, null, scaling.hpFormula)
-                            + (scaling.damage > 0 ? bestiaryStatChip("Dmg", scaling.damage) : "");
+                            + (scaling.damage > 0 ? bestiaryStatChip("Dmg", scaling.damage, null, scaling.damageFormula) : "");
                     } else if (scaling) {
                         // HP, then Speed, then Damage - and Damage only when there is any.
                         //
@@ -9698,7 +9698,7 @@
                         stats = bestiaryStatChip("HP", entry.hp, scaling.hpPercent, scaling.hpFormula)
                             + bestiaryStatChip("Spd", entry.speed.toFixed(2))
                             + (entry.damage > 0
-                                ? bestiaryStatChip("Dmg", entry.damage, scaling.damagePercent)
+                                ? bestiaryStatChip("Dmg", entry.damage, scaling.damagePercent, scaling.damageFormula)
                                 : "");
                         // No "off-wave curve" tag here. The softer curve is already the
                         // visible thing about these rows - a ghoul reading +131% next to a
@@ -12082,7 +12082,12 @@
                         kind: "absolute",
                         hp,
                         damage: 16 + tier * 2,
-                        hpFormula: steps.join("\n")
+                        hpFormula: steps.join("\n"),
+                        damageFormula: [
+                            "tower damage: what it takes off the tower on arrival",
+                            `16 + tier ${tier} x 2 = ${16 + tier * 2}`,
+                            "steps every ten waves with the tier, not every wave"
+                        ].join("\n")
                     };
                 }
 
@@ -12115,11 +12120,22 @@
                 // No `note` on this branch: the percentages themselves are what tell an
                 // off-wave kind apart from a wave enemy. Only the absolute branch above
                 // carries one, where the tier genuinely is not derivable from the figure.
+                // Damage is worth spelling out for a different reason than health: the
+                // figure is *only* what the tower loses when this reaches it. What a minion
+                // takes is a separate path that does not read this number at all, so a bare
+                // "Dmg 5" reads as a general threat rating when it is nothing of the kind.
+                const dmgMult = enemyDamageMultiplier(wave);
                 return {
                     kind: "percent",
                     hpPercent: Math.round((hpMult - 1) * 100),
-                    damagePercent: Math.round((enemyDamageMultiplier(wave) - 1) * 100),
-                    hpFormula: steps.join("\n")
+                    damagePercent: Math.round((dmgMult - 1) * 100),
+                    hpFormula: steps.join("\n"),
+                    damageFormula: [
+                        "tower damage: what it takes off the tower on arrival",
+                        `wave ${wave}: 1 + ${wave} x ${ENEMY_DAMAGE_LINEAR_PER_WAVE} = x${dmgMult.toFixed(2)}`,
+                        `= ${entry.damage} -> ${Math.round(entry.damage * dmgMult)}`,
+                        "fixed at spawn: one that arrived on an earlier wave still hits for that wave"
+                    ].join("\n")
                 };
             }
             function scaledEnemyHp(baseHp, waveNumber, offWave) {

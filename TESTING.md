@@ -908,6 +908,19 @@ slots 2-7 cast the six spells, and 8-9 stay empty as room for whatever moves in 
       way, and the misalignment only exists as a difference between rows.
 - [ ] Dropping the placeholder loses nothing - ghoul, warden and blight each say they do
       not touch the tower in their own description line.
+- [ ] **Hovering a Dmg chip says the figure is tower damage only, and shows its working.**
+      A scout at wave 30 reads: `tower damage: what it takes off the tower on arrival` /
+      `wave 30: 1 + 30 x 0.03 = x1.90` / `= 5 -> 10` / `fixed at spawn: one that arrived on
+      an earlier wave still hits for that wave`. The boss instead reads
+      `16 + tier 3 x 2 = 22` and says it steps with the tier rather than every wave.
+      This matters more than the HP working does: `enemy.damage` is read in exactly one
+      place - the tower-hit branch - and what a **minion** takes is a separate path that
+      never reads it. A bare "Dmg 5" reads as a general threat rating when it is nothing of
+      the kind, which is why the four zero-damage kinds are still lethal to gatherers.
+      Regression: the only tooltip saying this was attached to the `Dmg -` placeholder, and
+      it was lost along with the placeholder when zero-damage rows stopped showing a chip.
+      A tooltip carried by an element that gets deleted for an unrelated reason leaves no
+      trace that it was ever there.
 - [ ] Boss and war chief show an **absolute** figure, not a percentage. The boss steps
       every ten waves (`(10 + tier*6)` where tier is `floor(wave/10)`), and the war chief is
       off the wave curve entirely at `WARCHIEF_BASE_HP + tier * WARCHIEF_HP_PER_TIER`
